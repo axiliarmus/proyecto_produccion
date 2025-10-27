@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% block title %}Producción por Operador{% endblock %}
+{% block content %}
+
+<h2 class="mb-4 text-center">👷 Informe de Producción por Operador</h2>
+
+<div class="card bg-dark border-light shadow-lg mx-auto" style="max-width: 1000px;">
+  <div class="card-body">
+    
+    <!-- Filtros -->
+    <form method="POST" action="{{ url_for('informe_operadores') }}" class="row g-3 align-items-end mb-4">
+      <div class="col-md-4">
+        <label class="form-label text-light">Operador:</label>
+        <select name="operador" class="form-select bg-secondary text-light">
+          <option value="todos">Todos los operadores</option>
+          {% for op in operadores %}
+          <option value="{{ op._id }}" {% if operador_sel == op._id|string %}selected{% endif %}>
+            {{ op.nombre }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Desde:</label>
+        <input type="date" class="form-control bg-secondary text-light" name="fecha_inicio"
+               value="{{ fecha_inicio or '' }}">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Hasta:</label>
+        <input type="date" class="form-control bg-secondary text-light" name="fecha_fin"
+               value="{{ fecha_fin or '' }}">
+      </div>
+
+      <div class="col-md-2 text-end">
+        <button type="submit" class="btn btn-accent w-100">Filtrar</button>
+      </div>
+    </form>
+
+    {% if datos_tabla %}
+    <!-- Exportar -->
+    <form method="POST" action="{{ url_for('exportar_operadores_excel') }}">
+      <input type="hidden" name="operador" value="{{ operador_sel or 'todos' }}">
+      <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
+      <input type="hidden" name="fecha_fin" value="{{ fecha_fin or '' }}">
+      <div class="text-end mb-3">
+        <button type="submit" class="btn btn-success">📤 Exportar a Excel</button>
+      </div>
+    </form>
+
+    <!-- Tabla -->
+    <div class="table-responsive">
+      <table class="table table-dark table-striped align-middle">
+        <thead>
+          <tr>
+            <th>Operador</th>
+            <th>Tipo</th>
+            <th>Marco</th>
+            <th>Tramo</th>
+            <th>Cantidad</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in datos_tabla %}
+          <tr>
+            <td>{{ r.usuario }}</td>
+            <td>{{ r.modo|capitalize }}</td>
+            <td>{{ r.marco }}</td>
+            <td>{{ r.tramo }}</td>
+            <td><span class="badge bg-accent fs-6">{{ r.cantidad }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="alert alert-secondary text-center">No hay datos para mostrar con los filtros actuales.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="text-center mt-4">
+  <a href="{{ url_for('admin_informes') }}" class="btn btn-secondary px-4">← Volver a Informes</a>
+</div>
+
+{% endblock %}

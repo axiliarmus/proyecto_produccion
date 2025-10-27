@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}Supervisor{% endblock %}
+{% block content %}
+
+<h2 class="mb-4">Supervisor – Control de Piezas del Día</h2>
+
+{% if piezas %}
+  <div class="table-responsive">
+    <table class="table table-dark table-striped align-middle">
+      <thead>
+        <tr>
+          <th>Hora</th>
+          <th>Operador</th>
+          <th>Código Pieza</th>
+          <th>Modo</th>
+          <th>Box</th>
+          <th>Marco</th>
+          <th>Tramo</th>
+          <th>Estado</th>
+          <th class="text-end">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in piezas %}
+        <tr>
+          <td>{{ p.fecha.strftime('%H:%M:%S') }}</td>
+          <td>{{ p.usuario }}</td>
+          <td>{{ p.codigo_pieza }}</td>
+          <td>{{ p.modo|capitalize }}</td>
+          <td>{{ p.box }}</td>
+          <td>{{ p.marco }}</td>
+          <td>{{ p.tramo }}</td>
+          <td>
+            {% if p.calidad_status == 'aprobado' %}
+              <span class="badge bg-success">Aprobado</span>
+            {% elif p.calidad_status == 'rechazado' %}
+              <span class="badge bg-danger">Rechazado</span>
+            {% else %}
+              <span class="badge bg-secondary">Pendiente</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <form class="d-inline" method="post" action="{{ url_for('supervisor_validar_pieza', id=p._id) }}">
+              <input type="hidden" name="decision" value="aprobado">
+              <button class="btn btn-sm btn-success">Aprobar</button>
+            </form>
+            <form class="d-inline" method="post" action="{{ url_for('supervisor_validar_pieza', id=p._id) }}">
+              <input type="hidden" name="decision" value="rechazado">
+              <button class="btn btn-sm btn-danger">Rechazar</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="alert alert-secondary">No hay piezas registradas hoy.</div>
+{% endif %}
+
+{% endblock %}

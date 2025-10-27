@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Panel de Administración{% endblock %}
+{% block content %}
+
+<h2 class="mb-4 text-center">Panel de Administración</h2>
+
+<!-- Primera fila: Gestión principal -->
+<div class="row g-4 mb-4 justify-content-center">
+  <!-- Usuarios -->
+  <div class="col-md-3">
+    <div class="card bg-dark border-light shadow text-center">
+      <div class="card-body">
+        <h5 class="card-title text-light">👤 Usuarios</h5>
+        <p class="text-secondary mb-2">Administra los usuarios del sistema y sus roles.</p>
+        <p class="display-6 text-white fw-bold">{{ total_usuarios }}</p>
+        <a href="{{ url_for('usuarios_list') }}" class="btn btn-accent w-100 mt-2">Gestionar Usuarios</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Boxes -->
+  <div class="col-md-3">
+    <div class="card bg-dark border-light shadow text-center">
+      <div class="card-body">
+        <h5 class="card-title text-light">🧰 Boxes</h5>
+        <p class="text-secondary mb-2">Crea y edita los boxes disponibles para producción.</p>
+        <p class="display-6 text-white fw-bold">{{ total_boxes }}</p>
+        <a href="{{ url_for('boxes_list') }}" class="btn btn-accent w-100 mt-2">Gestionar Boxes</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Piezas -->
+  <div class="col-md-3">
+    <div class="card bg-dark border-light shadow text-center">
+      <div class="card-body">
+        <h5 class="card-title text-light">🧩 Piezas</h5>
+        <p class="text-secondary mb-2">Define los tipos de piezas, marcos y tramos.</p>
+        <p class="display-6 text-white fw-bold">{{ total_piezas }}</p>
+        <a href="{{ url_for('piezas_list') }}" class="btn btn-accent w-100 mt-2">Gestionar Piezas</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Segunda fila: Informes -->
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card bg-dark border-light shadow-lg text-center">
+      <div class="card-body">
+        <h4 class="card-title text-light mb-3">📊 Informes</h4>
+        <p class="text-secondary">
+          Accede a reportes detallados de horarios, producción de piezas y rendimiento por operador.
+        </p>
+        <p class="display-6 text-white fw-bold">{{ total_produccion }}</p>
+        <a href="{{ url_for('admin_informes') }}" class="btn btn-accent mt-2 px-4">Ver Informes del Sistema</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

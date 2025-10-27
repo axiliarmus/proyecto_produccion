@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Nuevo Box' if modo == 'nuevo' else 'Editar Box' }}{% endblock %}
+{% block content %}
+
+<div class="card bg-dark text-light shadow-lg mx-auto" style="max-width: 600px;">
+  <div class="card-body">
+    <h3 class="card-title text-center mb-4">
+      {{ 'Crear Nuevo Box' if modo == 'nuevo' else 'Editar Box' }}
+    </h3>
+
+    <form method="post" action="">
+      <div class="mb-3">
+        <label class="form-label">Código</label>
+        <input type="text" class="form-control bg-secondary text-light" name="codigo" value="{{ box.codigo if box else '' }}" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Descripción</label>
+        <input type="text" class="form-control bg-secondary text-light" name="descripcion" value="{{ box.descripcion if box else '' }}" required>
+      </div>
+
+      <div class="d-flex justify-content-between mt-4">
+        <a href="{{ url_for('boxes_list') }}" class="btn btn-secondary">← Volver</a>
+        <button type="submit" class="btn btn-accent">{{ 'Guardar' if modo == 'nuevo' else 'Actualizar' }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

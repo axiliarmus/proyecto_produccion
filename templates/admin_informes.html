@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Informes del Sistema{% endblock %}
+{% block content %}
+
+<h2 class="mb-4 text-center">📊 Centro de Informes</h2>
+
+<p class="text-center text-secondary mb-5">
+Consulta los reportes generales de asistencia, producción y desempeño de tus operadores.
+</p>
+
+<!-- Tarjetas de informes -->
+<div class="row g-4 justify-content-center">
+  
+  <!-- Informe de horarios -->
+  <div class="col-md-3">
+    <div class="card bg-dark border-light shadow text-center h-100">
+      <div class="card-body d-flex flex-column justify-content-between">
+        <div>
+          <h5 class="card-title text-light">⏰ Horarios</h5>
+          <p class="text-secondary">
+            Visualiza los registros de ingreso y salida de los operadores durante la jornada.
+          </p>
+        </div>
+        <a href="{{ url_for('informe_horarios') }}" class="btn btn-accent w-100 mt-3">Ver Informe</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Informe de producción de piezas -->
+  <div class="col-md-3">
+    <div class="card bg-dark border-light shadow text-center h-100">
+      <div class="card-body d-flex flex-column justify-content-between">
+        <div>
+          <h5 class="card-title text-light">🧩 Producción de Piezas</h5>
+          <p class="text-secondary">
+            Revisa todas las piezas creadas, su estado de calidad y detalles de fabricación.
+          </p>
+        </div>
+        <a href="{{ url_for('informe_piezas') }}" class="btn btn-accent w-100 mt-3">Ver Informe</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Informe por operador -->
+  <div class="col-md-3">
+    <div class="card bg-dark border-light shadow text-center h-100">
+      <div class="card-body d-flex flex-column justify-content-between">
+        <div>
+          <h5 class="card-title text-light">👷 Producción por Operador</h5>
+          <p class="text-secondary">
+            Consulta cuántas piezas ha producido cada operador en el sistema.
+          </p>
+        </div>
+        <a href="{{ url_for('informe_operadores') }}" class="btn btn-accent w-100 mt-3">Ver Informe</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Botón para volver -->
+<div class="text-center mt-5">
+  <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary px-4">← Volver al Panel Principal</a>
+</div>
+
+{% endblock %}

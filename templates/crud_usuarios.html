@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Usuarios{% endblock %}
+{% block content %}
+
+<h2 class="mb-3">Gestión de Usuarios</h2>
+
+<div class="d-flex justify-content-between mb-3">
+  <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">← Volver al Panel</a>
+  <a href="{{ url_for('usuarios_nuevo_form') }}" class="btn btn-accent">➕ Nuevo Usuario</a>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-dark table-striped align-middle">
+    <thead>
+      <tr>
+        <th>Usuario</th>
+        <th>Nombre</th>
+        <th>Tipo</th>
+        <th class="text-end">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in usuarios %}
+      <tr>
+        <td>{{ u.usuario }}</td>
+        <td>{{ u.nombre }}</td>
+        <td>{{ u.tipo|capitalize }}</td>
+        <td class="text-end">
+          <a href="{{ url_for('usuarios_editar_form', id=u._id) }}" class="btn btn-sm btn-warning">Editar</a>
+          <form action="{{ url_for('usuarios_delete', id=u._id) }}" method="post" class="d-inline">
+            <button class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar este usuario?')">Eliminar</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if usuarios|length == 0 %}
+  <div class="alert alert-secondary text-center mt-3">No hay usuarios registrados aún.</div>
+{% endif %}
+
+{% endblock %}

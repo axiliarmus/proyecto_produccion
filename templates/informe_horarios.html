@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Informe de Horarios{% endblock %}
+{% block content %}
+
+<h2 class="mb-4 text-center">⏰ Informe de Horarios</h2>
+
+<div class="card bg-dark border-light shadow-lg mx-auto" style="max-width: 900px;">
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('informe_horarios') }}" class="row g-3 align-items-end mb-4">
+      <div class="col-md-8">
+        <label class="form-label text-light">Seleccionar Operador:</label>
+        <select name="operador" class="form-select bg-secondary text-light">
+          <option value="todos">Todos los operadores</option>
+          {% for op in operadores %}
+          <option value="{{ op._id }}" {% if operador_sel == op._id|string %}selected{% endif %}>
+            {{ op.nombre }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 text-end">
+        <button type="submit" class="btn btn-accent w-100">Filtrar</button>
+      </div>
+    </form>
+
+    {% if jornadas %}
+    <form method="POST" action="{{ url_for('exportar_horarios_excel') }}">
+      <input type="hidden" name="operador" value="{{ operador_sel or 'todos' }}">
+      <div class="text-end mb-3">
+        <button type="submit" class="btn btn-success">📤 Exportar a Excel</button>
+      </div>
+    </form>
+
+    <div class="table-responsive">
+      <table class="table table-dark table-striped align-middle">
+        <thead>
+          <tr>
+            <th>Operador</th>
+            <th>Fecha</th>
+            <th>Ingreso</th>
+            <th>Salida</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for j in jornadas %}
+          <tr>
+            <td>{{ j.nombre }}</td>
+            <td>{{ j.fecha.strftime('%d-%m-%Y') }}</td>
+            <td>{{ j.ingreso.strftime('%H:%M:%S') if j.ingreso else '—' }}</td>
+            <td>{{ j.salida.strftime('%H:%M:%S') if j.salida else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="alert alert-secondary text-center">No hay registros disponibles.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="text-center mt-4">
+  <a href="{{ url_for('admin_informes') }}" class="btn btn-secondary px-4">← Volver a Informes</a>
+</div>
+
+{% endblock %}
