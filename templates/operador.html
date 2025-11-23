@@ -17,6 +17,7 @@
   <div class="card-body">
     <h5 class="mb-3">Registrar nueva pieza</h5>
     <form class="row g-3" method="post" action="{{ url_for('operador_registrar') }}">
+
       <div class="col-md-3">
         <label class="form-label">Modo</label>
         <select class="form-select" name="modo" required>
@@ -35,29 +36,9 @@
         </select>
       </div>
 
-      <div class="col-md-3">
-        <label class="form-label">Marco</label>
-        <select class="form-select" name="marco" required>
-          <option value="" selected disabled>Seleccione...</option>
-          {% for m in marcos %}
-            <option value="{{ m }}">{{ m }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="col-md-3">
-        <label class="form-label">Tramo</label>
-        <select class="form-select" name="tramo" required>
-          <option value="" selected disabled>Seleccione...</option>
-          {% for t in tramos %}
-            <option value="{{ t }}">{{ t }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
       <div class="col-md-4">
         <label class="form-label">Código de pieza</label>
-        <input class="form-control" name="codigo_pieza" placeholder="Ej: PZ-1234" required>
+        <input class="form-control" name="codigo_pieza" placeholder="Ej: 101" required>
       </div>
 
       <div class="col-12">
@@ -77,6 +58,7 @@
           <th>Código</th>
           <th>Modo</th>
           <th>Box</th>
+          <th>Empresa</th>
           <th>Marco</th>
           <th>Tramo</th>
           <th>Estado</th>
@@ -89,6 +71,7 @@
           <td>{{ p.codigo_pieza }}</td>
           <td>{{ p.modo|capitalize }}</td>
           <td>{{ p.box }}</td>
+          <td>{{ p.empresa }}</td>
           <td>{{ p.marco }}</td>
           <td>{{ p.tramo }}</td>
           <td>

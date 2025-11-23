@@ -1,35 +1,77 @@
 {% extends 'base.html' %}
 {% block title %}Supervisor{% endblock %}
+
 {% block content %}
 
-<h2 class="mb-4">Supervisor – Control de Piezas del Día</h2>
+<h2 class="mb-4">Supervisor – Piezas Rematadas</h2>
+
+<!-- ================= FILTROS ================= -->
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="POST" class="row g-3">
+
+      <div class="col-md-3">
+        <label class="form-label">Fecha inicio</label>
+        <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Fecha fin</label>
+        <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-control">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Código pieza</label>
+        <input type="text" name="codigo" value="{{ codigo }}" class="form-control" placeholder="Ej: 1001">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Estado</label>
+        <select name="estado" class="form-select">
+          <option value="todos" {% if estado_sel=='todos' or not estado_sel %}selected{% endif %}>Todos</option>
+          <option value="pendiente" {% if estado_sel=='pendiente' %}selected{% endif %}>Pendiente</option>
+          <option value="aprobado" {% if estado_sel=='aprobado' %}selected{% endif %}>Aprobado</option>
+          <option value="rechazado" {% if estado_sel=='rechazado' %}selected{% endif %}>Rechazado</option>
+        </select>
+      </div>
+
+      <div class="col-md-12">
+        <button class="btn btn-accent w-100">Aplicar filtros</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= TABLA ================= -->
 
 {% if piezas %}
   <div class="table-responsive">
     <table class="table table-dark table-striped align-middle">
       <thead>
         <tr>
-          <th>Hora</th>
+          <th>Fecha</th>
           <th>Operador</th>
-          <th>Código Pieza</th>
-          <th>Modo</th>
+          <th>Código</th>
           <th>Box</th>
+          <th>Empresa</th>
           <th>Marco</th>
           <th>Tramo</th>
           <th>Estado</th>
-          <th class="text-end">Acciones</th>
+          <th style="width: 380px;">Supervisión</th>
         </tr>
       </thead>
       <tbody>
       {% for p in piezas %}
         <tr>
-          <td>{{ p.fecha.strftime('%H:%M:%S') }}</td>
+          <td>{{ p.fecha.strftime('%d-%m-%Y %H:%M') }}</td>
           <td>{{ p.usuario }}</td>
           <td>{{ p.codigo_pieza }}</td>
-          <td>{{ p.modo|capitalize }}</td>
           <td>{{ p.box }}</td>
+          <td>{{ p.empresa }}</td>
           <td>{{ p.marco }}</td>
           <td>{{ p.tramo }}</td>
+
+          <!-- ESTADO ACTUAL -->
           <td>
             {% if p.calidad_status == 'aprobado' %}
               <span class="badge bg-success">Aprobado</span>
@@ -39,14 +81,50 @@
               <span class="badge bg-secondary">Pendiente</span>
             {% endif %}
           </td>
-          <td class="text-end">
-            <form class="d-inline" method="post" action="{{ url_for('supervisor_validar_pieza', id=p._id) }}">
-              <input type="hidden" name="decision" value="aprobado">
-              <button class="btn btn-sm btn-success">Aprobar</button>
-            </form>
-            <form class="d-inline" method="post" action="{{ url_for('supervisor_validar_pieza', id=p._id) }}">
-              <input type="hidden" name="decision" value="rechazado">
-              <button class="btn btn-sm btn-danger">Rechazar</button>
+
+          <!-- FORMULARIO DE SUPERVISIÓN (EDITABLE SIEMPRE) -->
+          <td>
+            <form method="POST" action="{{ url_for('supervisor_validar_pieza', id=p._id) }}" class="row g-2">
+
+              <div class="col-md-6">
+                <input 
+                  class="form-control" 
+                  type="number" 
+                  step="0.01" 
+                  name="cuerda_interna" 
+                  placeholder="Cuerda interna"
+                  value="{{ p.cuerda_interna or '' }}">
+              </div>
+
+              <div class="col-md-6">
+                <input 
+                  class="form-control" 
+                  type="number" 
+                  step="0.01" 
+                  name="cuerda_externa" 
+                  placeholder="Cuerda externa"
+                  value="{{ p.cuerda_externa or '' }}">
+              </div>
+
+              <div class="col-12 mt-2">
+                <textarea 
+                  class="form-control" 
+                  name="comentario" 
+                  placeholder="Comentario (motivo si se rechaza)">{{ p.comentario_supervisor or '' }}</textarea>
+              </div>
+
+              <div class="col-md-6 mt-2">
+                <button name="decision" value="aprobado" class="btn btn-success w-100">
+                  ✔ Aprobar / Actualizar
+                </button>
+              </div>
+
+              <div class="col-md-6 mt-2">
+                <button name="decision" value="rechazado" class="btn btn-danger w-100">
+                  ✖ Rechazar / Actualizar
+                </button>
+              </div>
+
             </form>
           </td>
         </tr>
@@ -55,7 +133,9 @@
     </table>
   </div>
 {% else %}
-  <div class="alert alert-secondary">No hay piezas registradas hoy.</div>
+  <div class="alert alert-secondary text-center">
+    No se encontraron piezas rematadas con los filtros seleccionados.
+  </div>
 {% endif %}
 
 {% endblock %}

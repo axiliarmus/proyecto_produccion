@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+{% block title %}Informe Piezas Rematadas{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Informe – Piezas Rematadas</h2>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <p class="text-secondary mb-0">
+    Visualiza las piezas que ya pasaron por remate y fueron evaluadas por el supervisor.
+  </p>
+  <a href="{{ url_for('admin_informes') }}" class="btn btn-secondary">
+    ← Volver a Informes
+  </a>
+</div>
+
+<!-- ================= FILTROS ================= -->
+
+<div class="card bg-dark border-light shadow mb-4">
+  <div class="card-body">
+
+    <form method="POST" class="row g-3">
+
+      <div class="col-md-3">
+        <label class="form-label">Fecha inicio</label>
+        <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Fecha fin</label>
+        <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-control">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Código pieza</label>
+        <input type="text" name="codigo_pieza" value="{{ codigo }}" class="form-control">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Estado</label>
+        <select name="estado" class="form-select">
+          <option value="todos">Todos</option>
+          <option value="pendiente" {% if estado_sel=='pendiente' %}selected{% endif %}>Pendiente</option>
+          <option value="aprobado" {% if estado_sel=='aprobado' %}selected{% endif %}>Aprobado</option>
+          <option value="rechazado" {% if estado_sel=='rechazado' %}selected{% endif %}>Rechazado</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Operador</label>
+        <select name="operador" class="form-select">
+          <option value="todos">Todos</option>
+          {% for op in operadores %}
+          <option {% if operador_sel==op %}selected{% endif %}>{{ op }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-12">
+        <button class="btn btn-accent w-100">🔍 Filtrar</button>
+      </div>
+    </form>
+
+    <!-- EXPORTAR -->
+    <form class="mt-3" method="POST" action="{{ url_for('exportar_piezas_rematadas_excel') }}">
+      <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio }}">
+      <input type="hidden" name="fecha_fin" value="{{ fecha_fin }}">
+      <input type="hidden" name="codigo_pieza" value="{{ codigo }}">
+      <input type="hidden" name="operador" value="{{ operador_sel }}">
+      <input type="hidden" name="estado" value="{{ estado_sel }}">
+      <button class="btn btn-success w-100">📥 Exportar a Excel</button>
+    </form>
+
+  </div>
+</div>
+
+<!-- ================= TABLA ================= -->
+
+{% if piezas %}
+<div class="table-responsive mb-4">
+  <table class="table table-dark table-striped align-middle">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Código</th>
+        <th>Empresa</th>
+        <th>Operador</th>
+        <th>Marco</th>
+        <th>Tramo</th>
+        <th>C.Int</th>
+        <th>C.Ext</th>
+        <th>Estado</th>
+        <th>Comentario</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in piezas %}
+      <tr>
+        <td>
+          {% if p.fecha %}
+            {{ p.fecha.strftime("%d-%m-%Y %H:%M") }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td>{{ p.codigo_pieza }}</td>
+        <td>{{ p.empresa or '—' }}</td>
+        <td>{{ p.usuario or '—' }}</td>
+        <td>{{ p.marco or '—' }}</td>
+        <td>{{ p.tramo or '—' }}</td>
+        <td>{{ p.cuerda_interna if p.cuerda_interna is defined else '—' }}</td>
+        <td>{{ p.cuerda_externa if p.cuerda_externa is defined else '—' }}</td>
+        <td>
+          {% if p.calidad_status=='aprobado' %}
+            <span class="badge bg-success">Aprobado</span>
+          {% elif p.calidad_status=='rechazado' %}
+            <span class="badge bg-danger">Rechazado</span>
+          {% else %}
+            <span class="badge bg-secondary">Pendiente</span>
+          {% endif %}
+        </td>
+        <td>{{ p.comentario_supervisor if p.comentario_supervisor is defined else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="alert alert-secondary text-center">No se encontraron resultados.</div>
+{% endif %}
+
+<!-- ================= GRÁFICO (AL FINAL) ================= -->
+
+<div class="card bg-dark border-light shadow mt-4">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Distribución por estado</h5>
+    <p class="text-secondary">
+      Cantidad de piezas rematadas por estado dentro del rango filtrado.
+    </p>
+    <canvas id="grafEstadosRematadas" height="120"></canvas>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+var ctx = document.getElementById('grafEstadosRematadas').getContext('2d');
+
+var dataEstados = {
+    labels: ['Pendiente', 'Aprobado', 'Rechazado'],
+    datasets: [{
+        label: 'Cantidad de piezas',
+        data: [
+            {{ estado_counts.pendiente or 0 }},
+            {{ estado_counts.aprobado or 0 }},
+            {{ estado_counts.rechazado or 0 }}
+        ]
+    }]
+};
+
+var configEstados = {
+    type: 'bar',
+    data: dataEstados,
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: { enabled: true }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { precision: 0 }
+            }
+        }
+    }
+};
+
+new Chart(ctx, configEstados);
+</script>
+
+{% endblock %}

@@ -1,33 +1,106 @@
 {% extends 'base.html' %}
-{% block title %}{{ 'Nueva Pieza' if modo == 'nuevo' else 'Editar Pieza' }}{% endblock %}
+{% block title %}
+  {{ 'Nueva Pieza' if modo == 'nuevo' else 'Editar Pieza' }}
+{% endblock %}
 {% block content %}
 
-<div class="card bg-dark text-light shadow-lg mx-auto" style="max-width: 600px;">
+<div class="card bg-dark text-light shadow-lg mx-auto" style="max-width: 650px;">
   <div class="card-body">
     <h3 class="card-title text-center mb-4">
       {{ 'Crear Nueva Pieza' if modo == 'nuevo' else 'Editar Pieza' }}
     </h3>
 
     <form method="post" action="">
+
+      <!-- EMPRESA -->
       <div class="mb-3">
-        <label class="form-label">Nombre</label>
-        <input type="text" class="form-control bg-secondary text-light" name="nombre" value="{{ pieza.nombre if pieza else '' }}" required>
+        <label class="form-label">Empresa</label>
+        <input 
+          type="text" 
+          class="form-control bg-secondary text-light" 
+          name="empresa" 
+          value="{{ pieza.empresa if pieza else '' }}" 
+          required>
       </div>
 
+      <!-- MARCO -->
       <div class="mb-3">
         <label class="form-label">Marco</label>
-        <input type="text" class="form-control bg-secondary text-light" name="marco" value="{{ pieza.marco if pieza else '' }}" required>
+        <input 
+          type="text" 
+          class="form-control bg-secondary text-light" 
+          name="marco" 
+          value="{{ pieza.marco if pieza else '' }}" 
+          required>
       </div>
 
+      <!-- TRAMO -->
       <div class="mb-3">
         <label class="form-label">Tramo</label>
-        <input type="text" class="form-control bg-secondary text-light" name="tramo" value="{{ pieza.tramo if pieza else '' }}" required>
+        <input 
+          type="text" 
+          class="form-control bg-secondary text-light" 
+          name="tramo" 
+          value="{{ pieza.tramo if pieza else '' }}" 
+          required>
       </div>
+
+      <!-- KILO POR PIEZA -->
+      <div class="mb-3">
+        <label class="form-label">Kilos por pieza</label>
+        <input 
+          type="number" 
+          step="0.01" 
+          class="form-control bg-secondary text-light" 
+          name="kilo_pieza" 
+          value="{{ pieza.kilo_pieza if pieza else '' }}" 
+          required>
+      </div>
+
+      <!-- PRECIO ARMADO -->
+      <div class="mb-3">
+        <label class="form-label">Precio por armado ($)</label>
+        <input 
+          type="number" 
+          step="0.01" 
+          class="form-control bg-secondary text-light" 
+          name="precio_armado" 
+          value="{{ pieza.precio_armado if pieza and pieza.precio_armado is defined else '' }}" 
+          required>
+      </div>
+
+      <!-- PRECIO REMATE -->
+      <div class="mb-3">
+        <label class="form-label">Precio por remate ($)</label>
+        <input 
+          type="number" 
+          step="0.01" 
+          class="form-control bg-secondary text-light" 
+          name="precio_remate" 
+          value="{{ pieza.precio_remate if pieza and pieza.precio_remate is defined else '' }}" 
+          required>
+      </div>
+
+      <!-- CANTIDAD (solo en nuevo) -->
+      {% if modo == 'nuevo' %}
+      <div class="mb-3">
+        <label class="form-label">Cantidad de piezas a generar</label>
+        <input 
+          type="number" 
+          min="1" 
+          class="form-control bg-secondary text-light" 
+          name="cantidad" 
+          required>
+      </div>
+      {% endif %}
 
       <div class="d-flex justify-content-between mt-4">
         <a href="{{ url_for('piezas_list') }}" class="btn btn-secondary">← Volver</a>
-        <button type="submit" class="btn btn-accent">{{ 'Guardar' if modo == 'nuevo' else 'Actualizar' }}</button>
+        <button type="submit" class="btn btn-accent">
+          {{ 'Guardar' if modo == 'nuevo' else 'Actualizar' }}
+        </button>
       </div>
+
     </form>
   </div>
 </div>
