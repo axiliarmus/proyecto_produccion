@@ -1,4 +1,11 @@
-Flask==3.0.3
-Flask-PyMongo==2.3.0
+Flask==3.0.0
+pymongo==4.6.1
+dnspython==2.6.1
 python-dotenv==1.0.1
-Werkzeug==3.0.4
+Werkzeug==3.0.3
+
+pandas==2.2.2
+XlsxWriter==3.2.0
+
+# Necesario para convertir ObjectId y manejar BSON
+bson==0.5.10
