@@ -19,16 +19,44 @@ db = mongo.db
 
 
 # ============================================================
-#                     HELPERS / AUTH
+#              IMPORTS NECESARIOS (asegúrate de tenerlos)
 # ============================================================
+from datetime import datetime, timedelta
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+from werkzeug.security import generate_password_hash, check_password_hash
+from bson import ObjectId
 
+# ============================================================
+#                     LOGIN REQUIRED
+# ============================================================
 def login_required(role=None):
-    """Protege rutas según rol."""
+    """Protege rutas según rol y obliga a cambiar contraseña si está expirada."""
     def wrapper(fn):
         def _wrapped(*args, **kwargs):
+
+            # Usuario no logeado
             if 'user_id' not in session:
                 flash('Inicia sesión para continuar', 'warning')
                 return redirect(url_for('login'))
+
+            # --- IMPORTANTE ---
+            # NO verificar expiración en la ruta cambiar-password
+            if request.endpoint == "cambiar_password":
+                return fn(*args, **kwargs)
+
+            # --- VERIFICAR EXPIRACIÓN DE CONTRASEÑA ---
+            user = db.usuarios.find_one({'_id': ObjectId(session['user_id'])})
+            if user:
+                ultimo_cambio = user.get('password_changed_at')
+
+                if not ultimo_cambio:
+                    return redirect(url_for('cambiar_password'))
+
+                if datetime.utcnow() - ultimo_cambio > timedelta(days=30):
+                    flash("Tu contraseña ha expirado. Debes cambiarla.", "warning")
+                    return redirect(url_for('cambiar_password'))
+
+            # --- Validación de rol ---
             if role and session.get('role') != role:
                 real_role = session.get('role')
                 if real_role == 'administrador':
@@ -37,26 +65,34 @@ def login_required(role=None):
                     return redirect(url_for('supervisor_home'))
                 else:
                     return redirect(url_for('operador_home'))
+
             return fn(*args, **kwargs)
+
         _wrapped.__name__ = fn.__name__
         return _wrapped
     return wrapper
 
 
+
+# ============================================================
+#                  CREAR ADMIN POR DEFECTO
+# ============================================================
 def seed_admin():
-    """Crea un usuario admin por defecto."""
+    """Crea un usuario admin por defecto si no existe."""
     if not db.usuarios.find_one({'usuario': 'admin'}):
         db.usuarios.insert_one({
             'usuario': 'admin',
             'nombre': 'Administrador',
             'tipo': 'administrador',
-            'password': generate_password_hash('admin123')
+            'password': generate_password_hash('admin123'),
+            'password_changed_at': datetime.utcnow()  # ← necesario para el control de expiración
         })
         print("> Usuario admin creado (admin / admin123)")
 
 
 @app.before_request
 def ensure_seed():
+    """Asegura que el admin siempre exista."""
     if request.endpoint not in ('static',):
         seed_admin()
 
@@ -65,17 +101,28 @@ def ensure_seed():
 #                     LOGIN / LOGOUT
 # ============================================================
 
-@app.route('/')
+@app.route('/', methods=['GET'])
 def index():
-    """Redirección automática según rol."""
+    """Redirección automática según el rol del usuario."""
     if 'user_id' in session:
         role = session.get('role')
+
+        # Primero verificar expiración de contraseña
+        user = db.usuarios.find_one({'_id': ObjectId(session['user_id'])})
+        if user:
+            ultimo_cambio = user.get("password_changed_at")
+
+            if not ultimo_cambio or datetime.utcnow() - ultimo_cambio > timedelta(days=30):
+                return redirect(url_for('cambiar_password'))
+
+        # Redirecciones normales
         if role == 'administrador':
             return redirect(url_for('admin_dashboard'))
         elif role == 'supervisor':
             return redirect(url_for('supervisor_home'))
         else:
             return redirect(url_for('operador_home'))
+
     return redirect(url_for('login'))
 
 
@@ -84,7 +131,8 @@ def login():
     """Página de inicio de sesión."""
     if request.method == 'POST':
         usuario = request.form.get('usuario', '').strip()
-        password = request.form.get('password', '')
+        password = request.form.get('password')
+
         user = db.usuarios.find_one({'usuario': usuario})
 
         if user and check_password_hash(user['password'], password):
@@ -92,6 +140,13 @@ def login():
             session['username'] = user['usuario']
             session['nombre'] = user.get('nombre', user['usuario'])
             session['role'] = user['tipo']
+
+            # Validar expiración inmediatamente
+            if not user.get("password_changed_at") or \
+               datetime.utcnow() - user["password_changed_at"] > timedelta(days=30):
+                flash("Debes cambiar tu contraseña antes de continuar.", "warning")
+                return redirect(url_for("cambiar_password"))
+
             flash(f"Bienvenido, {session['nombre']}", 'success')
             return redirect(url_for('index'))
 
@@ -103,9 +158,45 @@ def login():
 @app.route('/logout')
 @login_required()
 def logout():
+    """Cierra sesión limpia."""
     session.clear()
     flash('Sesión cerrada correctamente', 'info')
     return redirect(url_for('login'))
+
+
+# ============================================================
+#               CAMBIAR CONTRASEÑA (OBLIGATORIO)
+# ============================================================
+
+@app.route('/cambiar-password', methods=['GET', 'POST'])
+@login_required()
+def cambiar_password():
+    """Forzar al usuario a cambiar contraseña si está expirada."""
+
+    if request.method == 'POST':
+        nueva = request.form.get("password_nueva")
+        repetir = request.form.get("password_repetir")
+
+        if nueva != repetir:
+            flash("Las contraseñas no coinciden.", "danger")
+            return redirect(url_for('cambiar_password'))
+
+        if len(nueva) < 6:
+            flash("La contraseña debe tener al menos 6 caracteres.", "warning")
+            return redirect(url_for('cambiar_password'))
+
+        db.usuarios.update_one(
+            {"_id": ObjectId(session["user_id"])},
+            {"$set": {
+                "password": generate_password_hash(nueva),
+                "password_changed_at": datetime.utcnow()
+            }}
+        )
+
+        flash("Contraseña actualizada correctamente 👌", "success")
+        return redirect(url_for('index'))
+
+    return render_template("cambiar_password.html")
 
 
 # ============================================================
