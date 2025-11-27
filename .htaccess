@@ -1,0 +1,6 @@
+PassengerEnabled on
+PassengerAppType wsgi
+PassengerPython /home/mktesjiv/virtualenv/public_html/proyecto_produccion/3.12/bin/python3.12
+PassengerAppRoot /home/mktesjiv/public_html/proyecto_produccion
+PassengerBaseURI /proyecto_produccion
+PassengerStartupFile passenger_wsgi.py

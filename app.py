@@ -7,15 +7,17 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from io import BytesIO
 import pandas as pd
+from pymongo import MongoClient
+
 
 load_dotenv()
 
 app = Flask(__name__)
-app.config['MONGO_URI'] = os.getenv('MONGO_URI', 'mongodb://localhost:27017/produccion_db')
-app.secret_key = os.getenv('SECRET_KEY', 'dev_secret_key')
+app.secret_key = os.getenv("SECRET_KEY") or os.urandom(24)
 
-mongo = PyMongo(app)
-db = mongo.db
+client = MongoClient(os.getenv("MONGO_URI"))
+db = client["miBase"]
+
 
 
 # ============================================================
