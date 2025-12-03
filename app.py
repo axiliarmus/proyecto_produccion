@@ -1,4 +1,5 @@
 import os
+import json
 from datetime import datetime, date, timedelta
 from bson import ObjectId
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
@@ -352,13 +353,14 @@ def boxes_delete(id):
 #                     CRUD PIEZAS (NUEVO MODELO)
 # ============================================================
 
-
 @app.route('/admin/piezas')
 @login_required('administrador')
 def piezas_list():
     piezas = list(db.piezas.find().sort('codigo', 1))
     return render_template('crud_piezas.html', piezas=piezas)
 
+
+# ==================== NUEVA PIEZA ====================
 
 @app.route('/admin/piezas/nuevo')
 @login_required('administrador')
@@ -377,6 +379,9 @@ def piezas_nuevo_post():
     precio_remate = float(request.form['precio_remate'])
     cantidad = int(request.form['cantidad'])
 
+    cuerda_interna = request.form.get("cuerda_interna", "").strip()
+    cuerda_externa = request.form.get("cuerda_externa", "").strip()
+
     # Obtener último código usado
     last = db.piezas.find_one(sort=[("codigo", -1)])
     next_codigo = last['codigo'] + 1 if last and 'codigo' in last else 1
@@ -391,6 +396,8 @@ def piezas_nuevo_post():
             "kilo_pieza": kilo_pieza,
             "precio_armado": precio_armado,
             "precio_remate": precio_remate,
+            "cuerda_interna": cuerda_interna,
+            "cuerda_externa": cuerda_externa,
             "created_at": datetime.utcnow()
         })
 
@@ -400,6 +407,8 @@ def piezas_nuevo_post():
     flash(f'✅ Se crearon {cantidad} piezas correctamente (desde código {next_codigo}).', 'success')
     return redirect(url_for('piezas_list'))
 
+
+# ==================== EDITAR PIEZA ====================
 
 @app.route('/admin/piezas/<id>/editar')
 @login_required('administrador')
@@ -420,6 +429,9 @@ def piezas_editar_post(id):
     kilo_pieza = float(request.form['kilo_pieza'])
     precio_armado = float(request.form['precio_armado'])
     precio_remate = float(request.form['precio_remate'])
+    
+    cuerda_interna = request.form.get("cuerda_interna", "").strip()
+    cuerda_externa = request.form.get("cuerda_externa", "").strip()
 
     db.piezas.update_one(
         {'_id': ObjectId(id)},
@@ -429,7 +441,9 @@ def piezas_editar_post(id):
             "tramo": tramo,
             "kilo_pieza": kilo_pieza,
             "precio_armado": precio_armado,
-            "precio_remate": precio_remate
+            "precio_remate": precio_remate,
+            "cuerda_interna": cuerda_interna,
+            "cuerda_externa": cuerda_externa
         }}
     )
 
@@ -437,12 +451,101 @@ def piezas_editar_post(id):
     return redirect(url_for('piezas_list'))
 
 
+# ==================== ELIMINAR ====================
+
 @app.route('/admin/piezas/<id>/delete', methods=['POST'])
 @login_required('administrador')
 def piezas_delete(id):
     db.piezas.delete_one({'_id': ObjectId(id)})
     flash('Pieza eliminada', 'info')
     return redirect(url_for('piezas_list'))
+
+# ============================================================
+#                API DINÁMICA PARA LISTAS DEPENDIENTES
+# ============================================================
+
+@app.route('/api/marcos/<empresa>')
+@login_required('administrador')
+def api_marcos(empresa):
+    marcos = db.piezas.distinct("marco", {"empresa": empresa})
+    return {"marcos": marcos}
+
+
+@app.route('/api/tramos/<empresa>/<marco>')
+@login_required('administrador')
+def api_tramos(empresa, marco):
+    tramos = db.piezas.distinct("tramo", {"empresa": empresa, "marco": marco})
+    return {"tramos": tramos}
+
+
+
+# ============================================================
+#       EDICIÓN MASIVA — PASO 1: FILTRAR Y VISTA PREVIA
+# ============================================================
+
+@app.route('/admin/piezas/masivo', methods=['GET', 'POST'])
+@login_required('administrador')
+def piezas_masivo():
+    filtros = {}
+    piezas = []
+
+    # 🔥 Cargar empresas disponibles para Jinja
+    empresas = db.piezas.distinct("empresa")
+
+    if request.method == "POST":
+        empresa = request.form.get("empresa")
+        marco = request.form.get("marco")
+        tramo = request.form.get("tramo")
+
+        if empresa:
+            filtros["empresa"] = empresa
+        if marco:
+            filtros["marco"] = marco
+        if tramo:
+            filtros["tramo"] = tramo
+
+        piezas = list(db.piezas.find(filtros).sort("codigo", 1))
+
+        if not piezas:
+            flash("No se encontraron piezas con esos filtros.", "warning")
+
+    return render_template(
+        "piezas_masivo.html",
+        piezas=piezas,
+        filtros=json.dumps(filtros),
+        empresas=empresas   # 👈 NECESARIO
+    )
+
+
+# ============================================================
+#       EDICIÓN MASIVA — PASO 2: CONFIRMAR CAMBIOS
+# ============================================================
+
+@app.route('/admin/piezas/masivo/confirmar', methods=['POST'])
+@login_required('administrador')
+def piezas_masivo_confirmar():
+    filtros = json.loads(request.form.get("filtros"))
+    campo = request.form.get("campo")
+    valor = request.form.get("valor")
+
+    if not campo or not valor:
+        flash("Debes indicar el campo y el valor a modificar.", "warning")
+        return redirect(url_for("piezas_masivo"))
+
+    # Convertir valor numérico si aplica
+    if campo in ["kilo_pieza", "precio_armado", "precio_remate"]:
+        try:
+            valor = float(valor)
+        except:
+            flash("El valor debe ser numérico para este campo.", "danger")
+            return redirect(url_for("piezas_masivo"))
+
+    resultado = db.piezas.update_many(filtros, {"$set": {campo: valor}})
+
+    flash(f"Se actualizaron {resultado.modified_count} piezas correctamente.", "success")
+    return redirect(url_for("piezas_masivo"))
+
+
 
 # ============================================================
 #                     ADMIN PANEL E INFORMES
@@ -1102,7 +1205,7 @@ def operador_salida():
 
 
 # ============================================================
-#              NUEVO REGISTRO DE PRODUCCIÓN CON REGLAS
+#              NUEVO REGISTRO DE PRODUCCIÓN (MEJORADO)
 # ============================================================
 
 @app.route('/operador/registrar', methods=['POST'])
@@ -1111,16 +1214,19 @@ def operador_registrar():
     user_id = session.get("user_id")
     usuario = session.get("nombre")
 
-    modo = request.form["modo"]      # armador / rematador
+    modo = request.form["modo"]                  # armador / rematador
     box = request.form["box"]
     codigo_pieza = request.form["codigo_pieza"].strip()
+
+    # CUERDAS SOLO SI ES ARMADOR
+    cuerda_interna = request.form.get("cuerda_interna")
+    cuerda_externa = request.form.get("cuerda_externa")
 
     # ---------------------- VALIDACIÓN DE CÓDIGO ----------------------
     if not codigo_pieza:
         flash("Debes ingresar un código de pieza", "warning")
         return redirect(url_for("operador_home"))
 
-    # Buscar la pieza por su código (en la colección piezas)
     try:
         pieza_data = db.piezas.find_one({"codigo": int(codigo_pieza)})
     except:
@@ -1131,6 +1237,7 @@ def operador_registrar():
         return redirect(url_for("operador_home"))
 
     # ------------------- CONTADORES PREVIOS -------------------
+
     armado_count = db.produccion.count_documents({
         "codigo_pieza": codigo_pieza,
         "modo": "armador"
@@ -1143,21 +1250,49 @@ def operador_registrar():
 
     # ------------------- VALIDACIONES LÓGICAS -------------------
 
-    # ARMADO: máximo 2 registros (puede tener 1 o 2; con 0 no pasó a armado)
     if modo == "armador":
         if armado_count >= 2:
             flash(f"❌ La pieza {codigo_pieza} ya fue armada 2 veces", "danger")
             return redirect(url_for("operador_home"))
 
-    # REMATE: máximo 1, y solo si ya tiene AL MENOS 1 armado
+        # VALIDACIÓN DE CUERDAS
+        try:
+            cuerda_interna = float(cuerda_interna)
+            cuerda_externa = float(cuerda_externa)
+        except:
+            flash("❌ Debes ingresar valores válidos para cuerda interna y externa.", "danger")
+            return redirect(url_for("operador_home"))
+
+        # RANGO PERMITIDO = ±10%
+        base_interna = float(pieza_data.get("cuerda_interna", 0))
+        base_externa = float(pieza_data.get("cuerda_externa", 0))
+
+        margen_interna_min = base_interna * 0.90
+        margen_interna_max = base_interna * 1.10
+        margen_externa_min = base_externa * 0.90
+        margen_externa_max = base_externa * 1.10
+
+        if not (margen_interna_min <= cuerda_interna <= margen_interna_max):
+            flash(f"❌ Cuerda interna fuera de rango permitido: {margen_interna_min:.2f} - {margen_interna_max:.2f}", "danger")
+            return redirect(url_for("operador_home"))
+
+        if not (margen_externa_min <= cuerda_externa <= margen_externa_max):
+            flash(f"❌ Cuerda externa fuera de rango permitido: {margen_externa_min:.2f} - {margen_externa_max:.2f}", "danger")
+            return redirect(url_for("operador_home"))
+
     if modo == "rematador":
+
         if remate_count >= 1:
             flash(f"❌ La pieza {codigo_pieza} ya fue rematada", "danger")
             return redirect(url_for("operador_home"))
 
         if armado_count < 1:
-            flash(f"⚠ La pieza {codigo_pieza} aún no tiene ningún registro de armado.", "warning")
+            flash(f"⚠ La pieza {codigo_pieza} aún no tiene armado registrado.", "warning")
             return redirect(url_for("operador_home"))
+
+        # REMATADOR NO DEBE TENER CUERDAS
+        cuerda_interna = None
+        cuerda_externa = None
 
     # ------------------- GUARDAR REGISTRO -------------------
 
@@ -1168,13 +1303,16 @@ def operador_registrar():
         "box": box,
         "codigo_pieza": codigo_pieza,
 
-        # datos copiados desde la pieza base
         "empresa": pieza_data.get("empresa", ""),
         "marco": pieza_data.get("marco", ""),
         "tramo": pieza_data.get("tramo", ""),
         "kilo_pieza": pieza_data.get("kilo_pieza", 0),
+
         "precio_armado": pieza_data.get("precio_armado", 0),
         "precio_remate": pieza_data.get("precio_remate", 0),
+
+        "cuerda_interna": cuerda_interna,
+        "cuerda_externa": cuerda_externa,
 
         "fecha": datetime.utcnow(),
         "calidad_status": "pendiente"

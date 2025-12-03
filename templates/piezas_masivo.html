@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% block title %}Edición Masiva de Piezas{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Edición Masiva de Piezas</h2>
+
+<!-- 🔙 Botón volver -->
+<div class="mb-3">
+    <a href="{{ url_for('piezas_list') }}" class="btn btn-secondary">
+        ← Volver a Piezas
+    </a>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+
+    <form method="POST" class="row g-3">
+
+      <!-- EMPRESA -->
+      <div class="col-md-4">
+        <label class="form-label">Empresa</label>
+        <select name="empresa" id="empresa" class="form-select">
+          <option value="">Seleccione...</option>
+          {% for e in empresas %}
+            <option value="{{ e }}">{{ e }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- MARCO -->
+      <div class="col-md-4">
+        <label class="form-label">Marco</label>
+        <select name="marco" id="marco" class="form-select" disabled>
+          <option value="">Seleccione una empresa</option>
+        </select>
+      </div>
+
+      <!-- TRAMO -->
+      <div class="col-md-4">
+        <label class="form-label">Tramo</label>
+        <select name="tramo" id="tramo" class="form-select" disabled>
+          <option value="">Seleccione un marco</option>
+        </select>
+      </div>
+
+      <div class="col-md-12">
+        <button class="btn btn-accent w-100">Buscar Piezas</button>
+      </div>
+
+    </form>
+
+  </div>
+</div>
+
+{% if piezas %}
+<h4>Vista previa ({{ piezas|length }} piezas encontradas)</h4>
+
+<div class="table-responsive mb-4">
+  <table class="table table-dark table-striped">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Empresa</th>
+        <th>Marco</th>
+        <th>Tramo</th>
+        <th>Peso</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in piezas %}
+      <tr>
+        <td>{{ p.codigo }}</td>
+        <td>{{ p.empresa }}</td>
+        <td>{{ p.marco }}</td>
+        <td>{{ p.tramo }}</td>
+        <td>{{ p.kilo_pieza }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- FORMULARIO DE CONFIRMACIÓN -->
+<div class="card">
+  <div class="card-body">
+
+    <form method="POST" action="{{ url_for('piezas_masivo_confirmar') }}">
+
+      <input type="hidden" name="filtros" value="{{ filtros }}">
+
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Campo a modificar</label>
+          <select name="campo" class="form-select" required>
+            <option value="">Seleccione...</option>
+            <option value="empresa">Empresa</option>
+            <option value="marco">Marco</option>
+            <option value="tramo">Tramo</option>
+            <option value="kilo_pieza">Kilo por pieza</option>
+            <option value="precio_armado">Precio Armado</option>
+            <option value="precio_remate">Precio Remate</option>
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Nuevo valor</label>
+          <input name="valor" class="form-control" required>
+        </div>
+
+        <div class="col-md-4 d-flex align-items-end">
+          <button class="btn btn-success w-100">Aplicar Cambios</button>
+        </div>
+      </div>
+
+    </form>
+
+  </div>
+</div>
+
+{% endif %}
+
+<!-- ================================
+       SCRIPT LISTAS DINÁMICAS
+================================ -->
+<script>
+document.getElementById("empresa").addEventListener("change", async function () {
+    const empresa = this.value;
+    const selMarco = document.getElementById("marco");
+    const selTramo = document.getElementById("tramo");
+
+    selMarco.innerHTML = "<option>Procesando...</option>";
+    selMarco.disabled = true;
+
+    selTramo.innerHTML = "<option>Seleccione un marco</option>";
+    selTramo.disabled = true;
+
+    if (!empresa) return;
+
+    const res = await fetch(`/api/marcos/${empresa}`);
+    const data = await res.json();
+
+    selMarco.innerHTML = "<option value=''>Seleccione...</option>";
+
+    data.marcos.forEach(m => {
+        selMarco.innerHTML += `<option value="${m}">${m}</option>`;
+    });
+
+    selMarco.disabled = false;
+});
+
+document.getElementById("marco").addEventListener("change", async function () {
+    const empresa = document.getElementById("empresa").value;
+    const marco = this.value;
+
+    const selTramo = document.getElementById("tramo");
+    selTramo.innerHTML = "<option>Procesando...</option>";
+    selTramo.disabled = true;
+
+    if (!empresa || !marco) return;
+
+    const res = await fetch(`/api/tramos/${empresa}/${marco}`);
+    const data = await res.json();
+
+    selTramo.innerHTML = "<option value=''>Seleccione...</option>";
+
+    data.tramos.forEach(t => {
+        selTramo.innerHTML += `<option value="${t}">${t}</option>`;
+    });
+
+    selTramo.disabled = false;
+});
+</script>
+
+{% endblock %}

@@ -15,17 +15,21 @@
 
 <div class="card shadow mb-4">
   <div class="card-body">
+
     <h5 class="mb-3">Registrar nueva pieza</h5>
+
     <form class="row g-3" method="post" action="{{ url_for('operador_registrar') }}">
 
+      <!-- MODO -->
       <div class="col-md-3">
         <label class="form-label">Modo</label>
-        <select class="form-select" name="modo" required>
+        <select class="form-select" name="modo" id="modo" required>
           <option value="armador">Armador</option>
           <option value="rematador">Rematador</option>
         </select>
       </div>
 
+      <!-- BOX -->
       <div class="col-md-3">
         <label class="form-label">Box</label>
         <select class="form-select" name="box" required>
@@ -36,19 +40,37 @@
         </select>
       </div>
 
+      <!-- CÓDIGO DE PIEZA -->
       <div class="col-md-4">
         <label class="form-label">Código de pieza</label>
         <input class="form-control" name="codigo_pieza" placeholder="Ej: 101" required>
       </div>
 
+      <!-- SECCIÓN DE CUERDAS (solo armador) -->
+      <div id="cuerdas_section" style="display:block;">
+        
+        <div class="col-md-3">
+          <label class="form-label">Cuerda interna</label>
+          <input class="form-control" name="cuerda_interna" step="0.01" type="number">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Cuerda externa</label>
+          <input class="form-control" name="cuerda_externa" step="0.01" type="number">
+        </div>
+
+      </div>
+
       <div class="col-12">
         <button class="btn btn-accent">Registrar pieza</button>
       </div>
+
     </form>
   </div>
 </div>
 
 <h5 class="mb-2">Piezas producidas hoy</h5>
+
 {% if piezas_hoy %}
   <div class="table-responsive">
     <table class="table table-dark table-striped align-middle">
@@ -98,5 +120,19 @@
     {% if jornada.salida %} · salida: {{ jornada.salida }}{% endif %}
   </div>
 {% endif %}
+
+<!-- SCRIPT PARA MOSTRAR/OCULTAR CUERDAS -->
+<script>
+document.getElementById("modo").addEventListener("change", function () {
+    let valor = this.value;
+    let cuerdas = document.getElementById("cuerdas_section");
+
+    if (valor === "armador") {
+        cuerdas.style.display = "flex";
+    } else {
+        cuerdas.style.display = "none";
+    }
+});
+</script>
 
 {% endblock %}
