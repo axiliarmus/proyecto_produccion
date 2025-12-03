@@ -1210,7 +1210,7 @@ def operador_salida():
 
 
 # ============================================================
-#              NUEVO REGISTRO DE PRODUCCIÓN (MEJORADO)
+#              NUEVO REGISTRO DE PRODUCCIÓN (FINAL)
 # ============================================================
 
 @app.route('/operador/registrar', methods=['POST'])
@@ -1223,9 +1223,9 @@ def operador_registrar():
     box = request.form["box"]
     codigo_pieza = request.form["codigo_pieza"].strip()
 
-    # CUERDAS SOLO SI ES ARMADOR
-    cuerda_interna = request.form.get("cuerda_interna")
-    cuerda_externa = request.form.get("cuerda_externa")
+    # Cuerdas ingresadas SOLO si es armador
+    cuerda_interna_raw = request.form.get("cuerda_interna")
+    cuerda_externa_raw = request.form.get("cuerda_externa")
 
     # ---------------------- VALIDACIÓN DE CÓDIGO ----------------------
     if not codigo_pieza:
@@ -1256,37 +1256,50 @@ def operador_registrar():
     # ------------------- VALIDACIONES LÓGICAS -------------------
 
     if modo == "armador":
+
+        # Máximo 2 armados
         if armado_count >= 2:
             flash(f"❌ La pieza {codigo_pieza} ya fue armada 2 veces", "danger")
             return redirect(url_for("operador_home"))
 
-        # VALIDACIÓN DE CUERDAS
-        try:
-            cuerda_interna = float(cuerda_interna)
-            cuerda_externa = float(cuerda_externa)
-        except:
-            flash("❌ Debes ingresar valores válidos para cuerda interna y externa.", "danger")
+        # ===== VALIDAR CUERDAS INGRESADAS =====
+        def safe_float(v):
+            try:
+                return float(v)
+            except:
+                return None
+
+        cuerda_interna = safe_float(cuerda_interna_raw)
+        cuerda_externa = safe_float(cuerda_externa_raw)
+
+        if cuerda_interna is None or cuerda_externa is None:
+            flash("❌ Debes ingresar valores numéricos para cuerdas interna y externa.", "danger")
             return redirect(url_for("operador_home"))
 
-        # RANGO PERMITIDO = ±10%
-        base_interna = float(pieza_data.get("cuerda_interna", 0))
-        base_externa = float(pieza_data.get("cuerda_externa", 0))
+        # ===== VALIDACIÓN CONTRA BASE DE PIEZA =====
+        base_interna = safe_float(pieza_data.get("cuerda_interna"))
+        base_externa = safe_float(pieza_data.get("cuerda_externa"))
 
-        margen_interna_min = base_interna * 0.90
-        margen_interna_max = base_interna * 1.10
-        margen_externa_min = base_externa * 0.90
-        margen_externa_max = base_externa * 1.10
+        # Si la pieza no tiene valores base → no validar cuerdas
+        if base_interna is not None:
+            margen_interna_min = base_interna * 0.90
+            margen_interna_max = base_interna * 1.10
 
-        if not (margen_interna_min <= cuerda_interna <= margen_interna_max):
-            flash(f"❌ Cuerda interna fuera de rango permitido: {margen_interna_min:.2f} - {margen_interna_max:.2f}", "danger")
-            return redirect(url_for("operador_home"))
+            if not (margen_interna_min <= cuerda_interna <= margen_interna_max):
+                flash(f"❌ Cuerda interna fuera de rango permitido: {margen_interna_min:.2f} - {margen_interna_max:.2f}", "danger")
+                return redirect(url_for("operador_home"))
 
-        if not (margen_externa_min <= cuerda_externa <= margen_externa_max):
-            flash(f"❌ Cuerda externa fuera de rango permitido: {margen_externa_min:.2f} - {margen_externa_max:.2f}", "danger")
-            return redirect(url_for("operador_home"))
+        if base_externa is not None:
+            margen_externa_min = base_externa * 0.90
+            margen_externa_max = base_externa * 1.10
+
+            if not (margen_externa_min <= cuerda_externa <= margen_externa_max):
+                flash(f"❌ Cuerda externa fuera de rango permitido: {margen_externa_min:.2f} - {margen_externa_max:.2f}", "danger")
+                return redirect(url_for("operador_home"))
 
     if modo == "rematador":
 
+        # remate solo si existe armado
         if remate_count >= 1:
             flash(f"❌ La pieza {codigo_pieza} ya fue rematada", "danger")
             return redirect(url_for("operador_home"))
@@ -1295,7 +1308,7 @@ def operador_registrar():
             flash(f"⚠ La pieza {codigo_pieza} aún no tiene armado registrado.", "warning")
             return redirect(url_for("operador_home"))
 
-        # REMATADOR NO DEBE TENER CUERDAS
+        # rematador NO usa cuerdas
         cuerda_interna = None
         cuerda_externa = None
 
@@ -1327,6 +1340,7 @@ def operador_registrar():
 
     flash(f"✔ Pieza {codigo_pieza} registrada correctamente como {modo}", "success")
     return redirect(url_for("operador_home"))
+
 
 # ============================================================
 #                         SUPERVISOR
