@@ -64,6 +64,8 @@
         <th>Marco</th>
         <th>Tramo</th>
         <th>Peso</th>
+        <th>C. Interna</th>
+        <th>C. Externa</th>
       </tr>
     </thead>
     <tbody>
@@ -74,6 +76,8 @@
         <td>{{ p.marco }}</td>
         <td>{{ p.tramo }}</td>
         <td>{{ p.kilo_pieza }}</td>
+        <td>{{ p.cuerda_interna }}</td>
+        <td>{{ p.cuerda_externa }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -99,6 +103,8 @@
             <option value="kilo_pieza">Kilo por pieza</option>
             <option value="precio_armado">Precio Armado</option>
             <option value="precio_remate">Precio Remate</option>
+            <option value="cuerda_interna">Cuerda Interna</option>
+            <option value="cuerda_externa">Cuerda Externa</option>
           </select>
         </div>
 

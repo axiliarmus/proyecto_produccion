@@ -532,7 +532,7 @@ def piezas_masivo_confirmar():
         flash("Debes indicar el campo y el valor a modificar.", "warning")
         return redirect(url_for("piezas_masivo"))
 
-    # Convertir valor numérico si aplica
+    # Campos numéricos
     if campo in ["kilo_pieza", "precio_armado", "precio_remate"]:
         try:
             valor = float(valor)
@@ -540,10 +540,15 @@ def piezas_masivo_confirmar():
             flash("El valor debe ser numérico para este campo.", "danger")
             return redirect(url_for("piezas_masivo"))
 
+    # Campos nuevos: cadenas simples
+    if campo in ["cuerda_interna", "cuerda_externa"]:
+        valor = valor.strip()
+
     resultado = db.piezas.update_many(filtros, {"$set": {campo: valor}})
 
     flash(f"Se actualizaron {resultado.modified_count} piezas correctamente.", "success")
     return redirect(url_for("piezas_masivo"))
+
 
 
 
