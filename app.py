@@ -32,22 +32,39 @@ from bson import ObjectId
 # ============================================================
 #                     LOGIN REQUIRED
 # ============================================================
-def login_required(role=None):
-    """Protege rutas según rol y obliga a cambiar contraseña si está expirada."""
+def login_required(roles=None):
+    """
+    Protege rutas según uno o varios roles
+    y obliga a cambiar contraseña si está expirada.
+    
+    roles puede ser:
+        - None (cualquiera logeado)
+        - 'administrador'
+        - ['administrador', 'supervisor']
+    """
+    # Normalizamos roles
+    if isinstance(roles, str):
+        roles = [roles]
+
     def wrapper(fn):
         def _wrapped(*args, **kwargs):
 
-            # Usuario no logeado
+            # ============================
+            # 1) Usuario no logueado
+            # ============================
             if 'user_id' not in session:
                 flash('Inicia sesión para continuar', 'warning')
                 return redirect(url_for('login'))
 
-            # --- IMPORTANTE ---
-            # NO verificar expiración en la ruta cambiar-password
+            # ============================
+            # 2) Excepción: no verificar expiración en cambiar_password
+            # ============================
             if request.endpoint == "cambiar_password":
                 return fn(*args, **kwargs)
 
-            # --- VERIFICAR EXPIRACIÓN DE CONTRASEÑA ---
+            # ============================
+            # 3) Verificar expiración de contraseña
+            # ============================
             user = db.usuarios.find_one({'_id': ObjectId(session['user_id'])})
             if user:
                 ultimo_cambio = user.get('password_changed_at')
@@ -59,16 +76,25 @@ def login_required(role=None):
                     flash("Tu contraseña ha expirado. Debes cambiarla.", "warning")
                     return redirect(url_for('cambiar_password'))
 
-            # --- Validación de rol ---
-            if role and session.get('role') != role:
-                real_role = session.get('role')
-                if real_role == 'administrador':
-                    return redirect(url_for('admin_dashboard'))
-                elif real_role == 'supervisor':
-                    return redirect(url_for('supervisor_home'))
-                else:
-                    return redirect(url_for('operador_home'))
+            # ============================
+            # 4) Validación de rol
+            # ============================
+            user_role = session.get('role')
 
+            if roles and user_role not in roles:
+                # No autorizado → redirigir a su página principal
+                flash("No tienes permisos para acceder a esta sección.", "danger")
+
+                if user_role == "administrador":
+                    return redirect(url_for("admin_dashboard"))
+                elif user_role == "supervisor":
+                    return redirect(url_for("supervisor_home"))
+                else:
+                    return redirect(url_for("operador_home"))
+
+            # ============================
+            # Si todo OK → permitir acceso
+            # ============================
             return fn(*args, **kwargs)
 
         _wrapped.__name__ = fn.__name__
@@ -657,7 +683,7 @@ def exportar_horarios_excel():
 # ============================================================
 
 @app.route('/admin/informes/piezas/rematadas', methods=['GET', 'POST'])
-@login_required('administrador')
+@login_required(["administrador", "supervisor"])
 def informe_piezas_rematadas():
 
     filtro = {"modo": "rematador"}  # solo piezas rematadas
@@ -724,7 +750,7 @@ def informe_piezas_rematadas():
 # ============================================================
 
 @app.route('/admin/informes/piezas_rematadas/export', methods=['POST'])
-@login_required('administrador')
+@login_required(["administrador", "supervisor"])
 def exportar_piezas_rematadas_excel():
     # Leemos filtros desde el form (cuidando 'None')
     fecha_inicio = (request.form.get("fecha_inicio") or "").strip()
@@ -818,7 +844,7 @@ def exportar_piezas_rematadas_excel():
 # ============================================================
 
 @app.route('/admin/informes/piezas/pendientes-remate', methods=['GET', 'POST'])
-@login_required('administrador')
+@login_required(["administrador", "supervisor"])
 def informe_piezas_pendientes_remate():
     # Filtro base: solo registros de ARMADOR
     filtro_base = {"modo": "armador"}
@@ -902,7 +928,7 @@ def informe_piezas_pendientes_remate():
 # ============================================================
 
 @app.route('/admin/informes/piezas/pendientes-remate/export', methods=['POST'])
-@login_required('administrador')
+@login_required(["administrador", "supervisor"])
 def exportar_piezas_pendientes_remate_excel():
     # Base: solo registros en modo "armador"
     filtro_base = {"modo": "armador"}
@@ -1401,6 +1427,11 @@ def supervisor_home():
         estado_sel=estado_sel
     )
 
+@app.route('/supervisor/informes')
+@login_required('supervisor')
+def supervisor_informes():
+    return render_template("supervisor_informes.html")
+
 
 # ============================================================
 #                 VALIDACIÓN DE PIEZA (SUPERVISOR)
@@ -1619,7 +1650,7 @@ def exportar_valor_operador_excel():
 # ============================================================
 
 @app.route('/admin/informes/piezas/sin-produccion', methods=['GET', 'POST'])
-@login_required('administrador')
+@login_required(["administrador", "supervisor"])
 def informe_piezas_sin_produccion():
 
     empresa = request.form.get("empresa")
@@ -1671,7 +1702,7 @@ def informe_piezas_sin_produccion():
 # ============================================================
 
 @app.route('/admin/informes/piezas/sin-produccion/export', methods=['POST'])
-@login_required('administrador')
+@login_required(["administrador", "supervisor"])
 def exportar_piezas_sin_produccion_excel():
 
     empresa = request.form.get("empresa")

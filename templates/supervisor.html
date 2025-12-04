@@ -5,6 +5,13 @@
 
 <h2 class="mb-4">Supervisor – Piezas Rematadas</h2>
 
+<!-- ============= BOTÓN PARA IR A INFORMES ================= -->
+<div class="mb-3 text-end">
+  <a href="{{ url_for('supervisor_informes') }}" class="btn btn-accent">
+    📊 Ver Informes
+  </a>
+</div>
+
 <!-- ================= FILTROS ================= -->
 <div class="card mb-4">
   <div class="card-body">
@@ -38,6 +45,7 @@
       <div class="col-md-12">
         <button class="btn btn-accent w-100">Aplicar filtros</button>
       </div>
+
     </form>
   </div>
 </div>
@@ -71,7 +79,6 @@
           <td>{{ p.marco }}</td>
           <td>{{ p.tramo }}</td>
 
-          <!-- ESTADO ACTUAL -->
           <td>
             {% if p.calidad_status == 'aprobado' %}
               <span class="badge bg-success">Aprobado</span>
@@ -82,7 +89,6 @@
             {% endif %}
           </td>
 
-          <!-- FORMULARIO DE SUPERVISIÓN (EDITABLE SIEMPRE) -->
           <td>
             <form method="POST" action="{{ url_for('supervisor_validar_pieza', id=p._id) }}" class="row g-2">
 
