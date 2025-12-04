@@ -9,7 +9,10 @@ from dotenv import load_dotenv
 from io import BytesIO
 import pandas as pd
 from pymongo import MongoClient
+from datetime import timezone, timedelta
 
+# Zona horaria Chile (UTC-3)
+CL = timezone(timedelta(hours=-3))
 
 load_dotenv()
 
@@ -28,6 +31,25 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from bson import ObjectId
+
+# ============================================================
+#     MANEJO CENTRALIZADO DE FECHAS SIN DESFASES
+# ============================================================
+
+def now_cl():
+    """Devuelve la fecha/hora actual en Chile (UTC-3), siempre aware."""
+    return datetime.now(timezone.utc).astimezone(CL)
+
+def to_cl(dt):
+    """Convierte cualquier datetime de MongoDB a Chile."""
+    if dt is None:
+        return None
+
+    # Si viene naive → asumir UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    return dt.astimezone(CL)
 
 # ============================================================
 #                     LOGIN REQUIRED
@@ -132,19 +154,16 @@ def ensure_seed():
 
 @app.route('/', methods=['GET'])
 def index():
-    """Redirección automática según el rol del usuario."""
     if 'user_id' in session:
         role = session.get('role')
 
-        # Primero verificar expiración de contraseña
         user = db.usuarios.find_one({'_id': ObjectId(session['user_id'])})
         if user:
-            ultimo_cambio = user.get("password_changed_at")
+            ultimo_cambio = to_cl(user.get("password_changed_at"))
 
-            if not ultimo_cambio or datetime.utcnow() - ultimo_cambio > timedelta(days=30):
+            if not ultimo_cambio or (now_cl() - ultimo_cambio) > timedelta(days=30):
                 return redirect(url_for('cambiar_password'))
 
-        # Redirecciones normales
         if role == 'administrador':
             return redirect(url_for('admin_dashboard'))
         elif role == 'supervisor':
@@ -157,7 +176,6 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Página de inicio de sesión."""
     if request.method == 'POST':
         usuario = request.form.get('usuario', '').strip()
         password = request.form.get('password')
@@ -165,14 +183,15 @@ def login():
         user = db.usuarios.find_one({'usuario': usuario})
 
         if user and check_password_hash(user['password'], password):
+
             session['user_id'] = str(user['_id'])
             session['username'] = user['usuario']
             session['nombre'] = user.get('nombre', user['usuario'])
             session['role'] = user['tipo']
 
-            # Validar expiración inmediatamente
-            if not user.get("password_changed_at") or \
-               datetime.utcnow() - user["password_changed_at"] > timedelta(days=30):
+            pw_date = to_cl(user.get("password_changed_at"))
+
+            if not pw_date or (now_cl() - pw_date) > timedelta(days=30):
                 flash("Debes cambiar tu contraseña antes de continuar.", "warning")
                 return redirect(url_for("cambiar_password"))
 
@@ -184,6 +203,8 @@ def login():
     return render_template('login.html')
 
 
+
+
 @app.route('/logout')
 @login_required()
 def logout():
@@ -193,6 +214,7 @@ def logout():
     return redirect(url_for('login'))
 
 
+
 # ============================================================
 #               CAMBIAR CONTRASEÑA (OBLIGATORIO)
 # ============================================================
@@ -200,8 +222,6 @@ def logout():
 @app.route('/cambiar-password', methods=['GET', 'POST'])
 @login_required()
 def cambiar_password():
-    """Forzar al usuario a cambiar contraseña si está expirada."""
-
     if request.method == 'POST':
         nueva = request.form.get("password_nueva")
         repetir = request.form.get("password_repetir")
@@ -218,7 +238,7 @@ def cambiar_password():
             {"_id": ObjectId(session["user_id"])},
             {"$set": {
                 "password": generate_password_hash(nueva),
-                "password_changed_at": datetime.utcnow()
+                "password_changed_at": now_cl()
             }}
         )
 
@@ -226,6 +246,7 @@ def cambiar_password():
         return redirect(url_for('index'))
 
     return render_template("cambiar_password.html")
+
 
 
 # ============================================================
@@ -627,6 +648,12 @@ def informe_horarios():
 
     for j in jornadas:
         j['nombre'] = usuarios_map.get(j['user_id'], 'Desconocido')
+        if j.get('fecha'):
+            j['fecha'] = to_cl(j.get('fecha'))
+        if j.get('ingreso'):
+            j['ingreso'] = to_cl(j.get('ingreso'))
+        if j.get('salida'):
+            j['salida'] = to_cl(j.get('salida'))
 
     return render_template(
         'informe_horarios.html',
@@ -651,11 +678,14 @@ def exportar_horarios_excel():
 
     data = []
     for j in jornadas:
+        fecha = to_cl(j.get('fecha')) if j.get('fecha') else None
+        ingreso = to_cl(j.get('ingreso')) if j.get('ingreso') else None
+        salida = to_cl(j.get('salida')) if j.get('salida') else None
         data.append({
             'Operador': usuarios_map.get(j['user_id'], 'Desconocido'),
-            'Fecha': j['fecha'].strftime('%d-%m-%Y'),
-            'Ingreso': j.get('ingreso').strftime('%H:%M') if j.get('ingreso') else '',
-            'Salida': j.get('salida').strftime('%H:%M') if j.get('salida') else ''
+            'Fecha': fecha.strftime('%d-%m-%Y') if fecha else '',
+            'Ingreso': ingreso.strftime('%H:%M') if ingreso else '',
+            'Salida': salida.strftime('%H:%M') if salida else ''
         })
 
     if not data:
@@ -696,13 +726,19 @@ def informe_piezas_rematadas():
 
     # ===================== FILTROS =====================
 
-    # Filtro por fechas
+    # Filtro por fechas (interpretar como horario Chile y convertir a UTC)
     if fecha_inicio and fecha_fin:
         try:
-            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d")
-            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d")
-            d2 = datetime.combine(d2, datetime.max.time())
-            filtro["fecha"] = {"$gte": d1, "$lte": d2}
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+
+            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+
+            filtro["fecha"] = {
+                "$gte": start_cl.astimezone(timezone.utc),
+                "$lte": end_cl.astimezone(timezone.utc)
+            }
         except:
             flash("Fechas inválidas", "warning")
 
@@ -721,6 +757,8 @@ def informe_piezas_rematadas():
     # ===================== CONSULTA PRINCIPAL =====================
 
     piezas = list(db.produccion.find(filtro).sort("fecha", -1))
+    for p in piezas:
+        p["fecha"] = to_cl(p.get("fecha"))
 
     # Para el select operador
     operadores = sorted({p["usuario"] for p in db.produccion.find({"modo": "rematador"})})
@@ -768,10 +806,11 @@ def exportar_piezas_rematadas_excel():
     # Fechas si están completas
     if fecha_inicio and fecha_inicio != "None" and fecha_fin and fecha_fin != "None":
         try:
-            inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d")
-            fin = datetime.strptime(fecha_fin, "%Y-%m-%d")
-            fin = datetime.combine(fin, datetime.max.time())
-            filtro["fecha"] = {"$gte": inicio, "$lte": fin}
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            filtro["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
         except ValueError:
             flash("Fechas inválidas (usa AAAA-MM-DD).", "warning")
             return redirect(url_for("informe_piezas_rematadas"))
@@ -789,7 +828,7 @@ def exportar_piezas_rematadas_excel():
     # Armar datos para Excel
     data = []
     for p in piezas:
-        fecha = p.get("fecha")
+        fecha = to_cl(p.get("fecha"))
         fecha_str = fecha.strftime("%d-%m-%Y %H:%M") if isinstance(fecha, datetime) else ""
 
         data.append({
@@ -904,6 +943,8 @@ def informe_piezas_pendientes_remate():
     operadores = sorted({p.get("usuario", "") for p in db.produccion.find({"modo": "armador"})})
 
     # ---------------- GRÁFICO DE ESTADOS ----------------
+    for p in piezas_pendientes:
+        p["fecha"] = to_cl(p.get("fecha"))
     estado_counts = {"pendiente": 0, "aprobado": 0, "rechazado": 0}
     for p in piezas_pendientes:
         e = p.get("calidad_status", "pendiente")
@@ -948,10 +989,11 @@ def exportar_piezas_pendientes_remate_excel():
         and fecha_fin.lower() != "none"
     ):
         try:
-            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d")
-            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d")
-            d2 = datetime.combine(d2, datetime.max.time())
-            filtro_base["fecha"] = {"$gte": d1, "$lte": d2}
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            filtro_base["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
         except ValueError:
             flash("Fechas inválidas (usa formato AAAA-MM-DD).", "warning")
             return redirect(url_for("informe_piezas_pendientes_remate"))
@@ -996,7 +1038,7 @@ def exportar_piezas_pendientes_remate_excel():
     # ---------- Construir data para Excel ----------
     data = []
     for p in piezas_pendientes:
-        fecha = p.get("fecha")
+        fecha = to_cl(p.get("fecha"))
         fecha_str = fecha.strftime("%d-%m-%Y %H:%M") if isinstance(fecha, datetime) else "—"
 
         data.append({
@@ -1065,10 +1107,11 @@ def informe_operadores():
             filtro["usuario"] = operador_sel
 
         if fecha_inicio and fecha_fin:
-            inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d")
-            fin = datetime.strptime(fecha_fin, "%Y-%m-%d")
-            fin = datetime.combine(fin, datetime.max.time())
-            filtro["fecha"] = {"$gte": inicio, "$lte": fin}
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            filtro["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
 
     if "fecha" not in filtro:
         hoy = datetime.utcnow()
@@ -1112,10 +1155,11 @@ def exportar_operadores_excel():
         filtro["usuario"] = operador_sel
 
     if fecha_inicio and fecha_fin:
-        inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d")
-        fin = datetime.strptime(fecha_fin, "%Y-%m-%d")
-        fin = datetime.combine(fin, datetime.max.time())
-        filtro["fecha"] = {"$gte": inicio, "$lte": fin}
+        d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+        d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+        start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+        end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+        filtro["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
 
     produccion = list(db.produccion.find(filtro))
 
@@ -1166,9 +1210,11 @@ def operador_home():
 
     boxes = list(db.boxes.find().sort("codigo", 1))
 
-    today = date.today()
-    start = datetime.combine(today, datetime.min.time())
-    end = datetime.combine(today, datetime.max.time())
+    today = now_cl().date()
+    start_cl = datetime.combine(today, datetime.min.time()).replace(tzinfo=CL)
+    end_cl = datetime.combine(today, datetime.max.time()).replace(tzinfo=CL)
+    start = start_cl.astimezone(timezone.utc)
+    end = end_cl.astimezone(timezone.utc)
 
     piezas_hoy = list(db.produccion.find({
         "user_id": user_id,
@@ -1179,6 +1225,17 @@ def operador_home():
         "user_id": user_id,
         "fecha": {"$gte": start, "$lte": end}
     })
+
+    for p in piezas_hoy:
+        p["fecha"] = to_cl(p.get("fecha"))
+
+    if jornada:
+        if jornada.get("fecha"):
+            jornada["fecha"] = to_cl(jornada.get("fecha"))
+        if jornada.get("ingreso"):
+            jornada["ingreso"] = to_cl(jornada.get("ingreso"))
+        if jornada.get("salida"):
+            jornada["salida"] = to_cl(jornada.get("salida"))
 
     return render_template(
         "operador.html",
@@ -1193,10 +1250,12 @@ def operador_home():
 @login_required('operador')
 def operador_ingreso():
     user_id = session.get("user_id")
-    today = date.today()
+    today = now_cl().date()
 
-    start = datetime.combine(today, datetime.min.time())
-    end = datetime.combine(today, datetime.max.time())
+    start_cl = datetime.combine(today, datetime.min.time()).replace(tzinfo=CL)
+    end_cl = datetime.combine(today, datetime.max.time()).replace(tzinfo=CL)
+    start = start_cl.astimezone(timezone.utc)
+    end = end_cl.astimezone(timezone.utc)
 
     existe = db.jornadas.find_one({"user_id": user_id, "fecha": {"$gte": start, "$lte": end}})
 
@@ -1217,10 +1276,12 @@ def operador_ingreso():
 @login_required('operador')
 def operador_salida():
     user_id = session.get("user_id")
-    today = date.today()
+    today = now_cl().date()
 
-    start = datetime.combine(today, datetime.min.time())
-    end = datetime.combine(today, datetime.max.time())
+    start_cl = datetime.combine(today, datetime.min.time()).replace(tzinfo=CL)
+    end_cl = datetime.combine(today, datetime.max.time()).replace(tzinfo=CL)
+    start = start_cl.astimezone(timezone.utc)
+    end = end_cl.astimezone(timezone.utc)
 
     upd = db.jornadas.update_one(
         {"user_id": user_id, "fecha": {"$gte": start, "$lte": end}},
@@ -1375,9 +1436,11 @@ def operador_registrar():
 @app.route('/supervisor', methods=['GET', 'POST'])
 @login_required('supervisor')
 def supervisor_home():
-    today = date.today()
-    start_today = datetime.combine(today, datetime.min.time())
-    end_today = datetime.combine(today, datetime.max.time())
+    today = now_cl().date()
+    start_cl = datetime.combine(today, datetime.min.time()).replace(tzinfo=CL)
+    end_cl = datetime.combine(today, datetime.max.time()).replace(tzinfo=CL)
+    start_today = start_cl.astimezone(timezone.utc)
+    end_today = end_cl.astimezone(timezone.utc)
 
     # ------------ FILTROS ------------
     if request.method == 'POST':
@@ -1401,10 +1464,11 @@ def supervisor_home():
     # Filtro por rango de fechas
     if fecha_inicio and fecha_fin:
         try:
-            start = datetime.strptime(fecha_inicio, "%Y-%m-%d")
-            end = datetime.strptime(fecha_fin, "%Y-%m-%d")
-            end = datetime.combine(end, datetime.max.time())
-            filtro["fecha"] = {"$gte": start, "$lte": end}
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            filtro["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
         except ValueError:
             flash("Fechas inválidas (usa formato AAAA-MM-DD).", "warning")
     else:
@@ -1483,10 +1547,11 @@ def informe_piezas_operador():
 
     if fecha_inicio and fecha_fin:
         try:
-            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d")
-            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d")
-            d2 = datetime.combine(d2, datetime.max.time())
-            filtro["fecha"] = {"$gte": d1, "$lte": d2}
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            filtro["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
         except:
             flash("Fechas inválidas", "warning")
 
@@ -1533,7 +1598,7 @@ def informe_piezas_operador():
         total_general += valor
 
         resumen.append({
-            "fecha": p.get("fecha"),
+            "fecha": to_cl(p.get("fecha")),
             "codigo": codigo,
             "operador": p.get("usuario"),
             "empresa": pieza_info.get("empresa"),
@@ -1575,10 +1640,11 @@ def exportar_valor_operador_excel():
 
     if fecha_inicio and fecha_fin:
         try:
-            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d")
-            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d")
-            d2 = datetime.combine(d2, datetime.max.time())
-            filtro["fecha"] = {"$gte": d1, "$lte": d2}
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            filtro["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
         except:
             pass
 
@@ -1613,7 +1679,7 @@ def exportar_valor_operador_excel():
         else:
             valor = 0
 
-        fecha = p.get("fecha")
+        fecha = to_cl(p.get("fecha"))
         fecha_str = fecha.strftime("%d-%m-%Y %H:%M") if fecha else "—"
 
         data.append({
