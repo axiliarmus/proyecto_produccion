@@ -16,9 +16,9 @@
 
     <form method="POST" class="row g-3">
 
-      <!-- EMPRESA -->
+      <!-- CLIENTE -->
       <div class="col-md-4">
-        <label class="form-label">Empresa</label>
+        <label class="form-label">Cliente</label>
         <select name="empresa" id="empresa" class="form-select">
           <option value="">Seleccione...</option>
           {% for e in empresas %}
@@ -60,7 +60,7 @@
     <thead>
       <tr>
         <th>Código</th>
-        <th>Empresa</th>
+        <th>Cliente</th>
         <th>Marco</th>
         <th>Tramo</th>
         <th>Peso</th>
@@ -97,7 +97,7 @@
           <label class="form-label">Campo a modificar</label>
           <select name="campo" class="form-select" required>
             <option value="">Seleccione...</option>
-            <option value="empresa">Empresa</option>
+          <option value="empresa">Cliente</option>
             <option value="marco">Marco</option>
             <option value="tramo">Tramo</option>
             <option value="kilo_pieza">Kilo por pieza</option>

@@ -21,22 +21,22 @@
     <form method="POST" class="row g-3">
 
       <div class="col-md-3">
-        <label class="form-label">Fecha inicio</label>
+        <label class="form-label text-light">Fecha inicio</label>
         <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control">
       </div>
 
       <div class="col-md-3">
-        <label class="form-label">Fecha fin</label>
+        <label class="form-label text-light">Fecha fin</label>
         <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-control">
       </div>
 
       <div class="col-md-3">
-        <label class="form-label">Código pieza</label>
-        <input type="text" name="codigo_pieza" value="{{ codigo }}" class="form-control">
+        <label class="form-label text-light">Código pieza</label>
+        <input type="text" name="codigo_pieza" value="{{ codigo or '' }}" class="form-control" placeholder="Ej: 1001 (vacío = todas)">
       </div>
 
       <div class="col-md-3">
-        <label class="form-label">Estado</label>
+        <label class="form-label text-light">Estado</label>
         <select name="estado" class="form-select">
           <option value="todos">Todos</option>
           <option value="pendiente" {% if estado_sel=='pendiente' %}selected{% endif %}>Pendiente</option>
@@ -46,7 +46,7 @@
       </div>
 
       <div class="col-md-4">
-        <label class="form-label">Operador</label>
+        <label class="form-label text-light">Operador</label>
         <select name="operador" class="form-select">
           <option value="todos">Todos</option>
           {% for op in operadores %}
@@ -62,9 +62,9 @@
 
     <!-- EXPORTAR -->
     <form class="mt-3" method="POST" action="{{ url_for('exportar_piezas_rematadas_excel') }}">
-      <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio }}">
-      <input type="hidden" name="fecha_fin" value="{{ fecha_fin }}">
-      <input type="hidden" name="codigo_pieza" value="{{ codigo }}">
+      <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
+      <input type="hidden" name="fecha_fin" value="{{ fecha_fin or '' }}">
+      <input type="hidden" name="codigo_pieza" value="{{ codigo or '' }}">
       <input type="hidden" name="operador" value="{{ operador_sel }}">
       <input type="hidden" name="estado" value="{{ estado_sel }}">
       <button class="btn btn-success w-100">📥 Exportar a Excel</button>
@@ -82,7 +82,7 @@
       <tr>
         <th>Fecha</th>
         <th>Código</th>
-        <th>Empresa</th>
+        <th>Cliente</th>
         <th>Operador</th>
         <th>Marco</th>
         <th>Tramo</th>

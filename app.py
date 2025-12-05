@@ -512,14 +512,14 @@ def piezas_delete(id):
 # ============================================================
 
 @app.route('/api/marcos/<empresa>')
-@login_required('administrador')
+@login_required(["administrador", "supervisor"])
 def api_marcos(empresa):
     marcos = db.piezas.distinct("marco", {"empresa": empresa})
     return {"marcos": marcos}
 
 
 @app.route('/api/tramos/<empresa>/<marco>')
-@login_required('administrador')
+@login_required(["administrador", "supervisor"])
 def api_tramos(empresa, marco):
     tramos = db.piezas.distinct("tramo", {"empresa": empresa, "marco": marco})
     return {"tramos": tramos}
@@ -727,18 +727,25 @@ def informe_piezas_rematadas():
     # ===================== FILTROS =====================
 
     # Filtro por fechas (interpretar como horario Chile y convertir a UTC)
-    if fecha_inicio and fecha_fin:
+    if fecha_inicio or fecha_fin:
         try:
-            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            start_cl = None
+            end_cl = None
 
-            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
-            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            if fecha_inicio:
+                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            if fecha_fin:
+                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
 
-            filtro["fecha"] = {
-                "$gte": start_cl.astimezone(timezone.utc),
-                "$lte": end_cl.astimezone(timezone.utc)
-            }
+            rango = {}
+            if start_cl:
+                rango["$gte"] = start_cl.astimezone(timezone.utc)
+            if end_cl:
+                rango["$lte"] = end_cl.astimezone(timezone.utc)
+            if rango:
+                filtro["fecha"] = rango
         except:
             flash("Fechas inválidas", "warning")
 
@@ -803,14 +810,25 @@ def exportar_piezas_rematadas_excel():
     if codigo:
         filtro["codigo_pieza"] = codigo
 
-    # Fechas si están completas
-    if fecha_inicio and fecha_inicio != "None" and fecha_fin and fecha_fin != "None":
+    # Fechas – acepta inicio o fin por separado
+    if fecha_inicio or fecha_fin:
         try:
-            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
-            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
-            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
-            filtro["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
+            start_cl = None
+            end_cl = None
+            if fecha_inicio and fecha_inicio != "None":
+                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            if fecha_fin and fecha_fin != "None":
+                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+
+            rango = {}
+            if start_cl:
+                rango["$gte"] = start_cl.astimezone(timezone.utc)
+            if end_cl:
+                rango["$lte"] = end_cl.astimezone(timezone.utc)
+            if rango:
+                filtro["fecha"] = rango
         except ValueError:
             flash("Fechas inválidas (usa AAAA-MM-DD).", "warning")
             return redirect(url_for("informe_piezas_rematadas"))
@@ -981,19 +999,25 @@ def exportar_piezas_pendientes_remate_excel():
     operador = (request.form.get("operador") or "todos").strip()
     estado_sel = (request.form.get("estado") or "todos").strip()
 
-    # ---------- Filtro por rango de fechas (solo si vienen ambas y no son "None") ----------
-    if (
-        fecha_inicio
-        and fecha_inicio.lower() != "none"
-        and fecha_fin
-        and fecha_fin.lower() != "none"
-    ):
+    # ---------- Filtro por rango de fechas (acepta solo inicio o solo fin) ----------
+    if fecha_inicio or fecha_fin:
         try:
-            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
-            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
-            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
-            filtro_base["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
+            start_cl = None
+            end_cl = None
+            if fecha_inicio and fecha_inicio.lower() != "none":
+                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            if fecha_fin and fecha_fin.lower() != "none":
+                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+
+            rango = {}
+            if start_cl:
+                rango["$gte"] = start_cl.astimezone(timezone.utc)
+            if end_cl:
+                rango["$lte"] = end_cl.astimezone(timezone.utc)
+            if rango:
+                filtro_base["fecha"] = rango
         except ValueError:
             flash("Fechas inválidas (usa formato AAAA-MM-DD).", "warning")
             return redirect(url_for("informe_piezas_pendientes_remate"))
@@ -1104,19 +1128,26 @@ def informe_operadores():
         fecha_fin = request.form.get("fecha_fin")
 
         if operador_sel and operador_sel != "todos":
-            filtro["usuario"] = operador_sel
+            filtro["user_id"] = operador_sel
 
-        if fecha_inicio and fecha_fin:
-            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
-            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
-            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
-            filtro["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
+        if fecha_inicio or fecha_fin:
+            start_cl = None
+            end_cl = None
+            if fecha_inicio:
+                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            if fecha_fin:
+                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            rango = {}
+            if start_cl:
+                rango["$gte"] = start_cl.astimezone(timezone.utc)
+            if end_cl:
+                rango["$lte"] = end_cl.astimezone(timezone.utc)
+            if rango:
+                filtro["fecha"] = rango
 
-    if "fecha" not in filtro:
-        hoy = datetime.utcnow()
-        hace_15 = hoy - timedelta(days=14)
-        filtro["fecha"] = {"$gte": hace_15, "$lte": hoy}
+    # Sin filtros de fecha: traer todos
 
     produccion = list(db.produccion.find(filtro))
 
@@ -1152,14 +1183,24 @@ def exportar_operadores_excel():
     filtro = {}
 
     if operador_sel and operador_sel != "todos":
-        filtro["usuario"] = operador_sel
+        filtro["user_id"] = operador_sel
 
-    if fecha_inicio and fecha_fin:
-        d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-        d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
-        start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
-        end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
-        filtro["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
+    if fecha_inicio or fecha_fin:
+        start_cl = None
+        end_cl = None
+        if fecha_inicio:
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+        if fecha_fin:
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+        rango = {}
+        if start_cl:
+            rango["$gte"] = start_cl.astimezone(timezone.utc)
+        if end_cl:
+            rango["$lte"] = end_cl.astimezone(timezone.utc)
+        if rango:
+            filtro["fecha"] = rango
 
     produccion = list(db.produccion.find(filtro))
 
@@ -1545,13 +1586,23 @@ def informe_piezas_operador():
     if operador_sel and operador_sel != "todos":
         filtro["usuario"] = operador_sel
 
-    if fecha_inicio and fecha_fin:
+    if fecha_inicio or fecha_fin:
         try:
-            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
-            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
-            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
-            filtro["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
+            start_cl = None
+            end_cl = None
+            if fecha_inicio:
+                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            if fecha_fin:
+                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            rango = {}
+            if start_cl:
+                rango["$gte"] = start_cl.astimezone(timezone.utc)
+            if end_cl:
+                rango["$lte"] = end_cl.astimezone(timezone.utc)
+            if rango:
+                filtro["fecha"] = rango
         except:
             flash("Fechas inválidas", "warning")
 

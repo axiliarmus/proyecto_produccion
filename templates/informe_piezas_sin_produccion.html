@@ -23,9 +23,9 @@
     <form method="POST" class="row g-3">
 
       <div class="col-md-4">
-        <label class="form-label">Empresa</label>
-        <select name="empresa" class="form-select">
-          <option value="todos">Todas</option>
+        <label class="form-label text-light">Cliente</label>
+        <select name="empresa" id="empresa" class="form-select">
+          <option value="todos" {% if not empresa_sel or empresa_sel=='todos' %}selected{% endif %}>Todos</option>
           {% for e in empresas %}
             <option value="{{ e }}" {% if empresa_sel==e %}selected{% endif %}>{{ e }}</option>
           {% endfor %}
@@ -33,9 +33,9 @@
       </div>
 
       <div class="col-md-4">
-        <label class="form-label">Marco</label>
-        <select name="marco" class="form-select">
-          <option value="todos">Todos</option>
+        <label class="form-label text-light">Marco</label>
+        <select name="marco" id="marco" class="form-select">
+          <option value="todos" {% if not marco_sel or marco_sel=='todos' %}selected{% endif %}>Todos</option>
           {% for m in marcos %}
             <option value="{{ m }}" {% if marco_sel==m %}selected{% endif %}>{{ m }}</option>
           {% endfor %}
@@ -43,9 +43,9 @@
       </div>
 
       <div class="col-md-4">
-        <label class="form-label">Tramo</label>
-        <select name="tramo" class="form-select">
-          <option value="todos">Todos</option>
+        <label class="form-label text-light">Tramo</label>
+        <select name="tramo" id="tramo" class="form-select">
+          <option value="todos" {% if not tramo_sel or tramo_sel=='todos' %}selected{% endif %}>Todos</option>
           {% for t in tramos %}
             <option value="{{ t }}" {% if tramo_sel==t %}selected{% endif %}>{{ t }}</option>
           {% endfor %}
@@ -68,6 +68,79 @@
   </div>
 </div>
 
+<script>
+const ALL_MARCOS = {{ marcos|tojson }};
+const ALL_TRAMOS = {{ tramos|tojson }};
+
+const selEmpresa = document.getElementById('empresa');
+const selMarco = document.getElementById('marco');
+const selTramo = document.getElementById('tramo');
+
+function setOptions(selectEl, values, includeTodos=true) {
+  const prev = selectEl.value;
+  selectEl.innerHTML = '';
+  if (includeTodos) {
+    selectEl.innerHTML += `<option value="todos">Todos</option>`;
+  }
+  values.forEach(v => {
+    selectEl.innerHTML += `<option value="${v}">${v}</option>`;
+  });
+  // intenta preservar selección si existe
+  if ([...selectEl.options].some(o => o.value === prev)) selectEl.value = prev;
+}
+
+selEmpresa.addEventListener('change', async function() {
+  const empresa = this.value;
+  selMarco.disabled = true;
+  selTramo.disabled = true;
+  setOptions(selTramo, [], true);
+
+  if (!empresa || empresa === 'todos') {
+    setOptions(selMarco, ALL_MARCOS, true);
+    selMarco.disabled = false;
+    selTramo.disabled = false;
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/marcos/${encodeURIComponent(empresa)}`);
+    const data = await res.json();
+    setOptions(selMarco, data.marcos || [], true);
+    selMarco.disabled = false;
+  } catch (e) {
+    setOptions(selMarco, [], true);
+    selMarco.disabled = false;
+  }
+});
+
+selMarco.addEventListener('change', async function() {
+  const empresa = selEmpresa.value;
+  const marco = this.value;
+  selTramo.disabled = true;
+
+  if (!empresa || empresa === 'todos') {
+    // sin empresa específica: mostrar todos los tramos
+    setOptions(selTramo, ALL_TRAMOS, true);
+    selTramo.disabled = false;
+    return;
+  }
+  if (!marco || marco === 'todos') {
+    setOptions(selTramo, [], true);
+    selTramo.disabled = false;
+    return;
+  }
+  try {
+    const res = await fetch(`/api/tramos/${encodeURIComponent(empresa)}/${encodeURIComponent(marco)}`);
+    const data = await res.json();
+    setOptions(selTramo, data.tramos || [], true);
+    selTramo.disabled = false;
+  } catch (e) {
+    setOptions(selTramo, [], true);
+    selTramo.disabled = false;
+  }
+});
+</script>
+
 <!-- ================= TABLA ================= -->
 
 {% if piezas %}
@@ -77,7 +150,7 @@
     <thead>
       <tr>
         <th>Código</th>
-        <th>Empresa</th>
+        <th>Cliente</th>
         <th>Marco</th>
         <th>Tramo</th>
       </tr>

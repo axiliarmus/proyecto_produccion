@@ -18,22 +18,22 @@
     <form method="POST" class="row g-3">
 
       <div class="col-md-3">
-        <label class="form-label">Fecha inicio</label>
+        <label class="form-label text-light">Fecha inicio</label>
         <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control">
       </div>
 
       <div class="col-md-3">
-        <label class="form-label">Fecha fin</label>
+        <label class="form-label text-light">Fecha fin</label>
         <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-control">
       </div>
 
       <div class="col-md-3">
-        <label class="form-label">Código pieza</label>
-        <input type="text" name="codigo" value="{{ codigo }}" class="form-control" placeholder="Ej: 1001">
+        <label class="form-label text-light">Código pieza</label>
+        <input type="text" name="codigo" value="{{ codigo or '' }}" class="form-control" placeholder="Ej: 1001 (vacío = todas)">
       </div>
 
       <div class="col-md-3">
-        <label class="form-label">Estado</label>
+        <label class="form-label text-light">Estado</label>
         <select name="estado" class="form-select">
           <option value="todos" {% if estado_sel=='todos' or not estado_sel %}selected{% endif %}>Todos</option>
           <option value="pendiente" {% if estado_sel=='pendiente' %}selected{% endif %}>Pendiente</option>
@@ -61,7 +61,7 @@
           <th>Operador</th>
           <th>Código</th>
           <th>Box</th>
-          <th>Empresa</th>
+          <th>Cliente</th>
           <th>Marco</th>
           <th>Tramo</th>
           <th>Estado</th>
