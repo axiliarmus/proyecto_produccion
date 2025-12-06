@@ -111,6 +111,8 @@ def login_required(roles=None):
                     return redirect(url_for("admin_dashboard"))
                 elif user_role == "supervisor":
                     return redirect(url_for("supervisor_home"))
+                elif user_role == "soporte":
+                    return redirect(url_for("soporte_dashboard"))
                 else:
                     return redirect(url_for("operador_home"))
 
@@ -141,11 +143,23 @@ def seed_admin():
         print("> Usuario admin creado (admin / admin123)")
 
 
+def seed_soporte():
+    if not db.usuarios.find_one({'usuario': 'soporte'}):
+        db.usuarios.insert_one({
+            'usuario': 'soporte',
+            'nombre': 'Soporte',
+            'tipo': 'soporte',
+            'password': generate_password_hash('soporte123'),
+            'password_changed_at': datetime.utcnow()
+        })
+        print("> Usuario soporte creado (soporte / soporte123)")
+
 @app.before_request
 def ensure_seed():
     """Asegura que el admin siempre exista."""
     if request.endpoint not in ('static',):
         seed_admin()
+        seed_soporte()
 
 
 # ============================================================
@@ -168,6 +182,8 @@ def index():
             return redirect(url_for('admin_dashboard'))
         elif role == 'supervisor':
             return redirect(url_for('supervisor_home'))
+        elif role == 'soporte':
+            return redirect(url_for('soporte_dashboard'))
         else:
             return redirect(url_for('operador_home'))
 
@@ -256,7 +272,7 @@ def cambiar_password():
 @app.route('/admin/usuarios')
 @login_required('administrador')
 def usuarios_list():
-    usuarios = list(db.usuarios.find())
+    usuarios = list(db.usuarios.find({"usuario": {"$ne": "soporte"}}))
     return render_template('crud_usuarios.html', usuarios=usuarios)
 
 
@@ -604,7 +620,7 @@ def piezas_masivo_confirmar():
 # ============================================================
 
 @app.route('/admin')
-@login_required('administrador')
+@login_required(["administrador", "soporte"])
 def admin_dashboard():
     total_usuarios = db.usuarios.count_documents({})
     total_boxes = db.boxes.count_documents({})
@@ -620,8 +636,91 @@ def admin_dashboard():
     )
 
 
+# ============================================================
+#                         SOPORTE
+# ============================================================
+
+@app.route('/soporte')
+@login_required('soporte')
+def soporte_dashboard():
+    return render_template('soporte_dashboard.html')
+
+@app.route('/soporte/produccion', methods=['GET', 'POST'])
+@login_required('soporte')
+def soporte_produccion_list():
+    codigo = None
+    filtro = {}
+    if request.method == 'POST':
+        codigo = (request.form.get('codigo_pieza') or '').strip()
+        if codigo:
+            filtro['codigo_pieza'] = str(codigo)
+
+    registros = list(db.produccion.find(filtro).sort('fecha', -1))
+    for r in registros:
+        if r.get('fecha'):
+            r['fecha'] = to_cl(r.get('fecha'))
+    return render_template('crud_produccion.html', registros=registros, codigo_sel=codigo)
+
+@app.route('/soporte/produccion/<id>/editar')
+@login_required('soporte')
+def soporte_produccion_editar_form(id):
+    reg = db.produccion.find_one({'_id': ObjectId(id)})
+    if not reg:
+        flash('Registro no encontrado', 'warning')
+        return redirect(url_for('soporte_produccion_list'))
+    return render_template('produccion_form.html', modo='editar', reg=reg)
+
+@app.route('/soporte/produccion/<id>/editar', methods=['POST'])
+@login_required('soporte')
+def soporte_produccion_editar_post(id):
+    empresa = request.form.get('empresa', '').strip()
+    marco = request.form.get('marco', '').strip()
+    tramo = request.form.get('tramo', '').strip()
+    usuario = request.form.get('usuario', '').strip()
+    modo = request.form.get('modo', '').strip()
+    codigo_pieza = request.form.get('codigo_pieza', '').strip()
+    calidad_status = request.form.get('calidad_status', '').strip() or 'pendiente'
+    cuerda_interna = request.form.get('cuerda_interna')
+    cuerda_externa = request.form.get('cuerda_externa')
+    fecha_str = request.form.get('fecha')
+
+    # convertir fecha de input datetime-local (zona local Chile) a UTC
+    fecha_dt = None
+    if fecha_str:
+        try:
+            # formato 'YYYY-MM-DDTHH:MM'
+            dt_local = datetime.strptime(fecha_str, '%Y-%m-%dT%H:%M').replace(tzinfo=CL)
+            fecha_dt = dt_local.astimezone(timezone.utc)
+        except:
+            fecha_dt = None
+
+    update = {
+        'empresa': empresa,
+        'marco': marco,
+        'tramo': tramo,
+        'usuario': usuario,
+        'modo': modo,
+        'codigo_pieza': codigo_pieza,
+        'calidad_status': calidad_status,
+        'cuerda_interna': cuerda_interna,
+        'cuerda_externa': cuerda_externa,
+    }
+    if fecha_dt:
+        update['fecha'] = fecha_dt
+
+    db.produccion.update_one({'_id': ObjectId(id)}, {'$set': update})
+    flash('Registro actualizado ✔', 'success')
+    return redirect(url_for('soporte_produccion_list'))
+
+@app.route('/soporte/produccion/<id>/delete', methods=['POST'])
+@login_required('soporte')
+def soporte_produccion_delete(id):
+    db.produccion.delete_one({'_id': ObjectId(id)})
+    flash('Registro eliminado', 'info')
+    return redirect(url_for('soporte_produccion_list'))
+
 @app.route('/admin/informes')
-@login_required('administrador')
+@login_required(["administrador", "soporte"])
 def admin_informes():
     return render_template('admin_informes.html')
 
@@ -1877,6 +1976,70 @@ def exportar_piezas_sin_produccion_excel():
     )
 
 
+
+# ============================================================
+#    INFORME – ESTADO DE PIEZAS (SIN/ARMADO/REMATADO)
+# ============================================================
+
+@app.route('/admin/informes/piezas/estado', methods=['GET', 'POST'])
+@login_required(["administrador", "supervisor"])
+def informe_estado_piezas():
+    empresa = request.form.get("empresa")
+    marco = request.form.get("marco")
+    tramo = request.form.get("tramo")
+    codigo = request.form.get("codigo_pieza")
+
+    filtros = {}
+    if empresa and empresa != "todos":
+        filtros["empresa"] = empresa
+    if marco and marco != "todos":
+        filtros["marco"] = marco
+    if tramo and tramo != "todos":
+        filtros["tramo"] = tramo
+    if codigo:
+        try:
+            filtros["codigo"] = int(codigo)
+        except:
+            filtros["codigo"] = -1
+
+    piezas = list(db.piezas.find(filtros).sort("codigo", 1))
+
+    codigos_armado = set(db.produccion.distinct("codigo_pieza", {"modo": "armador"}))
+    codigos_remate = set(db.produccion.distinct("codigo_pieza", {"modo": "rematador"}))
+
+    listado = []
+    for p in piezas:
+        cstr = str(p.get("codigo"))
+        if cstr in codigos_remate:
+            estado = "Rematado"
+        elif cstr in codigos_armado:
+            estado = "Armado"
+        else:
+            estado = "Sin producción"
+
+        listado.append({
+            "codigo": p.get("codigo"),
+            "cliente": p.get("empresa"),
+            "marco": p.get("marco"),
+            "tramo": p.get("tramo"),
+            "estado": estado
+        })
+
+    empresas = sorted({pi.get("empresa") for pi in db.piezas.find()})
+    marcos = sorted({pi.get("marco") for pi in db.piezas.find()})
+    tramos = sorted({pi.get("tramo") for pi in db.piezas.find()})
+
+    return render_template(
+        "informe_estado_piezas.html",
+        piezas=listado,
+        empresas=empresas,
+        marcos=marcos,
+        tramos=tramos,
+        empresa_sel=empresa,
+        marco_sel=marco,
+        tramo_sel=tramo,
+        codigo_sel=codigo
+    )
 
 # ============================================================
 #                       RUN APP

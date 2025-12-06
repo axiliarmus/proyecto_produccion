@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}Soporte{% endblock %}
+
+{% block content %}
+
+<div class="text-center mb-4">
+  <h2 class="fw-bold">Panel de Soporte</h2>
+  <p class="text-secondary mb-0">Accesos rápidos para tareas de ayuda y revisión.</p>
+</div>
+
+<div class="row g-4 justify-content-center">
+  <div class="col-md-4 col-lg-3">
+    <div class="card bg-dark border-light shadow text-center h-100">
+      <div class="card-body d-flex flex-column justify-content-between">
+        <div>
+          <div class="display-6">🛠️</div>
+          <h5 class="card-title text-light mt-2">Panel Administrador</h5>
+          <p class="text-secondary">Acceso al panel principal de administración.</p>
+        </div>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-accent w-100 mt-3">Ir al Panel</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4 col-lg-3">
+    <div class="card bg-dark border-light shadow text-center h-100">
+      <div class="card-body d-flex flex-column justify-content-between">
+        <div>
+          <div class="display-6">📄</div>
+          <h5 class="card-title text-light mt-2">Registros de Producción</h5>
+          <p class="text-secondary">Ver, editar y eliminar registros realizados por operadores.</p>
+        </div>
+        <a href="{{ url_for('soporte_produccion_list') }}" class="btn btn-warning w-100 mt-3">Abrir Registros</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="text-center mt-5">
+  <a href="{{ url_for('index') }}" class="btn btn-secondary px-4">← Volver</a>
+</div>
+
+{% endblock %}

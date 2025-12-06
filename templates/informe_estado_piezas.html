@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% block title %}Informe Estado de Piezas{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Informe – Estado de Piezas</h2>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <p class="text-secondary mb-0">Ver si cada pieza está sin producir, en armado o rematada.</p>
+  <a href="{{ url_for('admin_informes') }}" class="btn btn-secondary">← Volver a Informes</a>
+  </div>
+
+<!-- ================= FILTROS ================= -->
+<div class="card bg-dark border-light shadow mb-4">
+  <div class="card-body">
+    <form method="POST" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label text-light">Cliente</label>
+        <select name="empresa" id="empresa" class="form-select">
+          <option value="todos" {% if not empresa_sel or empresa_sel=='todos' %}selected{% endif %}>Todos</option>
+          {% for e in empresas %}
+            <option value="{{ e }}" {% if empresa_sel==e %}selected{% endif %}>{{ e }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Marco</label>
+        <select name="marco" id="marco" class="form-select">
+          <option value="todos" {% if not marco_sel or marco_sel=='todos' %}selected{% endif %}>Todos</option>
+          {% for m in marcos %}
+            <option value="{{ m }}" {% if marco_sel==m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Tramo</label>
+        <select name="tramo" id="tramo" class="form-select">
+          <option value="todos" {% if not tramo_sel or tramo_sel=='todos' %}selected{% endif %}>Todos</option>
+          {% for t in tramos %}
+            <option value="{{ t }}" {% if tramo_sel==t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Código pieza</label>
+        <input type="text" name="codigo_pieza" value="{{ codigo_sel or '' }}" class="form-control" placeholder="Ej: 1001 (vacío = todas)">
+      </div>
+
+      <div class="col-md-12">
+        <button class="btn btn-accent w-100">🔍 Filtrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= TABLA ================= -->
+{% if piezas %}
+<div class="table-responsive mb-4">
+  <table class="table table-dark table-striped align-middle">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Cliente</th>
+        <th>Marco</th>
+        <th>Tramo</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in piezas %}
+      <tr>
+        <td>{{ p.codigo }}</td>
+        <td>{{ p.cliente }}</td>
+        <td>{{ p.marco }}</td>
+        <td>{{ p.tramo }}</td>
+        <td>{{ p.estado }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="alert alert-secondary text-center">No se encontraron resultados.</div>
+{% endif %}
+
+<script>
+const selEmpresa = document.getElementById('empresa');
+const selMarco = document.getElementById('marco');
+const selTramo = document.getElementById('tramo');
+
+function setOptions(selectEl, values) {
+  const prev = selectEl.value;
+  selectEl.innerHTML = '<option value="todos">Todos</option>';
+  (values || []).forEach(v => selectEl.innerHTML += `<option value="${v}">${v}</option>`);
+  if ([...selectEl.options].some(o => o.value === prev)) selectEl.value = prev;
+}
+
+selEmpresa && selEmpresa.addEventListener('change', async function() {
+  const empresa = this.value;
+  setOptions(selTramo, []);
+  if (!empresa || empresa === 'todos') {
+    // sin cliente: mantener marcos actuales
+    return;
+  }
+  try {
+    const res = await fetch(`/api/marcos/${encodeURIComponent(empresa)}`);
+    const data = await res.json();
+    setOptions(selMarco, data.marcos || []);
+  } catch (e) {
+    setOptions(selMarco, []);
+  }
+});
+
+selMarco && selMarco.addEventListener('change', async function() {
+  const empresa = selEmpresa.value;
+  const marco = this.value;
+  if (!empresa || empresa === 'todos' || !marco || marco === 'todos') {
+    setOptions(selTramo, []);
+    return;
+  }
+  try {
+    const res = await fetch(`/api/tramos/${encodeURIComponent(empresa)}/${encodeURIComponent(marco)}`);
+    const data = await res.json();
+    setOptions(selTramo, data.tramos || []);
+  } catch (e) {
+    setOptions(selTramo, []);
+  }
+});
+</script>
+
+{% endblock %}

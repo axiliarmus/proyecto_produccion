@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block title %}Editar Registro{% endblock %}
+
+{% block content %}
+<h2 class="mb-3">Editar Registro de Producción</h2>
+
+<div class="card bg-dark border-light">
+  <div class="card-body">
+    <form method="post" action="{{ url_for('soporte_produccion_editar_post', id=reg._id) }}" class="row g-3">
+
+      <div class="col-md-4">
+        <label class="form-label text-light">Fecha</label>
+        {% set fecha_val = reg.fecha.strftime('%Y-%m-%dT%H:%M') if reg.fecha %}
+        <input type="datetime-local" name="fecha" value="{{ fecha_val or '' }}" class="form-control bg-secondary text-light">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label text-light">Operador</label>
+        <input type="text" name="usuario" value="{{ reg.usuario or '' }}" class="form-control bg-secondary text-light">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label text-light">Modo</label>
+        <select name="modo" class="form-select bg-secondary text-light">
+          <option value="armador" {% if reg.modo=='armador' %}selected{% endif %}>Armador</option>
+          <option value="rematador" {% if reg.modo=='rematador' %}selected{% endif %}>Rematador</option>
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Box</label>
+        <input type="text" name="box" value="{{ reg.box or '' }}" class="form-control bg-secondary text-light" disabled>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Código pieza</label>
+        <input type="text" name="codigo_pieza" value="{{ reg.codigo_pieza or '' }}" class="form-control bg-secondary text-light">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Cliente</label>
+        <input type="text" name="empresa" value="{{ reg.empresa or '' }}" class="form-control bg-secondary text-light">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Marco</label>
+        <input type="text" name="marco" value="{{ reg.marco or '' }}" class="form-control bg-secondary text-light">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Tramo</label>
+        <input type="text" name="tramo" value="{{ reg.tramo or '' }}" class="form-control bg-secondary text-light">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Cuerda interna</label>
+        <input type="text" name="cuerda_interna" value="{{ reg.cuerda_interna if reg.cuerda_interna is defined else '' }}" class="form-control bg-secondary text-light">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Cuerda externa</label>
+        <input type="text" name="cuerda_externa" value="{{ reg.cuerda_externa if reg.cuerda_externa is defined else '' }}" class="form-control bg-secondary text-light">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Estado calidad</label>
+        <select name="calidad_status" class="form-select bg-secondary text-light">
+          <option value="pendiente" {% if reg.calidad_status=='pendiente' %}selected{% endif %}>Pendiente</option>
+          <option value="aprobado" {% if reg.calidad_status=='aprobado' %}selected{% endif %}>Aprobado</option>
+          <option value="rechazado" {% if reg.calidad_status=='rechazado' %}selected{% endif %}>Rechazado</option>
+        </select>
+      </div>
+
+      <div class="col-12 d-flex justify-content-between">
+        <a href="{{ url_for('soporte_produccion_list') }}" class="btn btn-secondary">← Volver</a>
+        <button type="submit" class="btn btn-accent">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
