@@ -274,20 +274,20 @@ def cambiar_password():
 # ============================================================
 
 @app.route('/admin/usuarios')
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def usuarios_list():
     usuarios = list(db.usuarios.find({"usuario": {"$ne": "soporte"}}))
     return render_template('crud_usuarios.html', usuarios=usuarios)
 
 
 @app.route('/admin/usuarios/nuevo')
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def usuarios_nuevo_form():
     return render_template('usuario_form.html', modo='nuevo')
 
 
 @app.route('/admin/usuarios/nuevo', methods=['POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def usuarios_nuevo_post():
     usuario = request.form['usuario'].strip()
     nombre = request.form['nombre'].strip()
@@ -310,7 +310,7 @@ def usuarios_nuevo_post():
 
 
 @app.route('/admin/usuarios/<id>/editar')
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def usuarios_editar_form(id):
     usuario = db.usuarios.find_one({'_id': ObjectId(id)})
     if not usuario:
@@ -321,7 +321,7 @@ def usuarios_editar_form(id):
 
 
 @app.route('/admin/usuarios/<id>/editar', methods=['POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def usuarios_editar_post(id):
     nombre = request.form['nombre'].strip()
     tipo = request.form['tipo']
@@ -337,7 +337,7 @@ def usuarios_editar_post(id):
 
 
 @app.route('/admin/usuarios/<id>/delete', methods=['POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def usuarios_delete(id):
     if str(session.get('user_id')) == id:
         flash('No puedes eliminar tu propio usuario', 'warning')
@@ -353,20 +353,20 @@ def usuarios_delete(id):
 # ============================================================
 
 @app.route('/admin/boxes')
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def boxes_list():
     boxes = list(db.boxes.find())
     return render_template('crud_boxes.html', boxes=boxes)
 
 
 @app.route('/admin/boxes/nuevo')
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def boxes_nuevo_form():
     return render_template('box_form.html', modo='nuevo')
 
 
 @app.route('/admin/boxes/nuevo', methods=['POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def boxes_nuevo_post():
     codigo = request.form['codigo'].strip()
     descripcion = request.form['descripcion'].strip()
@@ -386,7 +386,7 @@ def boxes_nuevo_post():
 
 
 @app.route('/admin/boxes/<id>/editar')
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def boxes_editar_form(id):
     box = db.boxes.find_one({'_id': ObjectId(id)})
     if not box:
@@ -397,7 +397,7 @@ def boxes_editar_form(id):
 
 
 @app.route('/admin/boxes/<id>/editar', methods=['POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def boxes_editar_post(id):
     codigo = request.form['codigo'].strip()
     descripcion = request.form['descripcion'].strip()
@@ -411,7 +411,7 @@ def boxes_editar_post(id):
 
 
 @app.route('/admin/boxes/<id>/delete', methods=['POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def boxes_delete(id):
     db.boxes.delete_one({'_id': ObjectId(id)})
     flash('Box eliminado', 'info')
@@ -421,7 +421,7 @@ def boxes_delete(id):
 # ============================================================
 
 @app.route('/admin/piezas')
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def piezas_list():
     piezas = list(db.piezas.find().sort('codigo', 1))
     return render_template('crud_piezas.html', piezas=piezas)
@@ -430,13 +430,13 @@ def piezas_list():
 # ==================== NUEVA PIEZA ====================
 
 @app.route('/admin/piezas/nuevo')
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def piezas_nuevo_form():
     return render_template('pieza_form.html', modo='nuevo', pieza=None)
 
 
 @app.route('/admin/piezas/nuevo', methods=['POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def piezas_nuevo_post():
     empresa = request.form['empresa'].strip()
     marco = request.form['marco'].strip()
@@ -478,7 +478,7 @@ def piezas_nuevo_post():
 # ==================== EDITAR PIEZA ====================
 
 @app.route('/admin/piezas/<id>/editar')
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def piezas_editar_form(id):
     pieza = db.piezas.find_one({'_id': ObjectId(id)})
     if not pieza:
@@ -488,7 +488,7 @@ def piezas_editar_form(id):
 
 
 @app.route('/admin/piezas/<id>/editar', methods=['POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def piezas_editar_post(id):
     empresa = request.form['empresa'].strip()
     marco = request.form['marco'].strip()
@@ -521,7 +521,7 @@ def piezas_editar_post(id):
 # ==================== ELIMINAR ====================
 
 @app.route('/admin/piezas/<id>/delete', methods=['POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def piezas_delete(id):
     db.piezas.delete_one({'_id': ObjectId(id)})
     flash('Pieza eliminada', 'info')
@@ -532,14 +532,14 @@ def piezas_delete(id):
 # ============================================================
 
 @app.route('/api/marcos/<empresa>')
-@login_required(["administrador", "supervisor"])
+@login_required(["administrador", "supervisor", "soporte"])
 def api_marcos(empresa):
     marcos = db.piezas.distinct("marco", {"empresa": empresa})
     return {"marcos": marcos}
 
 
 @app.route('/api/tramos/<empresa>/<marco>')
-@login_required(["administrador", "supervisor"])
+@login_required(["administrador", "supervisor", "soporte"])
 def api_tramos(empresa, marco):
     tramos = db.piezas.distinct("tramo", {"empresa": empresa, "marco": marco})
     return {"tramos": tramos}
@@ -551,7 +551,7 @@ def api_tramos(empresa, marco):
 # ============================================================
 
 @app.route('/admin/piezas/masivo', methods=['GET', 'POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def piezas_masivo():
     filtros = {}
     piezas = []
@@ -589,7 +589,7 @@ def piezas_masivo():
 # ============================================================
 
 @app.route('/admin/piezas/masivo/confirmar', methods=['POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def piezas_masivo_confirmar():
     filtros = json.loads(request.form.get("filtros"))
     campo = request.form.get("campo")
@@ -666,7 +666,7 @@ def soporte_produccion_list():
     return render_template('crud_produccion.html', registros=registros, codigo_sel=codigo)
 
 @app.route('/admin/produccion')
-@login_required(['administrador', 'cliente'])
+@login_required(['administrador', 'cliente', 'soporte'])
 def admin_produccion_list():
     registros = list(db.produccion.find().sort('fecha', -1))
     for r in registros:
@@ -743,7 +743,7 @@ def admin_informes():
 # ============================================================
 
 @app.route('/admin/informes/horarios', methods=['GET', 'POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def informe_horarios():
     operadores = list(db.usuarios.find({'tipo': 'operador'}))
     operador_sel = None
@@ -825,7 +825,7 @@ def exportar_horarios_excel():
 # ============================================================
 
 @app.route('/admin/informes/piezas/rematadas', methods=['GET', 'POST'])
-@login_required(["administrador", "supervisor", "cliente"])
+@login_required(["administrador", "supervisor", "soporte", "cliente"])
 def informe_piezas_rematadas():
 
     filtro = {"modo": "rematador"}  # solo piezas rematadas
@@ -907,7 +907,7 @@ def informe_piezas_rematadas():
 # ============================================================
 
 @app.route('/admin/informes/piezas_rematadas/export', methods=['POST'])
-@login_required(["administrador", "supervisor", "cliente"])
+@login_required(["administrador", "supervisor", "soporte", "cliente"])
 def exportar_piezas_rematadas_excel():
     # Leemos filtros desde el form (cuidando 'None')
     fecha_inicio = (request.form.get("fecha_inicio") or "").strip()
@@ -1013,7 +1013,7 @@ def exportar_piezas_rematadas_excel():
 # ============================================================
 
 @app.route('/admin/informes/piezas/pendientes-remate', methods=['GET', 'POST'])
-@login_required(["administrador", "supervisor", "cliente"])
+@login_required(["administrador", "supervisor", "soporte", "cliente"])
 def informe_piezas_pendientes_remate():
     # Filtro base: solo registros de ARMADOR
     filtro_base = {"modo": "armador"}
@@ -1099,7 +1099,7 @@ def informe_piezas_pendientes_remate():
 # ============================================================
 
 @app.route('/admin/informes/piezas/pendientes-remate/export', methods=['POST'])
-@login_required(["administrador", "supervisor", "cliente"])
+@login_required(["administrador", "supervisor", "soporte", "cliente"])
 def exportar_piezas_pendientes_remate_excel():
     # Base: solo registros en modo "armador"
     filtro_base = {"modo": "armador"}
@@ -1226,7 +1226,7 @@ def exportar_piezas_pendientes_remate_excel():
 # ============================================================
 
 @app.route('/admin/informes/operadores', methods=['GET', 'POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def informe_operadores():
     operadores = list(db.usuarios.find({'tipo': 'operador'}))
     operador_sel = None
@@ -1286,7 +1286,7 @@ def informe_operadores():
 
 
 @app.route('/admin/informes/operadores/export', methods=['POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def exportar_operadores_excel():
     operador_sel = request.form.get("operador")
     fecha_inicio = request.form.get("fecha_inicio")
@@ -1682,7 +1682,7 @@ def supervisor_validar_pieza(id):
 # ============================================================
 
 @app.route('/admin/informes/valor-operador', methods=['GET', 'POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def informe_piezas_operador():
 
     # Lista de operadores únicos
@@ -1789,7 +1789,7 @@ def informe_piezas_operador():
 # ============================================================
 
 @app.route('/admin/informes/valor-operador/export', methods=['POST'])
-@login_required('administrador')
+@login_required(['administrador', 'soporte'])
 def exportar_valor_operador_excel():
 
     operador_sel = request.form.get("operador")
@@ -1879,7 +1879,7 @@ def exportar_valor_operador_excel():
 # ============================================================
 
 @app.route('/admin/informes/piezas/sin-produccion', methods=['GET', 'POST'])
-@login_required(["administrador", "supervisor", "cliente"])
+@login_required(["administrador", "supervisor", "soporte", "cliente"])
 def informe_piezas_sin_produccion():
 
     empresa = request.form.get("empresa")
@@ -1931,7 +1931,7 @@ def informe_piezas_sin_produccion():
 # ============================================================
 
 @app.route('/admin/informes/piezas/sin-produccion/export', methods=['POST'])
-@login_required(["administrador", "supervisor", "cliente"])
+@login_required(["administrador", "supervisor", "soporte", "cliente"])
 def exportar_piezas_sin_produccion_excel():
 
     empresa = request.form.get("empresa")
@@ -1995,7 +1995,7 @@ def exportar_piezas_sin_produccion_excel():
 # ============================================================
 
 @app.route('/admin/informes/piezas/estado', methods=['GET', 'POST'])
-@login_required(["administrador", "supervisor", "cliente"])
+@login_required(["administrador", "supervisor", "soporte", "cliente"])
 def informe_estado_piezas():
     empresa = request.form.get("empresa")
     marco = request.form.get("marco")
@@ -2060,7 +2060,7 @@ def informe_estado_piezas():
 
 
 @app.route('/admin/informes/piezas/tarjetas', methods=['GET'])
-@login_required(["administrador", "supervisor", "cliente"])
+@login_required(["administrador", "supervisor", "soporte", "cliente"])
 def informe_piezas_tarjetas():
     clientes = db.piezas.distinct("empresa")
     resultado = []
