@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}Registros de Producción (Admin){% endblock %}
+
+{% block content %}
+
+<h2 class="mb-3">Registros de Producción</h2>
+
+<div class="d-flex justify-content-between mb-3">
+  <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">← Volver al Panel</a>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-dark table-striped align-middle">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Modo</th>
+        <th>Operador</th>
+        <th>Box</th>
+        <th>Código</th>
+        <th>Cliente</th>
+        <th>Marco</th>
+        <th>Tramo</th>
+        <th>C. Interna</th>
+        <th>C. Externa</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in registros %}
+      <tr>
+        <td>{% if r.fecha %}{{ r.fecha.strftime('%d-%m-%Y %H:%M') }}{% else %}—{% endif %}</td>
+        <td>{{ r.modo }}</td>
+        <td>{{ r.usuario }}</td>
+        <td>{{ r.box }}</td>
+        <td>{{ r.codigo_pieza }}</td>
+        <td>{{ r.empresa }}</td>
+        <td>{{ r.marco }}</td>
+        <td>{{ r.tramo }}</td>
+        <td>{{ r.cuerda_interna if r.cuerda_interna is defined else '—' }}</td>
+        <td>{{ r.cuerda_externa if r.cuerda_externa is defined else '—' }}</td>
+        <td>{{ r.calidad_status|capitalize }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if registros|length == 0 %}
+    <div class="alert alert-secondary text-center mt-3">No hay registros de producción.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

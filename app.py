@@ -113,6 +113,8 @@ def login_required(roles=None):
                     return redirect(url_for("supervisor_home"))
                 elif user_role == "soporte":
                     return redirect(url_for("soporte_dashboard"))
+                elif user_role == "cliente":
+                    return redirect(url_for("admin_informes"))
                 else:
                     return redirect(url_for("operador_home"))
 
@@ -184,6 +186,8 @@ def index():
             return redirect(url_for('supervisor_home'))
         elif role == 'soporte':
             return redirect(url_for('soporte_dashboard'))
+        elif role == 'cliente':
+            return redirect(url_for('admin_informes'))
         else:
             return redirect(url_for('operador_home'))
 
@@ -661,6 +665,15 @@ def soporte_produccion_list():
             r['fecha'] = to_cl(r.get('fecha'))
     return render_template('crud_produccion.html', registros=registros, codigo_sel=codigo)
 
+@app.route('/admin/produccion')
+@login_required(['administrador', 'cliente'])
+def admin_produccion_list():
+    registros = list(db.produccion.find().sort('fecha', -1))
+    for r in registros:
+        if r.get('fecha'):
+            r['fecha'] = to_cl(r.get('fecha'))
+    return render_template('crud_produccion_admin.html', registros=registros)
+
 @app.route('/soporte/produccion/<id>/editar')
 @login_required('soporte')
 def soporte_produccion_editar_form(id):
@@ -720,9 +733,9 @@ def soporte_produccion_delete(id):
     return redirect(url_for('soporte_produccion_list'))
 
 @app.route('/admin/informes')
-@login_required(["administrador", "soporte"])
+@login_required(["administrador", "soporte", "cliente"])
 def admin_informes():
-    return render_template('admin_informes.html')
+    return render_template('admin_informes.html', is_cliente=(session.get('role') == 'cliente'))
 
 
 # ============================================================
@@ -812,7 +825,7 @@ def exportar_horarios_excel():
 # ============================================================
 
 @app.route('/admin/informes/piezas/rematadas', methods=['GET', 'POST'])
-@login_required(["administrador", "supervisor"])
+@login_required(["administrador", "supervisor", "cliente"])
 def informe_piezas_rematadas():
 
     filtro = {"modo": "rematador"}  # solo piezas rematadas
@@ -894,7 +907,7 @@ def informe_piezas_rematadas():
 # ============================================================
 
 @app.route('/admin/informes/piezas_rematadas/export', methods=['POST'])
-@login_required(["administrador", "supervisor"])
+@login_required(["administrador", "supervisor", "cliente"])
 def exportar_piezas_rematadas_excel():
     # Leemos filtros desde el form (cuidando 'None')
     fecha_inicio = (request.form.get("fecha_inicio") or "").strip()
@@ -1000,7 +1013,7 @@ def exportar_piezas_rematadas_excel():
 # ============================================================
 
 @app.route('/admin/informes/piezas/pendientes-remate', methods=['GET', 'POST'])
-@login_required(["administrador", "supervisor"])
+@login_required(["administrador", "supervisor", "cliente"])
 def informe_piezas_pendientes_remate():
     # Filtro base: solo registros de ARMADOR
     filtro_base = {"modo": "armador"}
@@ -1086,7 +1099,7 @@ def informe_piezas_pendientes_remate():
 # ============================================================
 
 @app.route('/admin/informes/piezas/pendientes-remate/export', methods=['POST'])
-@login_required(["administrador", "supervisor"])
+@login_required(["administrador", "supervisor", "cliente"])
 def exportar_piezas_pendientes_remate_excel():
     # Base: solo registros en modo "armador"
     filtro_base = {"modo": "armador"}
@@ -1866,7 +1879,7 @@ def exportar_valor_operador_excel():
 # ============================================================
 
 @app.route('/admin/informes/piezas/sin-produccion', methods=['GET', 'POST'])
-@login_required(["administrador", "supervisor"])
+@login_required(["administrador", "supervisor", "cliente"])
 def informe_piezas_sin_produccion():
 
     empresa = request.form.get("empresa")
@@ -1918,7 +1931,7 @@ def informe_piezas_sin_produccion():
 # ============================================================
 
 @app.route('/admin/informes/piezas/sin-produccion/export', methods=['POST'])
-@login_required(["administrador", "supervisor"])
+@login_required(["administrador", "supervisor", "cliente"])
 def exportar_piezas_sin_produccion_excel():
 
     empresa = request.form.get("empresa")
@@ -1982,7 +1995,7 @@ def exportar_piezas_sin_produccion_excel():
 # ============================================================
 
 @app.route('/admin/informes/piezas/estado', methods=['GET', 'POST'])
-@login_required(["administrador", "supervisor"])
+@login_required(["administrador", "supervisor", "cliente"])
 def informe_estado_piezas():
     empresa = request.form.get("empresa")
     marco = request.form.get("marco")
@@ -2040,6 +2053,43 @@ def informe_estado_piezas():
         tramo_sel=tramo,
         codigo_sel=codigo
     )
+
+# ============================================================
+# INFORME PIEZAS EN TARJETAS
+# ============================================================
+
+
+@app.route('/admin/informes/piezas/tarjetas', methods=['GET'])
+@login_required(["administrador", "supervisor", "cliente"])
+def informe_piezas_tarjetas():
+    clientes = db.piezas.distinct("empresa")
+    resultado = []
+    for cliente in clientes:
+        marcos = db.piezas.distinct("marco", {"empresa": cliente})
+        marcos_info = []
+        for m in marcos:
+            tramos = db.piezas.distinct("tramo", {"empresa": cliente, "marco": m})
+            tramos_info = []
+            for t in tramos:
+                total = db.piezas.count_documents({"empresa": cliente, "marco": m, "tramo": t})
+                rem = db.produccion.count_documents({"modo": "rematador", "empresa": cliente, "marco": m, "tramo": t})
+                tramos_info.append({
+                    "tramo": t, 
+                    "total": total,
+                    "rematadas": rem,
+                    "pendientes": max(total - rem, 0)
+                })
+            marcos_info.append({
+                "marco": m,
+                "tramos": sorted(tramos_info, key=lambda x: str(x["tramo"]))
+            })
+        resultado.append({
+            "cliente": cliente,
+            "marcos": sorted(marcos_info, key=lambda x: str(x["marco"]))
+        })
+
+    return render_template("informe_piezas_tarjetas.html", grupos=resultado)
+
 
 # ============================================================
 #                       RUN APP

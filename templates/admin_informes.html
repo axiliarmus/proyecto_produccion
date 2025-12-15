@@ -12,6 +12,7 @@
 <div class="row g-4 justify-content-center">
   
   <!-- Informe de horarios -->
+  {% if not is_cliente %}
   <div class="col-md-3">
     <div class="card bg-dark border-light shadow text-center h-100">
       <div class="card-body d-flex flex-column justify-content-between">
@@ -57,6 +58,7 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
 </div>
 
@@ -130,6 +132,41 @@
       </div>
     </div>
   </div>
+
+  <!-- Informe de tarjetas por cliente/marco/tramo -->
+  <div class="col-md-3">
+    <div class="card bg-dark border-light shadow text-center h-100">
+      <div class="card-body d-flex flex-column justify-content-between">
+        <div>
+          <h5 class="card-title text-light">📦 Piezas por Cliente (Tarjetas)</h5>
+          <p class="text-secondary">
+            Tarjetas por cliente con marco y tramos: N - M = pendientes.
+          </p>
+        </div>
+        <a href="{{ url_for('informe_piezas_tarjetas') }}" class="btn btn-accent w-100 mt-3">
+          Ver Informe
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Informe produccion -->
+  <div class="col-md-3">
+    <div class="card bg-dark border-light shadow text-center h-100">
+      <div class="card-body d-flex flex-column justify-content-between">
+        <div>
+          <h5 class="card-title text-light">📄 Registros de Producción</h5>
+          <p class="text-secondary">
+            Listado general de registros de producción (solo lectura para admin).
+          </p>
+        </div>
+        <a href="{{ url_for('admin_produccion_list') }}" class="btn btn-accent w-100 mt-3">
+          Ver Registros
+        </a>
+      </div>
+    </div>
+  </div>
+
 
 </div>
 

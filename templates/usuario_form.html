@@ -27,6 +27,7 @@
           <option value="administrador" {% if usuario and usuario.tipo=='administrador' %}selected{% endif %}>Administrador</option>
           <option value="supervisor" {% if usuario and usuario.tipo=='supervisor' %}selected{% endif %}>Supervisor</option>
           <option value="operador" {% if usuario and usuario.tipo=='operador' %}selected{% endif %}>Operador</option>
+          <option value="cliente" {% if usuario and usuario.tipo=='cliente' %}selected{% endif %}>Cliente</option>
         </select>
       </div>
 
