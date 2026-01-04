@@ -40,14 +40,19 @@
         </select>
       </div>
 
-      <!-- CÓDIGO DE PIEZA -->
+      <!-- CÓDIGO DE PIEZA (Input + Escáner QR) -->
       <div class="col-md-4">
         <label class="form-label">Código de pieza</label>
-        <input class="form-control" name="codigo_pieza" placeholder="Ej: 101" required>
+        <div class="input-group">
+          <input class="form-control" name="codigo_pieza" id="codigo_pieza_input" placeholder="Ej: A101" required>
+          <button type="button" class="btn btn-outline-secondary" id="btn-scan-qr">
+            📷 Barcode
+          </button>
+        </div>
       </div>
 
       <!-- SECCIÓN DE CUERDAS (solo armador) -->
-      <div id="cuerdas_section" style="display:block;">
+      <div id="cuerdas_section" class="row col-12 mt-2" style="display:flex;">
         
         <div class="col-md-3">
           <label class="form-label">Cuerda interna</label>
@@ -61,57 +66,92 @@
 
       </div>
 
-      <div class="col-12">
-        <button class="btn btn-accent">Registrar pieza</button>
+      <div class="col-12 mt-4">
+        <button class="btn btn-accent w-100 py-2 fw-bold">Registrar pieza</button>
       </div>
 
     </form>
   </div>
 </div>
 
-<h5 class="mb-2">Piezas producidas hoy</h5>
+<!-- Modal para Escáner QR -->
+<div class="modal fade" id="qrModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-white">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Escanear Código de Barras</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <div id="reader" style="width: 100%;"></div>
+        <p class="mt-2 text-muted small">Apunta la cámara al código de barras de la pieza</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">Mis Registros de Producción</h5>
+</div>
+
+<!-- Filtro de Fechas -->
+<div class="card bg-dark border-light shadow mb-4">
+  <div class="card-body p-3">
+    <form method="POST" action="{{ url_for('operador_home') }}" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label text-light small">Desde</label>
+        <input type="date" name="fecha_inicio" class="form-control form-control-sm" value="{{ fecha_inicio }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label text-light small">Hasta</label>
+        <input type="date" name="fecha_fin" class="form-control form-control-sm" value="{{ fecha_fin }}">
+      </div>
+      <div class="col-md-4">
+        <button class="btn btn-accent btn-sm w-100">Filtrar</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 {% if piezas_hoy %}
   <div class="table-responsive">
     <table class="table table-dark table-striped align-middle">
       <thead>
         <tr>
-          <th>Hora</th>
+          <th>Fecha</th>
           <th>Código</th>
-          <th>Modo</th>
-          <th>Box</th>
-          <th>Empresa</th>
           <th>Marco</th>
           <th>Tramo</th>
-          <th>Estado</th>
+          <th>Modo</th>
+          <th>Valor Unit.</th>
+          <th>Peso</th>
+          <th>Total</th>
         </tr>
       </thead>
       <tbody>
         {% for p in piezas_hoy %}
         <tr>
-          <td>{{ p.fecha.strftime('%H:%M:%S') }}</td>
+          <td>{{ p.fecha.strftime('%d-%m-%Y %H:%M') }}</td>
           <td>{{ p.codigo_pieza }}</td>
-          <td>{{ p.modo|capitalize }}</td>
-          <td>{{ p.box }}</td>
-          <td>{{ p.empresa }}</td>
           <td>{{ p.marco }}</td>
           <td>{{ p.tramo }}</td>
-          <td>
-            {% if p.calidad_status == 'aprobado' %}
-              <span class="badge bg-success">Aprobado</span>
-            {% elif p.calidad_status == 'rechazado' %}
-              <span class="badge bg-danger">Rechazado</span>
-            {% else %}
-              <span class="badge bg-secondary">Pendiente</span>
-            {% endif %}
-          </td>
+          <td>{{ p.modo|capitalize }}</td>
+          <td>${{ "%.0f"|format(p.valor_calculado) }}</td>
+          <td>{{ "%.2f"|format(p.peso_calculado) }}</td>
+          <td>${{ "%.0f"|format(p.total_calculado) }}</td>
         </tr>
         {% endfor %}
       </tbody>
+      <tfoot>
+        <tr class="fw-bold bg-secondary">
+          <td colspan="7" class="text-end">TOTAL GENERAL:</td>
+          <td>${{ "%.0f"|format(total_general) }}</td>
+        </tr>
+      </tfoot>
     </table>
   </div>
 {% else %}
-  <div class="alert alert-secondary">Aún no hay piezas registradas hoy.</div>
+  <div class="alert alert-secondary">No se encontraron registros en el rango seleccionado.</div>
 {% endif %}
 
 {% if jornada %}
@@ -121,8 +161,10 @@
   </div>
 {% endif %}
 
-<!-- SCRIPT PARA MOSTRAR/OCULTAR CUERDAS -->
+<!-- SCRIPT PARA MOSTRAR/OCULTAR CUERDAS Y ESCÁNER QR -->
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <script>
+// Lógica de Cuerdas
 document.getElementById("modo").addEventListener("change", function () {
     let valor = this.value;
     let cuerdas = document.getElementById("cuerdas_section");
@@ -133,6 +175,68 @@ document.getElementById("modo").addEventListener("change", function () {
         cuerdas.style.display = "none";
     }
 });
+
+// Inicializar estado de cuerdas
+document.getElementById("modo").dispatchEvent(new Event('change'));
+
+// Lógica de Escáner QR
+const html5QrCode = new Html5Qrcode("reader", { 
+    formatsToSupport: [ 
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.UPC_A
+    ]
+});
+const qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
+let isScanning = false;
+
+document.getElementById('btn-scan-qr').addEventListener('click', () => {
+    qrModal.show();
+    startScanning();
+});
+
+document.getElementById('qrModal').addEventListener('hidden.bs.modal', () => {
+    stopScanning();
+});
+
+function startScanning() {
+    if (isScanning) return;
+    isScanning = true;
+    
+    html5QrCode.start(
+        { facingMode: "environment" }, 
+        {
+            fps: 10,
+            qrbox: { width: 300, height: 150 }
+        },
+        (decodedText, decodedResult) => {
+            // Success callback
+            document.getElementById('codigo_pieza_input').value = decodedText;
+            stopScanning();
+            qrModal.hide();
+            // Opcional: Auto-submit o foco
+            // document.forms[0].submit(); 
+        },
+        (errorMessage) => {
+            // Error callback (ignorar errores de lectura continua)
+        }
+    ).catch(err => {
+        console.error("Error al iniciar cámara", err);
+        isScanning = false;
+    });
+}
+
+function stopScanning() {
+    if (isScanning) {
+        html5QrCode.stop().then(() => {
+            isScanning = false;
+            html5QrCode.clear();
+        }).catch(err => {
+            console.error("Error al detener cámara", err);
+        });
+    }
+}
 </script>
 
 {% endblock %}

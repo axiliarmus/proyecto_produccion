@@ -54,24 +54,40 @@
       <table class="table table-dark table-striped align-middle">
         <thead>
           <tr>
+            <th>Fecha</th>
+            <th>Código</th>
             <th>Operador</th>
-            <th>Tipo</th>
+            <th>Modo</th>
             <th>Marco</th>
             <th>Tramo</th>
-            <th>Cantidad</th>
+            <th>Cant.</th>
+            <th>Peso</th>
+            <th>Precio Unit.</th>
+            <th>Total</th>
           </tr>
         </thead>
         <tbody>
           {% for r in datos_tabla %}
           <tr>
-            <td>{{ r.usuario }}</td>
+            <td>{{ r.fecha.strftime('%d-%m-%Y') if r.fecha else '—' }}</td>
+            <td>{{ r.codigo }}</td>
+            <td>{{ r.operador }}</td>
             <td>{{ r.modo|capitalize }}</td>
             <td>{{ r.marco }}</td>
             <td>{{ r.tramo }}</td>
-            <td><span class="badge bg-accent fs-6">{{ r.cantidad }}</span></td>
+            <td>{{ r.cantidad }}</td>
+            <td>{{ "%.2f"|format(r.peso) }}</td>
+            <td>${{ "%.0f"|format(r.valor_unitario) }}</td>
+            <td>${{ "%.0f"|format(r.total) }}</td>
           </tr>
           {% endfor %}
         </tbody>
+        <tfoot>
+            <tr class="fw-bold bg-secondary">
+                <td colspan="9" class="text-end">TOTAL GENERAL:</td>
+                <td>${{ "%.0f"|format(total_general) }}</td>
+            </tr>
+        </tfoot>
       </table>
     </div>
     {% else %}
@@ -80,8 +96,6 @@
   </div>
 </div>
 
-<div class="text-center mt-4">
-  <a href="{{ url_for('admin_informes') }}" class="btn btn-secondary px-4">← Volver a Informes</a>
-</div>
+ 
 
 {% endblock %}

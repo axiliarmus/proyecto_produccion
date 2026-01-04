@@ -1,13 +1,102 @@
 {% extends 'base.html' %}
-{% block title %}Registros de Producción (Admin){% endblock %}
+{% block title %}{% if archived_view %}Registros Archivados (Admin){% else %}Registros de Producción (Admin){% endif %}{% endblock %}
 
 {% block content %}
 
-<h2 class="mb-3">Registros de Producción</h2>
+<h2 class="mb-3">{% if archived_view %}Registros Archivados{% else %}Registros de Producción{% endif %}</h2>
 
-<div class="d-flex justify-content-between mb-3">
-  <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">← Volver al Panel</a>
+<div class="card bg-dark border-light shadow mb-4">
+  <div class="card-body">
+    <form method="POST" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label text-light">Operador</label>
+        <select name="operador" class="form-select">
+          <option value="todos">Todos</option>
+          {% for op in operadores %}
+            <option value="{{ op }}" {% if operador_sel == op %}selected{% endif %}>{{ op }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {% if archived_view %}
+      <div class="col-md-3">
+        <label class="form-label text-light">Mes</label>
+        <input type="month" name="mes" class="form-control" value="{{ mes_sel or '' }}">
+      </div>
+      {% endif %}
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Código</label>
+        <input type="text" name="codigo" class="form-control" value="{{ codigo_sel or '' }}">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Desde</label>
+        <input type="date" name="fecha_inicio" class="form-control" value="{{ fecha_inicio or '' }}">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label text-light">Hasta</label>
+        <input type="date" name="fecha_fin" class="form-control" value="{{ fecha_fin or '' }}">
+      </div>
+
+      <div class="col-md-12 text-end">
+        <button class="btn btn-accent w-100">Filtrar</button>
+      </div>
+    </form>
+    
+    <div class="row mt-3 g-2">
+      <div class="col-md-6">
+        <form method="POST" action="{{ archived_view and url_for('exportar_produccion_archivada_excel') or url_for('exportar_produccion_excel') }}">
+            <input type="hidden" name="operador" value="{{ operador_sel or 'todos' }}">
+            <input type="hidden" name="codigo" value="{{ codigo_sel or '' }}">
+            <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
+            <input type="hidden" name="fecha_fin" value="{{ fecha_fin or '' }}">
+            {% if archived_view %}
+            <input type="hidden" name="corte_nombre" value="{{ corte_nombre or '' }}">
+            {% endif %}
+            <button class="btn btn-success w-100">📥 Exportar a Excel</button>
+        </form>
+      </div>
+      {% if not archived_view %}
+      <div class="col-md-6">
+        <button class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#modalCorte">
+          ✂ Corte Mensual
+        </button>
+      </div>
+      {% endif %}
+    </div>
+  </div>
 </div>
+
+{% if not archived_view %}
+<!-- Modal Corte Mensual -->
+<div class="modal fade" id="modalCorte" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content bg-dark text-white">
+      <form method="POST" action="{{ url_for('admin_corte_mensual') }}">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title">Realizar Corte Mensual</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-danger small">
+            ⚠️ Esta acción archivará todos los registros del mes seleccionado y los eliminará de esta lista principal.
+          </p>
+          <div class="mb-3">
+            <label class="form-label">Seleccionar Mes</label>
+            <input type="month" name="mes" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-danger">Confirmar Corte</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <div class="table-responsive">
   <table class="table table-dark table-striped align-middle">

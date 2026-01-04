@@ -31,6 +31,28 @@
         </select>
       </div>
 
+      <div class="row">
+        <div class="col-6 mb-3">
+          <label class="form-label">Precio Metro - Armado ($)</label>
+          <input type="number" step="0.01" class="form-control bg-secondary text-light" name="precio_metro_armado" value="{{ usuario.precio_metro_armado if usuario and usuario.precio_metro_armado else 0 }}">
+        </div>
+        <div class="col-6 mb-3">
+          <label class="form-label">Precio Metro - Remate ($)</label>
+          <input type="number" step="0.01" class="form-control bg-secondary text-light" name="precio_metro_remate" value="{{ usuario.precio_metro_remate if usuario and usuario.precio_metro_remate else 0 }}">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-6 mb-3">
+          <label class="form-label">Precio Avo - Armado ($)</label>
+          <input type="number" step="0.01" class="form-control bg-secondary text-light" name="precio_avo_armado" value="{{ usuario.precio_avo_armado if usuario and usuario.precio_avo_armado else 0 }}">
+        </div>
+        <div class="col-6 mb-3">
+          <label class="form-label">Precio Avo - Remate ($)</label>
+          <input type="number" step="0.01" class="form-control bg-secondary text-light" name="precio_avo_remate" value="{{ usuario.precio_avo_remate if usuario and usuario.precio_avo_remate else 0 }}">
+        </div>
+      </div>
+
       <div class="mb-3">
         <label class="form-label">{{ 'Contraseña' if modo == 'nuevo' else 'Nueva Contraseña (opcional)' }}</label>
         <input type="password" class="form-control bg-secondary text-light" name="password" {% if modo == 'nuevo' %}required{% endif %}>

@@ -33,9 +33,8 @@
         <th>Cliente</th>
         <th>Marco</th>
         <th>Tramo</th>
+        <th>Tipo</th>
         <th>Peso (Kg)</th>
-        <th>Precio Armado</th>
-        <th>Precio Remate</th>
         <th>C. Interna</th>
         <th>C. Externa</th>
         <th class="text-end">Acciones</th>
@@ -56,10 +55,6 @@
           {% set peso = peso_raw | float %}
           {{ "%.2f"|format(peso) }}
         </td>
-
-        <!-- Precios -->
-        <td>${{ "%.0f"|format(p.get('precio_armado', 0) | float) }}</td>
-        <td>${{ "%.0f"|format(p.get('precio_remate', 0) | float) }}</td>
 
         <!-- Cuerdas -->
         <td>{{ p.get('cuerda_interna', '—') }}</td>

@@ -1,15 +1,18 @@
 {% extends 'base.html' %}
-{% block title %}Valor por Operador{% endblock %}
+{% block title %}Valor por Operador (Archivado){% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">Informe – Valor por Operador</h2>
+<h2 class="mb-4 text-warning">🗄️ Informe Archivado – Valor por Operador</h2>
+<p class="text-secondary">Viendo datos históricos del corte: <strong>{{ corte_nombre or 'Sin corte seleccionado' }}</strong></p>
 
 <div class="card bg-dark border-light shadow mb-4">
   <div class="card-body">
 
     <!-- FILTROS -->
     <form method="POST" class="row g-3">
+      <!-- Mantenemos el corte_nombre oculto para persistencia -->
+      <input type="hidden" name="corte_nombre" value="{{ corte_nombre }}">
 
       <div class="col-md-4">
         <label class="form-label text-light">Operador</label>
@@ -34,16 +37,17 @@
       </div>
 
       <div class="col-md-12">
-        <button class="btn btn-accent w-100">🔍 Filtrar</button>
+        <button class="btn btn-accent w-100">🔍 Filtrar en este Corte</button>
       </div>
     </form>
 
     <!-- EXPORTAR -->
-    <form class="mt-3" method="POST" action="{{ url_for('exportar_valor_operador_excel') }}">
+    <form class="mt-3" method="POST" action="{{ url_for('exportar_valor_operador_archivado') }}">
       <input type="hidden" name="operador" value="{{ operador_sel or 'todos' }}">
       <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
       <input type="hidden" name="fecha_fin" value="{{ fecha_fin or '' }}">
-      <button class="btn btn-success w-100">📥 Exportar a Excel</button>
+      <input type="hidden" name="corte_nombre" value="{{ corte_nombre or '' }}">
+      <button class="btn btn-success w-100">📥 Exportar Histórico a Excel</button>
     </form>
 
   </div>
@@ -57,13 +61,14 @@
       <tr>
         <th>Fecha</th>
         <th>Código</th>
-        <th>Cliente</th>
         <th>Operador</th>
+        <th>Modo</th>
         <th>Marco</th>
         <th>Tramo</th>
-        <th>Modo</th>
-        <th>Peso (kg)</th>
-        <th>Valor ($)</th>
+        <th>Cant.</th>
+        <th>Peso</th>
+        <th>Precio x Kilo</th>
+        <th>Total</th>
       </tr>
     </thead>
 
@@ -72,12 +77,13 @@
       <tr>
         <td>{{ p.fecha.strftime("%d-%m-%Y %H:%M") if p.fecha else "—" }}</td>
         <td>{{ p.codigo }}</td>
-        <td>{{ p.empresa }}</td>
         <td>{{ p.operador }}</td>
+        <td>{{ p.modo }}</td>
         <td>{{ p.marco }}</td>
         <td>{{ p.tramo }}</td>
-        <td>{{ p.modo }}</td>
+        <td>1</td>
         <td>{{ "%.2f"|format(p.peso) }}</td>
+        <td>${{ "%.0f"|format(p.precio_kilo) }}</td>
         <td>${{ "%.0f"|format(p.valor) }}</td>
       </tr>
       {% endfor %}
@@ -95,7 +101,7 @@
 
 {% else %}
   <div class="alert alert-secondary text-center">
-    No se encontraron registros con esos filtros.
+    No se encontraron registros archivados con esos filtros.
   </div>
 {% endif %}
 

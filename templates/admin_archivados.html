@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}Archivados{% endblock %}
+{% block content %}
+
+<h2 class="mb-4 text-center">🗄️ Centro de Archivados</h2>
+
+<!-- LISTA DE CORTES (Grid de tarjetas) -->
+<div class="row row-cols-1 row-cols-md-3 g-4">
+  {% for c in cortes %}
+  <div class="col">
+    <div class="card bg-dark border-light shadow h-100">
+      <div class="card-header bg-secondary text-white text-center py-3">
+        <h5 class="mb-0 fw-bold">{{ c.nombre }}</h5>
+        <small class="text-light opacity-75">Creado: {{ c.creado_en.strftime('%d/%m/%Y') if c.creado_en else 'Fecha N/A' }}</small>
+      </div>
+      <div class="card-body d-flex flex-column justify-content-center">
+         <a href="{{ url_for('admin_produccion_archivada') }}?corte_nombre={{ c.nombre }}" class="btn btn-outline-info w-100 mb-2 text-start">
+            <i class="me-2">📄</i> Ver Producción
+         </a>
+         <a href="{{ url_for('archivados_valor_operador') }}?corte_nombre={{ c.nombre }}" class="btn btn-outline-success w-100 mb-2 text-start">
+            <i class="me-2">💰</i> Valor Operador
+         </a>
+         <a href="{{ url_for('archivados_piezas_cliente') }}?corte_nombre={{ c.nombre }}" class="btn btn-outline-warning w-100 text-start">
+            <i class="me-2">📦</i> Piezas Tarjetas
+         </a>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12 text-center mt-5">
+      <p class="text-secondary display-6">No hay cortes archivados todavía.</p>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}

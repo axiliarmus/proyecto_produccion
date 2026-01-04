@@ -8,17 +8,32 @@
   <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
 </head>
 <body>
-  <nav class="navbar navbar-expand-lg navbar-dark" style="background:#0b1220;">
+  <nav class="navbar navbar-expand-lg navbar-dark fixed-top" style="background:#0b1220; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
     <div class="container-fluid">
       <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
         <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="logo" height="26" class="me-2"/>
         <strong>Plataforma Producción</strong>
       </a>
-      <div class="d-flex gap-2">
-        {% if session.get('nombre') %}
-          <span class="badge rounded-pill text-bg-light">{{ session.get('nombre') }} · {{ session.get('role')|capitalize }}</span>
-          <a class="btn btn-outline-light btn-sm" href="{{ url_for('logout') }}">Salir</a>
-        {% endif %}
+      
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarContent">
+        <ul class="navbar-nav ms-auto align-items-center gap-3">
+          {% if session.get('nombre') %}
+            <li class="nav-item">
+                <button class="btn btn-outline-secondary btn-lg px-4 fw-bold" onclick="history.back()">
+                    ⬅ VOLVER
+                </button>
+            </li>
+            <li class="nav-item">
+                <a class="btn btn-outline-danger btn-lg px-4 fw-bold" href="{{ url_for('logout') }}">
+                    CERRAR SESIÓN ➡
+                </a>
+            </li>
+          {% endif %}
+        </ul>
       </div>
     </div>
   </nav>

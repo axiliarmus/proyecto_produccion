@@ -12,7 +12,7 @@
 <div class="row g-4 justify-content-center">
   
   <!-- Informe de horarios -->
-  {% if not is_cliente %}
+  {% if role in ['administrador', 'soporte'] %}
   <div class="col-md-3">
     <div class="card bg-dark border-light shadow text-center h-100">
       <div class="card-body d-flex flex-column justify-content-between">
@@ -41,23 +41,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Informe valor piezas por operador -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <h5 class="card-title text-light">💰 Valor por Operador</h5>
-          <p class="text-secondary">
-            Muestra las piezas creadas por cada operador y el total en base a kilo × precio.
-          </p>
-        </div>
-        <a href="{{ url_for('informe_piezas_operador') }}" class="btn btn-accent w-100 mt-3">
-          Ver Informe
-        </a>
-      </div>
-    </div>
-  </div>
   {% endif %}
 
 </div>
@@ -65,56 +48,7 @@
 <!-- Segunda fila de informes específicos de piezas -->
 <div class="row g-4 justify-content-center mt-3">
 
-  <!-- Informe de piezas rematadas -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <h5 class="card-title text-light">✅ Piezas Rematadas</h5>
-          <p class="text-secondary">
-            Muestra solo las piezas que ya pasaron por remate, con estado final y supervisión.
-          </p>
-        </div>
-        <a href="{{ url_for('informe_piezas_rematadas') }}" class="btn btn-accent w-100 mt-3">
-          Ver Informe
-        </a>
-      </div>
-    </div>
-  </div>
 
-  <!-- Informe de piezas esperando remate -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <h5 class="card-title text-light">🕒 Piezas Pendientes de Remate</h5>
-          <p class="text-secondary">
-            Piezas que ya fueron armadas pero aún no tienen registro de remate en el sistema.
-          </p>
-        </div>
-        <a href="{{ url_for('informe_piezas_pendientes_remate') }}" class="btn btn-accent w-100 mt-3">
-          Ver Informe
-        </a>
-      </div>
-    </div>
-  </div>
-
-  <!-- Informe de piezas SIN producción -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <h5 class="card-title text-light">🚫 Piezas sin Producción</h5>
-          <p class="text-secondary">
-            Piezas que aún no han sido armadas ni rematadas en ninguna etapa.
-          </p>
-        </div>
-        <a href="{{ url_for('informe_piezas_sin_produccion') }}" class="btn btn-accent w-100 mt-3">
-          Ver Informe
-        </a>
-      </div>
-    </div>
-  </div>
 
   <!-- Informe de estado de piezas -->
   <div class="col-md-3">
@@ -157,7 +91,7 @@
         <div>
           <h5 class="card-title text-light">📄 Registros de Producción</h5>
           <p class="text-secondary">
-            Listado general de registros de producción (solo lectura para admin).
+            Listado general de registros de producción (solo lectura).
           </p>
         </div>
         <a href="{{ url_for('admin_produccion_list') }}" class="btn btn-accent w-100 mt-3">
@@ -170,9 +104,6 @@
 
 </div>
 
-<!-- Botón para volver -->
-<div class="text-center mt-5">
-  <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary px-4">← Volver al Panel Principal</a>
-</div>
+<!-- Navegación simplificada: sin botones de volver -->
 
 {% endblock %}

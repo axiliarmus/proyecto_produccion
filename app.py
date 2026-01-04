@@ -292,6 +292,12 @@ def usuarios_nuevo_post():
     usuario = request.form['usuario'].strip()
     nombre = request.form['nombre'].strip()
     tipo = request.form['tipo']
+    
+    precio_metro_armado = float(request.form.get('precio_metro_armado', 0))
+    precio_metro_remate = float(request.form.get('precio_metro_remate', 0))
+    precio_avo_armado = float(request.form.get('precio_avo_armado', 0))
+    precio_avo_remate = float(request.form.get('precio_avo_remate', 0))
+
     password = generate_password_hash(request.form['password'])
 
     if db.usuarios.find_one({'usuario': usuario}):
@@ -302,6 +308,10 @@ def usuarios_nuevo_post():
         'usuario': usuario,
         'nombre': nombre,
         'tipo': tipo,
+        'precio_metro_armado': precio_metro_armado,
+        'precio_metro_remate': precio_metro_remate,
+        'precio_avo_armado': precio_avo_armado,
+        'precio_avo_remate': precio_avo_remate,
         'password': password
     })
 
@@ -325,9 +335,22 @@ def usuarios_editar_form(id):
 def usuarios_editar_post(id):
     nombre = request.form['nombre'].strip()
     tipo = request.form['tipo']
+    
+    precio_metro_armado = float(request.form.get('precio_metro_armado', 0))
+    precio_metro_remate = float(request.form.get('precio_metro_remate', 0))
+    precio_avo_armado = float(request.form.get('precio_avo_armado', 0))
+    precio_avo_remate = float(request.form.get('precio_avo_remate', 0))
+
     pwd = request.form.get('password', '').strip()
 
-    update = {'nombre': nombre, 'tipo': tipo}
+    update = {
+        'nombre': nombre, 
+        'tipo': tipo,
+        'precio_metro_armado': precio_metro_armado,
+        'precio_metro_remate': precio_metro_remate,
+        'precio_avo_armado': precio_avo_armado,
+        'precio_avo_remate': precio_avo_remate
+    }
     if pwd:
         update['password'] = generate_password_hash(pwd)
 
@@ -442,27 +465,26 @@ def piezas_nuevo_post():
     marco = request.form['marco'].strip()
     tramo = request.form['tramo'].strip()
     kilo_pieza = float(request.form['kilo_pieza'])
-    precio_armado = float(request.form['precio_armado'])
-    precio_remate = float(request.form['precio_remate'])
     cantidad = int(request.form['cantidad'])
 
     cuerda_interna = request.form.get("cuerda_interna", "").strip()
     cuerda_externa = request.form.get("cuerda_externa", "").strip()
 
-    # Obtener último código usado
-    last = db.piezas.find_one(sort=[("codigo", -1)])
-    next_codigo = last['codigo'] + 1 if last and 'codigo' in last else 1
+    # Prefijo de ciclo actual
+    conf = db.config.find_one({"key": "ciclo_actual"}) or {"value": "a"}
+    prefijo = conf.get("value", "a")
+    # Calcular siguiente secuencia dentro del prefijo actual
+    count_prefijo = db.piezas.count_documents({"codigo": {"$regex": f"^{prefijo}"}})
+    next_seq = count_prefijo + 1
 
     docs = []
     for i in range(cantidad):
         docs.append({
-            "codigo": next_codigo + i,
+            "codigo": f"{prefijo}{next_seq + i}",
             "empresa": empresa,
             "marco": marco,
             "tramo": tramo,
             "kilo_pieza": kilo_pieza,
-            "precio_armado": precio_armado,
-            "precio_remate": precio_remate,
             "cuerda_interna": cuerda_interna,
             "cuerda_externa": cuerda_externa,
             "created_at": datetime.utcnow()
@@ -471,7 +493,7 @@ def piezas_nuevo_post():
     if docs:
         db.piezas.insert_many(docs)
 
-    flash(f'✅ Se crearon {cantidad} piezas correctamente (desde código {next_codigo}).', 'success')
+    flash(f'✅ Se crearon {cantidad} piezas correctamente (desde código {prefijo}{next_seq}).', 'success')
     return redirect(url_for('piezas_list'))
 
 
@@ -493,9 +515,8 @@ def piezas_editar_post(id):
     empresa = request.form['empresa'].strip()
     marco = request.form['marco'].strip()
     tramo = request.form['tramo'].strip()
+    tipo_precio = request.form['tipo_precio']
     kilo_pieza = float(request.form['kilo_pieza'])
-    precio_armado = float(request.form['precio_armado'])
-    precio_remate = float(request.form['precio_remate'])
     
     cuerda_interna = request.form.get("cuerda_interna", "").strip()
     cuerda_externa = request.form.get("cuerda_externa", "").strip()
@@ -506,9 +527,8 @@ def piezas_editar_post(id):
             "empresa": empresa,
             "marco": marco,
             "tramo": tramo,
+            "tipo_precio": tipo_precio,
             "kilo_pieza": kilo_pieza,
-            "precio_armado": precio_armado,
-            "precio_remate": precio_remate,
             "cuerda_interna": cuerda_interna,
             "cuerda_externa": cuerda_externa
         }}
@@ -600,7 +620,7 @@ def piezas_masivo_confirmar():
         return redirect(url_for("piezas_masivo"))
 
     # Campos numéricos
-    if campo in ["kilo_pieza", "precio_armado", "precio_remate"]:
+    if campo in ["kilo_pieza"]:
         try:
             valor = float(valor)
         except:
@@ -665,15 +685,675 @@ def soporte_produccion_list():
             r['fecha'] = to_cl(r.get('fecha'))
     return render_template('crud_produccion.html', registros=registros, codigo_sel=codigo)
 
-@app.route('/admin/produccion')
-@login_required(['administrador', 'cliente', 'soporte'])
+@app.route('/admin/corte_mensual', methods=['POST'])
+@login_required(['administrador', 'soporte'])
+def admin_corte_mensual():
+    nombre_custom = request.form.get('nombre')
+    mes = request.form.get('mes')  # YYYY-MM
+    fecha_inicio = request.form.get('fecha_inicio')
+    fecha_fin = request.form.get('fecha_fin')
+
+    try:
+        # Definir rango
+        if mes:
+            y, m = map(int, mes.split('-'))
+            start_date = datetime(y, m, 1)
+            end_date = datetime(y + (1 if m == 12 else 0), 1 if m == 12 else m + 1, 1)
+            start_utc = start_date.replace(tzinfo=CL).astimezone(timezone.utc)
+            end_utc = end_date.replace(tzinfo=CL).astimezone(timezone.utc)
+            # Nombre automático para mes
+            nombre = start_date.strftime('%B %Y')
+        elif fecha_inicio and fecha_fin:
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            start_utc = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL).astimezone(timezone.utc)
+            end_utc = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL).astimezone(timezone.utc)
+            # Nombre automático para rango
+            nombre = f"{d1.strftime('%d/%m/%Y')} - {d2.strftime('%d/%m/%Y')}"
+        else:
+            flash("Debes seleccionar un mes o rango de fechas", "warning")
+            return redirect(url_for('admin_dashboard'))
+        
+        # Si el usuario ingresó un nombre manual, lo usamos
+        if nombre_custom and nombre_custom.strip():
+            nombre = nombre_custom.strip()
+        
+        filtro = {
+            "fecha": {
+                "$gte": start_utc,
+                "$lt": end_utc
+            }
+        }
+        
+        registros = list(db.produccion.find(filtro))
+        count = len(registros)
+        
+        if count > 0:
+            # 1. Crear documento del corte
+            corte_doc = {
+                "nombre": nombre,
+                "inicio": start_utc,
+                "fin": end_utc,
+                "creado_en": datetime.utcnow()
+            }
+            res = db.cortes.insert_one(corte_doc)
+            corte_id = res.inserted_id
+
+            # 2. Archivar Producción
+            # Insertar en colección histórica con referencia al corte
+            for r in registros:
+                r["corte_id"] = corte_id
+            if registros:
+                db.produccion_historica.insert_many(registros)
+            
+            # 3. Archivar Piezas (SNAPSHOT COMPLETO)
+            # Guardamos TODAS las piezas actuales tal cual están en este momento
+            # Esto es vital para reconstruir los informes archivados
+            piezas_activas = list(db.piezas.find({}))
+            piezas_a_insertar = []
+            for p in piezas_activas:
+                p_copy = p.copy()
+                p_copy.pop("_id", None) # Generar nuevo ID para histórico
+                p_copy["corte_id"] = corte_id
+                piezas_a_insertar.append(p_copy)
+            
+            if piezas_a_insertar:
+                db.piezas_historicas.insert_many(piezas_a_insertar)
+
+            # 4. Archivar Usuarios (Snapshot de precios/configuración)
+            usuarios_activos = list(db.usuarios.find())
+            usuarios_a_insertar = []
+            for u in usuarios_activos:
+                u_copy = u.copy()
+                u_copy.pop("_id", None)
+                u_copy["corte_id"] = corte_id
+                usuarios_a_insertar.append(u_copy)
+            
+            if usuarios_a_insertar:
+                db.usuarios_historicos.insert_many(usuarios_a_insertar)
+
+            # 5. Limpieza (Borrar datos activos para nuevo ciclo)
+            # Eliminar producción del rango archivado
+            db.produccion.delete_many(filtro)
+            
+            # Eliminar todas las piezas (si el flujo es reiniciar piezas cada mes)
+            # Si el usuario NO quiere borrar piezas, comentar esta línea.
+            # Según el código anterior, se borraban. Mantenemos el comportamiento pero asegurando el backup primero.
+            db.piezas.delete_many({})
+
+            # Avanzar ciclo de prefijo (a -> b -> c ...)
+            conf = db.config.find_one({"key": "ciclo_actual"}) or {"key": "ciclo_actual", "value": "a"}
+            letra = conf.get("value", "a")
+            import string
+            abecedario = list(string.ascii_lowercase)
+            try:
+                idx = abecedario.index(letra)
+                nueva = abecedario[idx + 1] if idx + 1 < len(abecedario) else "a"
+            except:
+                nueva = "a"
+            db.config.update_one({"key": "ciclo_actual"}, {"$set": {"value": nueva}}, upsert=True)
+
+            flash(f"✅ Corte realizado. {count} registros archivados.", "success")
+        else:
+            flash("No se encontraron registros para el mes seleccionado.", "info")
+            
+    except Exception as e:
+        flash(f"Error al realizar el corte: {str(e)}", "danger")
+
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/produccion', methods=['GET', 'POST'])
+@login_required(['administrador', 'cliente', 'soporte', 'supervisor'])
 def admin_produccion_list():
-    registros = list(db.produccion.find().sort('fecha', -1))
+    filtro = {}
+    fecha_inicio = None
+    fecha_fin = None
+    operador_sel = None
+    codigo_sel = None
+
+    if request.method == 'POST':
+        operador_sel = request.form.get('operador')
+        codigo_sel = request.form.get('codigo')
+        fecha_inicio = request.form.get('fecha_inicio')
+        fecha_fin = request.form.get('fecha_fin')
+
+        if operador_sel and operador_sel != 'todos':
+            filtro['usuario'] = operador_sel
+        
+        if codigo_sel:
+            filtro['codigo_pieza'] = codigo_sel.strip()
+
+        if fecha_inicio or fecha_fin:
+            start_cl = None
+            end_cl = None
+            if fecha_inicio:
+                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            if fecha_fin:
+                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            rango = {}
+            if start_cl:
+                rango["$gte"] = start_cl.astimezone(timezone.utc)
+            if end_cl:
+                rango["$lte"] = end_cl.astimezone(timezone.utc)
+            if rango:
+                filtro["fecha"] = rango
+
+    registros = list(db.produccion.find(filtro).sort('fecha', -1))
+    
+    # Obtener lista de operadores para el filtro
+    operadores = db.produccion.distinct("usuario")
+    
     for r in registros:
         if r.get('fecha'):
             r['fecha'] = to_cl(r.get('fecha'))
-    return render_template('crud_produccion_admin.html', registros=registros)
+            
+    return render_template('crud_produccion_admin.html', 
+                           registros=registros,
+                           operadores=sorted(operadores),
+                           operador_sel=operador_sel,
+                           codigo_sel=codigo_sel,
+                           fecha_inicio=fecha_inicio,
+                           fecha_fin=fecha_fin)
 
+
+@app.route('/admin/produccion/export', methods=['POST'])
+@login_required(['administrador', 'soporte'])
+def exportar_produccion_excel():
+    filtro = {}
+    operador_sel = request.form.get('operador')
+    codigo_sel = request.form.get('codigo')
+    fecha_inicio = request.form.get('fecha_inicio')
+    fecha_fin = request.form.get('fecha_fin')
+
+    if operador_sel and operador_sel != 'todos':
+        filtro['usuario'] = operador_sel
+    
+    if codigo_sel:
+        filtro['codigo_pieza'] = codigo_sel.strip()
+
+    if fecha_inicio or fecha_fin:
+        start_cl = None
+        end_cl = None
+        if fecha_inicio:
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+        if fecha_fin:
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+        rango = {}
+        if start_cl:
+            rango["$gte"] = start_cl.astimezone(timezone.utc)
+        if end_cl:
+            rango["$lte"] = end_cl.astimezone(timezone.utc)
+        if rango:
+            filtro["fecha"] = rango
+
+    registros = list(db.produccion.find(filtro).sort('fecha', -1))
+
+    data = []
+    for r in registros:
+        fecha = to_cl(r.get('fecha')).strftime('%d-%m-%Y %H:%M') if r.get('fecha') else ''
+        data.append({
+            'Fecha': fecha,
+            'Modo': r.get('modo', ''),
+            'Operador': r.get('usuario', ''),
+            'Box': r.get('box', ''),
+            'Código': r.get('codigo_pieza', ''),
+            'Cliente': r.get('empresa', ''),
+            'Marco': r.get('marco', ''),
+            'Tramo': r.get('tramo', ''),
+            'Cuerda Int.': r.get('cuerda_interna', ''),
+            'Cuerda Ext.': r.get('cuerda_externa', ''),
+            'Estado': r.get('calidad_status', '')
+        })
+
+    df = pd.DataFrame(data)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Produccion")
+    output.seek(0)
+
+    return send_file(
+        output,
+        download_name="registro_produccion.xlsx",
+        as_attachment=True,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+@app.route('/admin/produccion/archivada', methods=['GET', 'POST'])
+@login_required(['administrador', 'soporte', 'supervisor'])
+def admin_produccion_archivada():
+    filtro = {}
+    fecha_inicio = None
+    fecha_fin = None
+    operador_sel = None
+    codigo_sel = None
+    mes_sel = None
+    corte_nombre = None
+
+    if request.method == 'POST':
+        operador_sel = request.form.get('operador')
+        codigo_sel = request.form.get('codigo')
+        fecha_inicio = request.form.get('fecha_inicio')
+        fecha_fin = request.form.get('fecha_fin')
+        mes_sel = request.form.get('mes')
+        corte_nombre = request.form.get('corte_nombre')
+    else:
+        corte_nombre = request.args.get('corte_nombre')
+
+        if operador_sel and operador_sel != 'todos':
+            filtro['usuario'] = operador_sel
+        
+        if codigo_sel:
+            filtro['codigo_pieza'] = codigo_sel.strip()
+
+        if not corte_nombre:
+            if mes_sel:
+                try:
+                    y, m = map(int, mes_sel.split('-'))
+                    start_date = datetime(y, m, 1)
+                    if m == 12:
+                        end_date = datetime(y + 1, 1, 1)
+                    else:
+                        end_date = datetime(y, m + 1, 1)
+                    start_utc = start_date.replace(tzinfo=CL).astimezone(timezone.utc)
+                    end_utc = end_date.replace(tzinfo=CL).astimezone(timezone.utc)
+                    filtro['fecha'] = {"$gte": start_utc, "$lt": end_utc}
+                except:
+                    pass
+            elif fecha_inicio or fecha_fin:
+                start_cl = None
+                end_cl = None
+                if fecha_inicio:
+                    d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                    start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+                if fecha_fin:
+                    d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                    end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+                rango = {}
+                if start_cl:
+                    rango["$gte"] = start_cl.astimezone(timezone.utc)
+                if end_cl:
+                    rango["$lte"] = end_cl.astimezone(timezone.utc)
+                if rango:
+                    filtro["fecha"] = rango
+        else:
+            corte = db.cortes.find_one({'nombre': corte_nombre})
+            if corte:
+                filtro['corte_id'] = corte.get('_id')
+
+    registros = list(db.produccion_historica.find(filtro).sort('fecha', -1))
+    
+    operadores = db.produccion_historica.distinct("usuario")
+    
+    for r in registros:
+        if r.get('fecha'):
+            r['fecha'] = to_cl(r.get('fecha'))
+            
+    return render_template('crud_produccion_admin.html', 
+                           registros=registros,
+                           operadores=sorted(operadores),
+                           operador_sel=operador_sel,
+                           codigo_sel=codigo_sel,
+                           fecha_inicio=fecha_inicio,
+                           fecha_fin=fecha_fin,
+                           mes_sel=mes_sel,
+                           archived_view=True,
+                           corte_nombre=corte_nombre)
+
+@app.route('/admin/produccion/archivada/export', methods=['POST'])
+@login_required(['administrador', 'soporte'])
+def exportar_produccion_archivada_excel():
+    filtro = {}
+    operador_sel = request.form.get('operador')
+    codigo_sel = request.form.get('codigo')
+    fecha_inicio = request.form.get('fecha_inicio')
+    fecha_fin = request.form.get('fecha_fin')
+    mes_sel = request.form.get('mes')
+    corte_nombre = request.form.get('corte_nombre')
+
+    if operador_sel and operador_sel != 'todos':
+        filtro['usuario'] = operador_sel
+    
+    if codigo_sel:
+        filtro['codigo_pieza'] = codigo_sel.strip()
+
+    if corte_nombre:
+        corte = db.cortes.find_one({'nombre': corte_nombre})
+        if corte:
+            corte_id = corte.get('_id')
+            corte_inicio = corte.get('inicio')
+            corte_fin = corte.get('fin')
+            
+            filtro_hibrido = []
+            if corte_id:
+                filtro_hibrido.append({"corte_id": corte_id})
+            if corte_inicio and corte_fin:
+                filtro_hibrido.append({"fecha": {"$gte": corte_inicio, "$lt": corte_fin}})
+            
+            if filtro_hibrido:
+                if len(filtro_hibrido) > 1:
+                    filtro["$or"] = filtro_hibrido
+                else:
+                    filtro.update(filtro_hibrido[0])
+            elif corte_id:
+                filtro['corte_id'] = corte_id
+    else:
+        if mes_sel:
+            try:
+                y, m = map(int, mes_sel.split('-'))
+                start_date = datetime(y, m, 1)
+                if m == 12:
+                    end_date = datetime(y + 1, 1, 1)
+                else:
+                    end_date = datetime(y, m + 1, 1)
+                start_utc = start_date.replace(tzinfo=CL).astimezone(timezone.utc)
+                end_utc = end_date.replace(tzinfo=CL).astimezone(timezone.utc)
+                filtro['fecha'] = {"$gte": start_utc, "$lt": end_utc}
+            except:
+                pass
+        elif fecha_inicio or fecha_fin:
+            start_cl = None
+            end_cl = None
+            if fecha_inicio:
+                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            if fecha_fin:
+                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            rango = {}
+            if start_cl:
+                rango["$gte"] = start_cl.astimezone(timezone.utc)
+            if end_cl:
+                rango["$lte"] = end_cl.astimezone(timezone.utc)
+            if rango:
+                filtro["fecha"] = rango
+
+    registros = list(db.produccion_historica.find(filtro).sort('fecha', -1))
+
+    data = []
+    for r in registros:
+        fecha = to_cl(r.get('fecha')).strftime('%d-%m-%Y %H:%M') if r.get('fecha') else ''
+        data.append({
+            'Fecha': fecha,
+            'Modo': r.get('modo', ''),
+            'Operador': r.get('usuario', ''),
+            'Box': r.get('box', ''),
+            'Código': r.get('codigo_pieza', ''),
+            'Cliente': r.get('empresa', ''),
+            'Marco': r.get('marco', ''),
+            'Tramo': r.get('tramo', ''),
+            'Cuerda Int.': r.get('cuerda_interna', ''),
+            'Cuerda Ext.': r.get('cuerda_externa', ''),
+            'Estado': r.get('calidad_status', '')
+        })
+
+    df = pd.DataFrame(data)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="ProduccionArchivada")
+    output.seek(0)
+
+    return send_file(
+        output,
+        download_name="registro_produccion_archivada.xlsx",
+        as_attachment=True,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+@app.route('/admin/archivados/valor-operador', methods=['GET', 'POST'])
+@login_required(['administrador', 'soporte'])
+def archivados_valor_operador():
+    corte_nombre = request.args.get('corte_nombre')
+    operador_sel = None
+    fecha_inicio = None
+    fecha_fin = None
+    filtro = {}
+
+    if request.method == 'POST':
+        operador_sel = request.form.get('operador')
+        fecha_inicio = request.form.get('fecha_inicio')
+        fecha_fin = request.form.get('fecha_fin')
+        corte_nombre = request.form.get('corte_nombre') or corte_nombre
+        if operador_sel and operador_sel != 'todos':
+            filtro['usuario'] = operador_sel
+        if fecha_inicio and fecha_fin:
+            try:
+                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+                filtro["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
+            except:
+                pass
+
+    piezas = []
+    total_general = 0
+    operadores = sorted(db.produccion_historica.distinct("usuario"))
+    
+    corte_id = None
+    if corte_nombre and "corte_id" not in filtro:
+        # Intentar buscar por nombre o por fecha convertida a string (si fuera el caso)
+        corte = db.cortes.find_one({'nombre': corte_nombre})
+        if not corte:
+             # Si no encuentra por nombre, podría ser un ID de corte disfrazado o fecha
+             try:
+                 corte = db.cortes.find_one({'_id': ObjectId(corte_nombre)})
+             except:
+                 pass
+                 
+        if corte:
+            corte_id = corte.get('_id')
+            # Usar filtro híbrido: corte_id (nuevos) O rango de fechas (antiguos)
+            corte_inicio = corte.get('inicio')
+            corte_fin = corte.get('fin')
+            
+            filtro_hibrido = []
+            if corte_id:
+                filtro_hibrido.append({"corte_id": corte_id})
+            if corte_inicio and corte_fin:
+                filtro_hibrido.append({"fecha": {"$gte": corte_inicio, "$lt": corte_fin}})
+            
+            if filtro_hibrido:
+                if len(filtro_hibrido) > 1:
+                    filtro["$or"] = filtro_hibrido
+                else:
+                    filtro.update(filtro_hibrido[0])
+            elif corte_id:
+                filtro['corte_id'] = corte_id
+
+    # Asegurar que traemos TODOS los operadores históricos para el filtro
+    if corte_id:
+         operadores = sorted(db.produccion_historica.distinct("usuario", {"corte_id": corte_id}))
+    if not operadores:
+         operadores = sorted(db.produccion_historica.distinct("usuario"))
+
+    produccion = list(db.produccion_historica.find(filtro).sort("fecha", -1))
+    
+    # Cargar usuarios históricos si hay corte, sino actuales
+    users_map = {}
+    if corte_id:
+        users_hist = list(db.usuarios_historicos.find({"corte_id": corte_id}))
+        if users_hist:
+            users_map = {u.get('usuario'): u for u in users_hist}
+    
+    # Fallback a usuarios actuales si no hay históricos (cortes antiguos)
+    if not users_map:
+        users_db = list(db.usuarios.find())
+        users_map = {u.get('usuario'): u for u in users_db}
+
+    for p in produccion:
+        codigo = p.get("codigo_pieza")
+        modo = p.get("modo")
+        if not codigo:
+            continue
+        
+        # Buscar pieza con robustez de tipos (str vs int)
+        pieza_info = None
+        codigos_probar = [codigo]
+        if isinstance(codigo, str) and codigo.isdigit():
+            codigos_probar.append(int(codigo))
+        elif isinstance(codigo, int):
+            codigos_probar.append(str(codigo))
+            
+        # 1. Intentar buscar en históricas con corte_id (lo ideal)
+        if corte_id:
+            for c in codigos_probar:
+                pieza_info = db.piezas_historicas.find_one({"codigo": c, "corte_id": corte_id})
+                if pieza_info: break
+        
+        # 2. Si no, buscar en históricas sin corte (cualquier versión antigua)
+        if not pieza_info:
+            for c in codigos_probar:
+                pieza_info = db.piezas_historicas.find_one({"codigo": c})
+                if pieza_info: break
+                
+        # 3. Si no, buscar en piezas actuales (fallback final)
+        if not pieza_info:
+            for c in codigos_probar:
+                pieza_info = db.piezas.find_one({"codigo": c})
+                if pieza_info: break
+            
+        # Si no se encuentra info de pieza, intentar obtener datos del registro de producción (si existen)
+        empresa_val = (pieza_info.get("empresa") if pieza_info else None) or p.get("empresa") or "Desconocido"
+        marco_val = (pieza_info.get("marco") if pieza_info else None) or p.get("marco") or "-"
+        tramo_val = (pieza_info.get("tramo") if pieza_info else None) or p.get("tramo") or "-"
+        
+        # PRIORIDAD: Obtener peso desde el registro histórico de producción
+        # Si no existe en producción, usar el de la ficha de pieza (fallback)
+        peso_val = p.get("kilo_pieza")
+        if peso_val is None:
+            peso_val = pieza_info.get("kilo_pieza", 0) if pieza_info else 0
+        
+        user = users_map.get(p.get("usuario"))
+        valor_unit = 0
+        if user:
+            tipo_precio = pieza_info.get("tipo_precio", "metro") if pieza_info else "metro"
+            if modo == "armador":
+                valor_unit = user.get("precio_metro_armado", 0) if tipo_precio == "metro" else user.get("precio_avo_armado", 0)
+            else:
+                valor_unit = user.get("precio_metro_remate", 0) if tipo_precio == "metro" else user.get("precio_avo_remate", 0)
+        
+        total = (peso_val or 0) * (valor_unit or 0)
+        
+        piezas.append({
+            "fecha": to_cl(p.get("fecha")) if p.get("fecha") else None,
+            "codigo": codigo,
+            "empresa": empresa_val,
+            "operador": p.get("usuario"),
+            "marco": marco_val,
+            "tramo": tramo_val,
+            "modo": modo,
+            "peso": peso_val,
+            "precio_kilo": valor_unit,
+            "valor": total
+        })
+        total_general += total
+
+    return render_template("informe_valor_operador_archivado.html",
+                           piezas=piezas,
+                           operadores=operadores,
+                           operador_sel=operador_sel,
+                           fecha_inicio=fecha_inicio,
+                           fecha_fin=fecha_fin,
+                           total_general=total_general,
+                           corte_nombre=corte_nombre)
+
+@app.route('/admin/archivados/piezas-cliente')
+@login_required(['administrador', 'soporte', 'supervisor'])
+def archivados_piezas_cliente():
+    corte_nombre = request.args.get('corte_nombre')
+    filtro_prod = {}
+    filtro_piezas = {}
+    if corte_nombre:
+        corte = db.cortes.find_one({'nombre': corte_nombre})
+        if corte:
+            corte_id = corte.get('_id')
+            corte_inicio = corte.get('inicio')
+            corte_fin = corte.get('fin')
+            
+            # Filtro Producción Híbrido
+            filtro_hibrido_prod = []
+            if corte_id:
+                filtro_hibrido_prod.append({"corte_id": corte_id})
+            if corte_inicio and corte_fin:
+                filtro_hibrido_prod.append({"fecha": {"$gte": corte_inicio, "$lt": corte_fin}})
+            
+            if filtro_hibrido_prod:
+                if len(filtro_hibrido_prod) > 1:
+                    filtro_prod["$or"] = filtro_hibrido_prod
+                else:
+                    filtro_prod.update(filtro_hibrido_prod[0])
+            elif corte_id:
+                filtro_prod['corte_id'] = corte_id
+            
+            # Filtro Piezas
+            if corte_id:
+                filtro_piezas = {'corte_id': corte_id}
+
+    produccion_hist = list(db.produccion_historica.find(filtro_prod))
+    # Manejar codigos como str para set
+    cod_armadas = set()
+    cod_remates = set()
+    for p in produccion_hist:
+        c = p.get("codigo_pieza")
+        if c:
+            cstr = str(c)
+            if p.get("modo") == "armador":
+                cod_armadas.add(cstr)
+            elif p.get("modo") == "rematador":
+                cod_remates.add(cstr)
+
+    # Intentar cargar piezas históricas del corte
+    piezas = []
+    if filtro_piezas:
+        piezas = list(db.piezas_historicas.find(filtro_piezas))
+    
+    # Si no hay piezas históricas (corte antiguo), usar piezas actuales como fallback
+    if not piezas:
+        piezas = list(db.piezas.find())
+
+    grupos_map = {}
+    for pi in piezas:
+        cli = pi.get("empresa"); mar = pi.get("marco"); tr = pi.get("tramo")
+        key_cli = cli
+        key_mar = (cli, mar)
+        if key_cli not in grupos_map:
+            grupos_map[key_cli] = {}
+        if key_mar not in grupos_map[key_cli]:
+            grupos_map[key_cli][key_mar] = {}
+        grupos_map[key_cli][key_mar].setdefault(tr, {"total": 0, "armadas": 0, "rematadas": 0})
+        grupos_map[key_cli][key_mar][tr]["total"] += 1
+        cstr = str(pi.get("codigo"))
+        if cstr in cod_armadas:
+            grupos_map[key_cli][key_mar][tr]["armadas"] += 1
+        if cstr in cod_remates:
+            grupos_map[key_cli][key_mar][tr]["rematadas"] += 1
+
+    grupos = []
+    for cli, marcos in grupos_map.items():
+        obj = {"cliente": cli, "marcos": []}
+        for (cli2, marco), tramos in marcos.items():
+            obj["marcos"].append({
+                "marco": marco,
+                "tramos": [{"tramo": t, 
+                            "total": v["total"], 
+                            "armadas": v["armadas"], 
+                            "rematadas": v["rematadas"], 
+                            "en_armado": max(v["armadas"] - v["rematadas"], 0),
+                            "pendientes": v["total"] - v["rematadas"]} for t, v in tramos.items()]
+            })
+        grupos.append(obj)
+
+    return render_template("informe_piezas_tarjetas_archivado.html", grupos=grupos, corte_nombre=corte_nombre)
+
+@app.route('/admin/archivados/pendientes')
+@login_required(['administrador', 'soporte', 'supervisor'])
+def archivados_pendientes_mes():
+    return archivados_piezas_cliente()
 @app.route('/soporte/produccion/<id>/editar')
 @login_required('soporte')
 def soporte_produccion_editar_form(id):
@@ -733,9 +1413,20 @@ def soporte_produccion_delete(id):
     return redirect(url_for('soporte_produccion_list'))
 
 @app.route('/admin/informes')
-@login_required(["administrador", "soporte", "cliente"])
+@login_required(["administrador", "soporte", "cliente", "supervisor"])
 def admin_informes():
-    return render_template('admin_informes.html', is_cliente=(session.get('role') == 'cliente'))
+    return render_template('admin_informes.html', is_cliente=(session.get('role') == 'cliente'), role=session.get('role'))
+
+@app.route('/admin/archivados', methods=['GET', 'POST'])
+@login_required(['administrador', 'soporte', 'supervisor'])
+def admin_archivados_menu():
+    corte_nombre = None
+    if request.method == 'POST':
+        corte_nombre = request.form.get('corte_nombre')
+    else:
+        corte_nombre = request.args.get('corte_nombre')
+    cortes = list(db.cortes.find().sort('creado_en', -1))
+    return render_template('admin_archivados.html', corte_nombre=corte_nombre, cortes=cortes)
 
 
 # ============================================================
@@ -820,403 +1511,7 @@ def exportar_horarios_excel():
     )
 
 
-# ============================================================
-#        INFORME — PIEZAS REMATADAS (GRÁFICOS + EXCEL)
-# ============================================================
 
-@app.route('/admin/informes/piezas/rematadas', methods=['GET', 'POST'])
-@login_required(["administrador", "supervisor", "soporte", "cliente"])
-def informe_piezas_rematadas():
-
-    filtro = {"modo": "rematador"}  # solo piezas rematadas
-
-    fecha_inicio = request.form.get("fecha_inicio")
-    fecha_fin = request.form.get("fecha_fin")
-    codigo = request.form.get("codigo_pieza")
-    operador = request.form.get("operador")
-    estado_sel = request.form.get("estado")
-
-    # ===================== FILTROS =====================
-
-    # Filtro por fechas (interpretar como horario Chile y convertir a UTC)
-    if fecha_inicio or fecha_fin:
-        try:
-            start_cl = None
-            end_cl = None
-
-            if fecha_inicio:
-                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
-            if fecha_fin:
-                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
-                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
-
-            rango = {}
-            if start_cl:
-                rango["$gte"] = start_cl.astimezone(timezone.utc)
-            if end_cl:
-                rango["$lte"] = end_cl.astimezone(timezone.utc)
-            if rango:
-                filtro["fecha"] = rango
-        except:
-            flash("Fechas inválidas", "warning")
-
-    # Código pieza
-    if codigo:
-        filtro["codigo_pieza"] = codigo.strip()
-
-    # Estado
-    if estado_sel and estado_sel != "todos":
-        filtro["calidad_status"] = estado_sel
-
-    # Operador
-    if operador and operador != "todos":
-        filtro["usuario"] = operador
-
-    # ===================== CONSULTA PRINCIPAL =====================
-
-    piezas = list(db.produccion.find(filtro).sort("fecha", -1))
-    for p in piezas:
-        p["fecha"] = to_cl(p.get("fecha"))
-
-    # Para el select operador
-    operadores = sorted({p["usuario"] for p in db.produccion.find({"modo": "rematador"})})
-
-    # ===================== GRÁFICO DE ESTADOS =====================
-    estado_counts = {"pendiente": 0, "aprobado": 0, "rechazado": 0}
-    for p in piezas:
-        e = p.get("calidad_status", "pendiente")
-        if e in estado_counts:
-            estado_counts[e] += 1
-
-    return render_template(
-        "informe_piezas_rematadas.html",
-        piezas=piezas,
-        fecha_inicio=fecha_inicio,
-        fecha_fin=fecha_fin,
-        codigo=codigo,
-        operadores=operadores,
-        operador_sel=operador,
-        estado_sel=estado_sel,
-        estado_counts=estado_counts
-    )
-
-
-# ============================================================
-#     EXPORTAR INFORME - PIEZAS REMATADAS A EXCEL
-# ============================================================
-
-@app.route('/admin/informes/piezas_rematadas/export', methods=['POST'])
-@login_required(["administrador", "supervisor", "soporte", "cliente"])
-def exportar_piezas_rematadas_excel():
-    # Leemos filtros desde el form (cuidando 'None')
-    fecha_inicio = (request.form.get("fecha_inicio") or "").strip()
-    fecha_fin = (request.form.get("fecha_fin") or "").strip()
-    codigo = (request.form.get("codigo_pieza") or "").strip()
-    operador_sel = (request.form.get("operador") or "todos").strip()
-    estado_sel = (request.form.get("estado") or "todos").strip()
-
-    filtro = {"modo": "rematador"}
-
-    # Código pieza
-    if codigo:
-        filtro["codigo_pieza"] = codigo
-
-    # Fechas – acepta inicio o fin por separado
-    if fecha_inicio or fecha_fin:
-        try:
-            start_cl = None
-            end_cl = None
-            if fecha_inicio and fecha_inicio != "None":
-                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
-            if fecha_fin and fecha_fin != "None":
-                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
-                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
-
-            rango = {}
-            if start_cl:
-                rango["$gte"] = start_cl.astimezone(timezone.utc)
-            if end_cl:
-                rango["$lte"] = end_cl.astimezone(timezone.utc)
-            if rango:
-                filtro["fecha"] = rango
-        except ValueError:
-            flash("Fechas inválidas (usa AAAA-MM-DD).", "warning")
-            return redirect(url_for("informe_piezas_rematadas"))
-
-    # Estado
-    if estado_sel and estado_sel != "todos":
-        filtro["calidad_status"] = estado_sel
-
-    # Operador
-    if operador_sel and operador_sel != "todos":
-        filtro["usuario"] = operador_sel
-
-    piezas = list(db.produccion.find(filtro).sort("fecha", -1))
-
-    # Armar datos para Excel
-    data = []
-    for p in piezas:
-        fecha = to_cl(p.get("fecha"))
-        fecha_str = fecha.strftime("%d-%m-%Y %H:%M") if isinstance(fecha, datetime) else ""
-
-        data.append({
-            "Fecha": fecha_str,
-            "Código pieza": p.get("codigo_pieza", "—"),
-            "Empresa": p.get("empresa", "—"),
-            "Operador": p.get("usuario", "—"),
-            "Marco": p.get("marco", "—"),
-            "Tramo": p.get("tramo", "—"),
-            "Estado": p.get("calidad_status", "pendiente").capitalize(),
-            "Cuerda interna": p.get("cuerda_interna", ""),
-            "Cuerda externa": p.get("cuerda_externa", ""),
-            "Comentario supervisor": p.get("comentario_supervisor", "")
-        })
-
-    if not data:
-        flash("No hay datos para exportar con esos filtros.", "warning")
-        return redirect(url_for("informe_piezas_rematadas"))
-
-    df = pd.DataFrame(data)
-
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Piezas rematadas")
-
-        # Formato de encabezado (opcional)
-        workbook = writer.book
-        worksheet = writer.sheets["Piezas rematadas"]
-        header_format = workbook.add_format({
-            "bold": True,
-            "text_wrap": True,
-            "valign": "middle",
-            "fg_color": "#222222",
-            "font_color": "white",
-            "border": 1
-        })
-        for col_num, value in enumerate(df.columns.values):
-            worksheet.write(0, col_num, value, header_format)
-
-    output.seek(0)
-
-    return send_file(
-        output,
-        download_name="informe_piezas_rematadas.xlsx",
-        as_attachment=True,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-
-# ============================================================
-#   INFORME — PIEZAS ESPERANDO REMATE (ARMADAS SIN REMATAR)
-# ============================================================
-
-@app.route('/admin/informes/piezas/pendientes-remate', methods=['GET', 'POST'])
-@login_required(["administrador", "supervisor", "soporte", "cliente"])
-def informe_piezas_pendientes_remate():
-    # Filtro base: solo registros de ARMADOR
-    filtro_base = {"modo": "armador"}
-
-    fecha_inicio = request.form.get("fecha_inicio")
-    fecha_fin = request.form.get("fecha_fin")
-    codigo = request.form.get("codigo_pieza")
-    operador = request.form.get("operador")
-    estado_sel = request.form.get("estado")
-
-    # ---------------- FILTROS ----------------
-
-    # Rango de fechas
-    if fecha_inicio and fecha_fin:
-        try:
-            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d")
-            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d")
-            d2 = datetime.combine(d2, datetime.max.time())
-            filtro_base["fecha"] = {"$gte": d1, "$lte": d2}
-        except:
-            flash("Fechas inválidas", "warning")
-
-    # Código pieza
-    if codigo:
-        filtro_base["codigo_pieza"] = codigo.strip()
-
-    # Estado
-    if estado_sel and estado_sel != "todos":
-        filtro_base["calidad_status"] = estado_sel
-
-    # Operador
-    if operador and operador != "todos":
-        filtro_base["usuario"] = operador
-
-    # ---------------- CONSULTA BASE (ARMADOR) ----------------
-    # Todas las producciones donde se ha ARMADO la pieza (según filtros)
-    produccion_armador = list(db.produccion.find(filtro_base).sort("fecha", -1))
-
-    # Códigos que YA tienen remate (en cualquier fecha)
-    codigos_con_remate = set(db.produccion.distinct("codigo_pieza", {"modo": "rematador"}))
-
-    # Nos quedamos SOLO con las piezas que NO tienen remate
-    piezas_pendientes = []
-    vistos = set()  # para no repetir código
-    for p in produccion_armador:
-        cod = p.get("codigo_pieza")
-        if not cod:
-            continue
-        if cod in codigos_con_remate:
-            continue
-        # primera vez que vemos este código -> lo usamos como "representante" en la tabla
-        if cod not in vistos:
-            vistos.add(cod)
-            piezas_pendientes.append(p)
-
-    # Operadores disponibles (para el filtro select)
-    operadores = sorted({p.get("usuario", "") for p in db.produccion.find({"modo": "armador"})})
-
-    # ---------------- GRÁFICO DE ESTADOS ----------------
-    for p in piezas_pendientes:
-        p["fecha"] = to_cl(p.get("fecha"))
-    estado_counts = {"pendiente": 0, "aprobado": 0, "rechazado": 0}
-    for p in piezas_pendientes:
-        e = p.get("calidad_status", "pendiente")
-        if e in estado_counts:
-            estado_counts[e] += 1
-
-    return render_template(
-        "informe_piezas_pendientes_remate.html",
-        piezas=piezas_pendientes,
-        fecha_inicio=fecha_inicio,
-        fecha_fin=fecha_fin,
-        codigo=codigo,
-        operadores=operadores,
-        operador_sel=operador,
-        estado_sel=estado_sel,
-        estado_counts=estado_counts
-    )
-
-
-# ============================================================
-#   EXPORTAR A EXCEL — PIEZAS ESPERANDO REMATE
-# ============================================================
-
-@app.route('/admin/informes/piezas/pendientes-remate/export', methods=['POST'])
-@login_required(["administrador", "supervisor", "soporte", "cliente"])
-def exportar_piezas_pendientes_remate_excel():
-    # Base: solo registros en modo "armador"
-    filtro_base = {"modo": "armador"}
-
-    # Leer filtros desde el formulario (cuidando None / strings vacías)
-    fecha_inicio = (request.form.get("fecha_inicio") or "").strip()
-    fecha_fin = (request.form.get("fecha_fin") or "").strip()
-    codigo = (request.form.get("codigo_pieza") or "").strip()
-    operador = (request.form.get("operador") or "todos").strip()
-    estado_sel = (request.form.get("estado") or "todos").strip()
-
-    # ---------- Filtro por rango de fechas (acepta solo inicio o solo fin) ----------
-    if fecha_inicio or fecha_fin:
-        try:
-            start_cl = None
-            end_cl = None
-            if fecha_inicio and fecha_inicio.lower() != "none":
-                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
-            if fecha_fin and fecha_fin.lower() != "none":
-                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
-                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
-
-            rango = {}
-            if start_cl:
-                rango["$gte"] = start_cl.astimezone(timezone.utc)
-            if end_cl:
-                rango["$lte"] = end_cl.astimezone(timezone.utc)
-            if rango:
-                filtro_base["fecha"] = rango
-        except ValueError:
-            flash("Fechas inválidas (usa formato AAAA-MM-DD).", "warning")
-            return redirect(url_for("informe_piezas_pendientes_remate"))
-
-    # ---------- Filtro por código ----------
-    if codigo:
-        filtro_base["codigo_pieza"] = codigo
-
-    # ---------- Filtro por estado ----------
-    if estado_sel and estado_sel != "todos":
-        filtro_base["calidad_status"] = estado_sel
-
-    # ---------- Filtro por operador ----------
-    if operador and operador != "todos":
-        filtro_base["usuario"] = operador
-
-    # Registros de armador según filtros
-    produccion_armador = list(db.produccion.find(filtro_base).sort("fecha", -1))
-
-    # Códigos que YA tienen al menos un registro en rematador
-    codigos_con_remate = set(
-        db.produccion.distinct("codigo_pieza", {"modo": "rematador"})
-    )
-
-    # Filtrar solo las piezas que aún NO tienen remate (una fila por código)
-    piezas_pendientes = []
-    vistos = set()
-    for p in produccion_armador:
-        cod = p.get("codigo_pieza")
-        if not cod:
-            continue
-        if cod in codigos_con_remate:
-            continue
-        if cod not in vistos:
-            vistos.add(cod)
-            piezas_pendientes.append(p)
-
-    if not piezas_pendientes:
-        flash("No hay datos para exportar con estos filtros.", "warning")
-        return redirect(url_for("informe_piezas_pendientes_remate"))
-
-    # ---------- Construir data para Excel ----------
-    data = []
-    for p in piezas_pendientes:
-        fecha = to_cl(p.get("fecha"))
-        fecha_str = fecha.strftime("%d-%m-%Y %H:%M") if isinstance(fecha, datetime) else "—"
-
-        data.append({
-            "Fecha": fecha_str,
-            "Código": p.get("codigo_pieza", ""),
-            "Empresa": p.get("empresa", ""),
-            "Operador": p.get("usuario", ""),
-            "Marco": p.get("marco", ""),
-            "Tramo": p.get("tramo", ""),
-            "Estado": p.get("calidad_status", "pendiente").capitalize(),
-            "Cuerda interna": p.get("cuerda_interna", ""),
-            "Cuerda externa": p.get("cuerda_externa", ""),
-            "Comentario supervisor": p.get("comentario_supervisor", "")
-        })
-
-    df = pd.DataFrame(data)
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="PendientesRemate")
-
-        # (Opcional) Formato de encabezado bonito
-        workbook = writer.book
-        worksheet = writer.sheets["PendientesRemate"]
-        header_format = workbook.add_format({
-            "bold": True,
-            "text_wrap": True,
-            "valign": "middle",
-            "fg_color": "#222222",
-            "font_color": "white",
-            "border": 1
-        })
-        for col_num, value in enumerate(df.columns.values):
-            worksheet.write(0, col_num, value, header_format)
-
-    output.seek(0)
-
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name="informe_piezas_pendientes_remate.xlsx",
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
 
 
 
@@ -1259,21 +1554,83 @@ def informe_operadores():
             if rango:
                 filtro["fecha"] = rango
 
-    # Sin filtros de fecha: traer todos
-
-    produccion = list(db.produccion.find(filtro))
-
-    resumen = {}
+    produccion = list(db.produccion.find(filtro).sort("fecha", -1))
+    
+    # Pre-fetch datos para evitar N+1
+    user_ids = []
     for p in produccion:
-        key = (p.get("usuario", "—"), p.get("modo", "—"), p.get("marco", "—"), p.get("tramo", "—"))
-        resumen[key] = resumen.get(key, 0) + 1
+        uid = p.get("user_id")
+        if uid and isinstance(uid, str) and len(uid) == 24:
+            user_ids.append(uid)
+    
+    user_ids = list(set(user_ids))
+    
+    try:
+        mapa_usuarios = {str(u["_id"]): u for u in db.usuarios.find({"_id": {"$in": [ObjectId(uid) for uid in user_ids]}})}
+    except:
+        mapa_usuarios = {}
 
-    datos_tabla = [
-        {"usuario": u, "modo": m, "marco": ma, "tramo": t, "cantidad": c}
-        for (u, m, ma, t), c in resumen.items()
-    ]
+    # El campo codigo_pieza en produccion es string (a veces), en piezas es int. Manejar ambos.
+    mapa_piezas = {}
+    piezas_db = list(db.piezas.find()) # Traer todas es más seguro si los tipos no coinciden
+    for p in piezas_db:
+        mapa_piezas[str(p["codigo"])] = p
 
-    datos_tabla = sorted(datos_tabla, key=lambda x: x["usuario"])
+    datos_tabla = []
+    total_general = 0
+
+    for p in produccion:
+        uid = p.get("user_id")
+        user = mapa_usuarios.get(uid)
+        
+        cod = str(p.get("codigo_pieza"))
+        pieza = mapa_piezas.get(cod)
+        
+        modo = p.get("modo") # armador / rematador
+        
+        peso = 0
+        valor_unitario = 0
+        total = 0
+        
+        if pieza and user:
+            peso = pieza.get("kilo_pieza")
+            if peso is None:
+                peso = 0
+            
+            tipo_precio = pieza.get("tipo_precio", "metro") # metro / avo
+            
+            # Determinar precio según modo y tipo
+            if modo == "armador":
+                if tipo_precio == "metro":
+                    valor_unitario = user.get("precio_metro_armado", 0)
+                else:
+                    valor_unitario = user.get("precio_avo_armado", 0)
+            elif modo == "rematador":
+                if tipo_precio == "metro":
+                    valor_unitario = user.get("precio_metro_remate", 0)
+                else:
+                    valor_unitario = user.get("precio_avo_remate", 0)
+            
+            if valor_unitario is None:
+                valor_unitario = 0
+
+            total = peso * valor_unitario
+        
+        total_general += total
+        
+        datos_tabla.append({
+            "fecha": to_cl(p.get("fecha")) if p.get("fecha") else None,
+            "codigo": cod,
+            "operador": user.get("nombre", "—") if user else "—",
+            "modo": modo,
+            "marco": p.get("marco", "—"),
+            "tramo": p.get("tramo", "—"),
+            "cantidad": 1,
+            "peso": peso,
+            "valor_unitario": valor_unitario, # Valor por kilo/unidad
+            "total": total,
+            "tipo_precio": pieza.get("tipo_precio") if pieza else ""
+        })
 
     return render_template(
         "informe_operadores.html",
@@ -1281,7 +1638,8 @@ def informe_operadores():
         operador_sel=operador_sel,
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
-        datos_tabla=datos_tabla
+        datos_tabla=datos_tabla,
+        total_general=total_general
     )
 
 
@@ -1314,22 +1672,83 @@ def exportar_operadores_excel():
         if rango:
             filtro["fecha"] = rango
 
-    produccion = list(db.produccion.find(filtro))
+    produccion = list(db.produccion.find(filtro).sort("fecha", -1))
 
-    resumen = {}
+    # Pre-fetch similar a la vista
+    user_ids = []
     for p in produccion:
-        key = (p.get("usuario", "—"), p.get("modo", "—"), p.get("marco", "—"), p.get("tramo", "—"))
-        resumen[key] = resumen.get(key, 0) + 1
+        uid = p.get("user_id")
+        if uid and isinstance(uid, str) and len(uid) == 24:
+            user_ids.append(uid)
+    user_ids = list(set(user_ids))
+
+    try:
+        mapa_usuarios = {str(u["_id"]): u for u in db.usuarios.find({"_id": {"$in": [ObjectId(uid) for uid in user_ids]}})}
+    except:
+        mapa_usuarios = {}
+    
+    piezas_db = list(db.piezas.find())
+    mapa_piezas = {str(p["codigo"]): p for p in piezas_db}
 
     data = []
-    for (usuario, modo, marco, tramo), cantidad in resumen.items():
+    total_general = 0
+
+    for p in produccion:
+        uid = p.get("user_id")
+        user = mapa_usuarios.get(uid)
+        cod = str(p.get("codigo_pieza"))
+        pieza = mapa_piezas.get(cod)
+        modo = p.get("modo")
+        
+        peso = 0
+        valor_unitario = 0
+        total = 0
+        
+        if pieza and user:
+            peso = pieza.get("kilo_pieza")
+            if peso is None:
+                peso = 0
+
+            tipo_precio = pieza.get("tipo_precio", "metro")
+            
+            if modo == "armador":
+                if tipo_precio == "metro":
+                    valor_unitario = user.get("precio_metro_armado", 0)
+                else:
+                    valor_unitario = user.get("precio_avo_armado", 0)
+            elif modo == "rematador":
+                if tipo_precio == "metro":
+                    valor_unitario = user.get("precio_metro_remate", 0)
+                else:
+                    valor_unitario = user.get("precio_avo_remate", 0)
+            
+            if valor_unitario is None:
+                valor_unitario = 0
+            
+            total = peso * valor_unitario
+            
+        total_general += total
+
         data.append({
-            "Operador": usuario,
-            "Tipo": modo,
-            "Marco": marco,
-            "Tramo": tramo,
-            "Cantidad": cantidad
+            "Fecha": to_cl(p.get("fecha")).strftime('%d-%m-%Y') if p.get("fecha") else "",
+            "Código": cod,
+            "Operador": user.get("nombre", "") if user else "",
+            "Modo": modo,
+            "Marco": p.get("marco", ""),
+            "Tramo": p.get("tramo", ""),
+            "Cantidad": 1,
+            "Peso": peso,
+            "Precio Unit.": valor_unitario,
+            "Tipo": tipo_precio if pieza else "",
+            "Total": total
         })
+
+    # Fila final de total
+    data.append({
+        "Fecha": "TOTAL",
+        "Código": "", "Operador": "", "Modo": "", "Marco": "", "Tramo": "", "Cantidad": "", "Peso": "", "Precio Unit.": "", "Tipo": "",
+        "Total": total_general
+    })
 
     if not data:
         flash("No hay datos", "warning")
@@ -1345,7 +1764,7 @@ def exportar_operadores_excel():
 
     return send_file(
         output,
-        download_name="informe_produccion_operadores.xlsx",
+        download_name="informe_valor_operador.xlsx",
         as_attachment=True,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
@@ -1355,32 +1774,170 @@ def exportar_operadores_excel():
 #                 OPERADOR — REGISTRO DE PRODUCCIÓN
 # ============================================================
 
-@app.route('/operador')
+@app.route('/operador', methods=['GET', 'POST'])
 @login_required('operador')
 def operador_home():
     user_id = session.get("user_id")
     nombre = session.get("nombre")
+    
+    # Manejo de filtros de fecha
+    fecha_inicio = request.form.get("fecha_inicio")
+    fecha_fin = request.form.get("fecha_fin")
+    
+    filtro = {"user_id": user_id}
+    
+    start_cl = None
+    end_cl = None
 
+    if fecha_inicio or fecha_fin:
+        # Si hay filtro manual
+        if fecha_inicio:
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+        if fecha_fin:
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+    else:
+        # Por defecto: HOY
+        today = now_cl().date()
+        start_cl = datetime.combine(today, datetime.min.time()).replace(tzinfo=CL)
+        end_cl = datetime.combine(today, datetime.max.time()).replace(tzinfo=CL)
+        # Para que el input date muestre hoy si no hay filtro (opcional)
+        fecha_inicio = today.strftime("%Y-%m-%d")
+        fecha_fin = today.strftime("%Y-%m-%d")
+
+    rango = {}
+    if start_cl:
+        rango["$gte"] = start_cl.astimezone(timezone.utc)
+    if end_cl:
+        rango["$lte"] = end_cl.astimezone(timezone.utc)
+    
+    if rango:
+        filtro["fecha"] = rango
+
+    if rango:
+        filtro["fecha"] = rango
+
+    # ------------------ NUEVA LÓGICA UNIFICADA (ACTIVO + HISTÓRICO) ------------------
+    
+    # 1. Buscar en Producción Activa
+    active_recs = list(db.produccion.find(filtro))
+    
+    # 2. Buscar en Producción Histórica
+    archived_recs = list(db.produccion_historica.find(filtro))
+    
+    piezas_produccion = active_recs + archived_recs
+    
+    # Ordenar por fecha descendente
+    piezas_produccion.sort(key=lambda x: x.get("fecha", datetime.min), reverse=True)
+    
+    # Preparar datos para cálculo
+    usuario_obj = db.usuarios.find_one({"_id": ObjectId(user_id)})
+    
+    # Mapas para activos
+    piezas_db = list(db.piezas.find())
+    mapa_piezas_active = {str(p["codigo"]): p for p in piezas_db}
+    
+    # Cachés para históricos
+    cache_users_hist = {}   # (corte_id, usuario_nombre) -> user_doc
+    cache_piezas_hist = {}  # (corte_id, codigo_pieza) -> pieza_doc
+    
     boxes = list(db.boxes.find().sort("codigo", 1))
+    total_general = 0
+    
+    for p in piezas_produccion:
+        p["fecha"] = to_cl(p.get("fecha"))
+        
+        # Datos básicos del registro
+        cod = str(p.get("codigo_pieza"))
+        modo = p.get("modo")
+        corte_id = p.get("corte_id")
+        
+        # Determinar Peso y Tipo de Precio
+        peso = 0.0
+        tipo_precio = "metro" # Default
+        
+        # Intento 1: Leer del registro (si existen)
+        if "kilo_pieza" in p:
+             try: peso = float(p["kilo_pieza"])
+             except: peso = 0.0
+        
+        if "tipo_precio" in p:
+             tipo_precio = p["tipo_precio"]
+        
+        # Intento 2: Buscar en Piezas (Activas o Históricas) si falta info
+        # Si ya tengo peso y tipo_precio del registro, no necesito buscar pieza, 
+        # PERO records viejos no tienen tipo_precio.
+        
+        pieza_doc = None
+        if peso == 0 or "tipo_precio" not in p:
+            if corte_id:
+                # Buscar en histórico
+                if (corte_id, cod) not in cache_piezas_hist:
+                    # Intenta string e int
+                    pz = db.piezas_historicas.find_one({"corte_id": corte_id, "codigo": cod})
+                    if not pz and cod.isdigit():
+                         pz = db.piezas_historicas.find_one({"corte_id": corte_id, "codigo": int(cod)})
+                    cache_piezas_hist[(corte_id, cod)] = pz
+                pieza_doc = cache_piezas_hist[(corte_id, cod)]
+            else:
+                # Buscar en activo
+                pieza_doc = mapa_piezas_active.get(cod)
+            
+            if pieza_doc:
+                if peso == 0:
+                    try: peso = float(pieza_doc.get("kilo_pieza") or 0)
+                    except: peso = 0.0
+                if "tipo_precio" not in p:
+                    tipo_precio = pieza_doc.get("tipo_precio", "metro")
 
-    today = now_cl().date()
-    start_cl = datetime.combine(today, datetime.min.time()).replace(tzinfo=CL)
-    end_cl = datetime.combine(today, datetime.max.time()).replace(tzinfo=CL)
-    start = start_cl.astimezone(timezone.utc)
-    end = end_cl.astimezone(timezone.utc)
+        # Determinar Precios del Usuario
+        # Si es histórico, buscar snapshot de usuario. Si no, usar actual.
+        user_vals = usuario_obj # Default to current
+        
+        if corte_id:
+            u_name = p.get("usuario")
+            if (corte_id, u_name) not in cache_users_hist:
+                uh = db.usuarios_historicos.find_one({"corte_id": corte_id, "usuario": u_name})
+                cache_users_hist[(corte_id, u_name)] = uh
+            if cache_users_hist[(corte_id, u_name)]:
+                user_vals = cache_users_hist[(corte_id, u_name)]
+        
+        # Calcular
+        valor = 0.0
+        if user_vals:
+             val_raw = 0
+             if modo == "armador":
+                 val_raw = user_vals.get("precio_metro_armado", 0) if tipo_precio == "metro" else user_vals.get("precio_avo_armado", 0)
+             elif modo == "rematador":
+                 val_raw = user_vals.get("precio_metro_remate", 0) if tipo_precio == "metro" else user_vals.get("precio_avo_remate", 0)
+             
+             try: valor = float(val_raw or 0)
+             except: valor = 0.0
+        
+        total = peso * valor
+        
+        p["peso_calculado"] = peso
+        p["valor_calculado"] = valor
+        p["total_calculado"] = total
+        
+        total_general += total
 
-    piezas_hoy = list(db.produccion.find({
-        "user_id": user_id,
-        "fecha": {"$gte": start, "$lte": end}
-    }).sort("fecha", -1))
-
+    # Jornada (solo se busca si estamos filtrando por HOY, o simplemente mostrar la del rango?)
+    # El requerimiento original era mostrar la jornada de hoy.
+    # Si filtra por rango, la "jornada actual" puede ser confusa. 
+    # Mantendremos la lógica de buscar jornada solo si el rango coincide con hoy o simplemente la última jornada en ese rango?
+    # El usuario pidió "filtro fecha desde hasta" en su producción.
+    # La jornada es para marcar ingreso/salida. Eso siempre debería ser "hoy".
+    
+    today_real = now_cl().date()
+    start_today = datetime.combine(today_real, datetime.min.time()).replace(tzinfo=CL).astimezone(timezone.utc)
+    end_today = datetime.combine(today_real, datetime.max.time()).replace(tzinfo=CL).astimezone(timezone.utc)
+    
     jornada = db.jornadas.find_one({
         "user_id": user_id,
-        "fecha": {"$gte": start, "$lte": end}
+        "fecha": {"$gte": start_today, "$lte": end_today}
     })
-
-    for p in piezas_hoy:
-        p["fecha"] = to_cl(p.get("fecha"))
 
     if jornada:
         if jornada.get("fecha"):
@@ -1394,8 +1951,11 @@ def operador_home():
         "operador.html",
         nombre=nombre,
         boxes=boxes,
-        piezas_hoy=piezas_hoy,
-        jornada=jornada
+        piezas_hoy=piezas_produccion, # Ahora puede ser un rango
+        jornada=jornada,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        total_general=total_general
     )
 
 
@@ -1472,10 +2032,15 @@ def operador_registrar():
         flash("Debes ingresar un código de pieza", "warning")
         return redirect(url_for("operador_home"))
 
-    try:
-        pieza_data = db.piezas.find_one({"codigo": int(codigo_pieza)})
-    except:
-        pieza_data = None
+    # Intentar buscar primero como string directo (alfanumérico)
+    pieza_data = db.piezas.find_one({"codigo": codigo_pieza})
+
+    # Si no encuentra, intentar como entero (compatibilidad)
+    if not pieza_data and codigo_pieza.isdigit():
+        try:
+            pieza_data = db.piezas.find_one({"codigo": int(codigo_pieza)})
+        except:
+            pass
 
     if not pieza_data:
         flash(f"❌ No existe una pieza con código {codigo_pieza}", "danger")
@@ -1565,9 +2130,7 @@ def operador_registrar():
         "marco": pieza_data.get("marco", ""),
         "tramo": pieza_data.get("tramo", ""),
         "kilo_pieza": pieza_data.get("kilo_pieza", 0),
-
-        "precio_armado": pieza_data.get("precio_armado", 0),
-        "precio_remate": pieza_data.get("precio_remate", 0),
+        "tipo_precio": pieza_data.get("tipo_precio", "metro"),
 
         "cuerda_interna": cuerda_interna,
         "cuerda_externa": cuerda_externa,
@@ -1721,12 +2284,17 @@ def informe_piezas_operador():
     # Obtener producción filtrada
     produccion = list(db.produccion.find(filtro).sort("fecha", -1))
 
+    # Cargar usuarios para obtener precios personalizados
+    users_db = list(db.usuarios.find())
+    users_map = {u['usuario']: u for u in users_db}
+
     resumen = []
     total_general = 0
 
     for p in produccion:
         codigo = p.get("codigo_pieza")
         modo = p.get("modo")
+        usuario_nombre = p.get("usuario")
 
         if not codigo:
             continue
@@ -1745,25 +2313,31 @@ def informe_piezas_operador():
 
         # Cargar valores seguros
         peso = float(pieza_info.get("kilo_pieza", 0))   # el peso de la pieza
-        precio_armado = float(pieza_info.get("precio_armado", 0))
-        precio_remate = float(pieza_info.get("precio_remate", 0))
+        
+        # --- LÓGICA DE PRECIOS POR USUARIO (4 TIPOS) ---
+        user_info = users_map.get(usuario_nombre, {})
+        tipo_precio = pieza_info.get("tipo_precio", "metro") 
 
-        # ------------------------
-        # Cálculo final
-        # ------------------------
-        if modo == "armador":
-            valor = peso * precio_armado
-        elif modo == "rematador":
-            valor = peso * precio_remate
-        else:
-            valor = 0
+        rate = 0.0
+        if tipo_precio == "metro":
+            if modo == "armador":
+                rate = float(user_info.get("precio_metro_armado", 0))
+            else: # rematador
+                rate = float(user_info.get("precio_metro_remate", 0))
+        else: # avo
+            if modo == "armador":
+                rate = float(user_info.get("precio_avo_armado", 0))
+            else: # rematador
+                rate = float(user_info.get("precio_avo_remate", 0))
+
+        valor = peso * rate
 
         total_general += valor
 
         resumen.append({
             "fecha": to_cl(p.get("fecha")),
             "codigo": codigo,
-            "operador": p.get("usuario"),
+            "operador": usuario_nombre,
             "empresa": pieza_info.get("empresa"),
             "marco": pieza_info.get("marco"),
             "tramo": pieza_info.get("tramo"),
@@ -1801,6 +2375,10 @@ def exportar_valor_operador_excel():
     if operador_sel and operador_sel != "todos":
         filtro["usuario"] = operador_sel
 
+    # Cargar usuarios para obtener precios personalizados
+    users_db = list(db.usuarios.find())
+    users_map = {u['usuario']: u for u in users_db}
+
     if fecha_inicio and fecha_fin:
         try:
             d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
@@ -1822,25 +2400,32 @@ def exportar_valor_operador_excel():
         if not codigo:
             continue
 
-        try:
-            codigo_int = int(codigo)
-        except:
-            continue
-
-        pieza_info = db.piezas.find_one({"codigo": codigo_int})
+        # Buscar pieza por código alfanumérico, con fallback a entero
+        pieza_info = db.piezas.find_one({"codigo": codigo}) or (
+            db.piezas.find_one({"codigo": int(codigo)}) if str(codigo).isdigit() else None
+        )
         if not pieza_info:
             continue
 
         peso = float(pieza_info.get("kilo_pieza", 0))
-        precio_armado = float(pieza_info.get("precio_armado", 0))
-        precio_remate = float(pieza_info.get("precio_remate", 0))
+        
+        # --- LÓGICA DE PRECIOS POR USUARIO (4 TIPOS) ---
+        user_info = users_map.get(p.get("usuario"), {})
+        tipo_precio = pieza_info.get("tipo_precio", "metro")
 
-        if modo == "armador":
-            valor = peso * precio_armado
-        elif modo == "rematador":
-            valor = peso * precio_remate
-        else:
-            valor = 0
+        rate = 0.0
+        if tipo_precio == "metro":
+            if modo == "armador":
+                rate = float(user_info.get("precio_metro_armado", 0))
+            else: # rematador
+                rate = float(user_info.get("precio_metro_remate", 0))
+        else: # avo
+            if modo == "armador":
+                rate = float(user_info.get("precio_avo_armado", 0))
+            else: # rematador
+                rate = float(user_info.get("precio_avo_remate", 0))
+
+        valor = peso * rate
 
         fecha = to_cl(p.get("fecha"))
         fecha_str = fecha.strftime("%d-%m-%Y %H:%M") if fecha else "—"
@@ -1873,120 +2458,110 @@ def exportar_valor_operador_excel():
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
+@app.route('/admin/archivados/valor-operador/export', methods=['POST'])
+@login_required(['administrador', 'soporte'])
+def exportar_valor_operador_archivado():
+    operador_sel = request.form.get("operador")
+    fecha_inicio = request.form.get("fecha_inicio")
+    fecha_fin = request.form.get("fecha_fin")
+    corte_nombre = request.form.get("corte_nombre")
 
-# ============================================================
-#    INFORME – PIEZAS SIN PRODUCCIÓN (NO ARMADAS/NO REMATADAS)
-# ============================================================
+    filtro = {}
+    if operador_sel and operador_sel != "todos":
+        filtro["usuario"] = operador_sel
 
-@app.route('/admin/informes/piezas/sin-produccion', methods=['GET', 'POST'])
-@login_required(["administrador", "supervisor", "soporte", "cliente"])
-def informe_piezas_sin_produccion():
+    if corte_nombre and not (fecha_inicio and fecha_fin):
+        corte = db.cortes.find_one({'nombre': corte_nombre})
+        if corte:
+            filtro['corte_id'] = corte.get('_id')
+    elif fecha_inicio and fecha_fin:
+        try:
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            filtro["fecha"] = {"$gte": start_cl.astimezone(timezone.utc), "$lte": end_cl.astimezone(timezone.utc)}
+        except:
+            pass
 
-    empresa = request.form.get("empresa")
-    marco = request.form.get("marco")
-    tramo = request.form.get("tramo")
+    produccion = list(db.produccion_historica.find(filtro).sort("fecha", -1))
+    
+    # Lógica de usuarios históricos
+    corte_id_filtro = filtro.get('corte_id')
+    users_map = {}
+    if corte_id_filtro:
+        users_hist = list(db.usuarios_historicos.find({"corte_id": corte_id_filtro}))
+        if users_hist:
+            users_map = {u.get('usuario'): u for u in users_hist}
+            
+    if not users_map:
+        users_db = list(db.usuarios.find())
+        users_map = {u.get('usuario'): u for u in users_db}
 
-    # --- Todas las piezas creadas ---
-    todas_piezas = list(db.piezas.find())
-
-    # --- Obtener códigos con registros de producción (armador o rematador) ---
-    codigos_producidos = set(
-        db.produccion.distinct("codigo_pieza")
-    )
-
-    # --- Filtrar solo las piezas sin producción ---
-    piezas_sin_produccion = []
-    for p in todas_piezas:
-        if str(p["codigo"]) not in codigos_producidos:
-
-            # Aplicar filtros opcionales
-            if empresa and empresa != "todos" and p.get("empresa") != empresa:
-                continue
-            if marco and marco != "todos" and p.get("marco") != marco:
-                continue
-            if tramo and tramo != "todos" and p.get("tramo") != tramo:
-                continue
-
-            piezas_sin_produccion.append(p)
-
-    # --- Listas únicas para los filtros ---
-    empresas = sorted({p.get("empresa") for p in todas_piezas})
-    marcos = sorted({p.get("marco") for p in todas_piezas})
-    tramos = sorted({p.get("tramo") for p in todas_piezas})
-
-    return render_template(
-        "informe_piezas_sin_produccion.html",
-        piezas=piezas_sin_produccion,
-        empresas=empresas,
-        marcos=marcos,
-        tramos=tramos,
-        empresa_sel=empresa,
-        marco_sel=marco,
-        tramo_sel=tramo
-    )
-
-
-# ============================================================
-#      EXPORTAR A EXCEL — PIEZAS SIN PRODUCCIÓN
-# ============================================================
-
-@app.route('/admin/informes/piezas/sin-produccion/export', methods=['POST'])
-@login_required(["administrador", "supervisor", "soporte", "cliente"])
-def exportar_piezas_sin_produccion_excel():
-
-    empresa = request.form.get("empresa")
-    marco = request.form.get("marco")
-    tramo = request.form.get("tramo")
-
-    # Todas las piezas creadas
-    todas_piezas = list(db.piezas.find())
-
-    # Códigos con producción registrada
-    codigos_producidos = set(
-        db.produccion.distinct("codigo_pieza")
-    )
-
-    piezas_sin_produccion = []
-    for p in todas_piezas:
-        if str(p["codigo"]) not in codigos_producidos:
-
-            if empresa and empresa != "todos" and p.get("empresa") != empresa:
-                continue
-            if marco and marco != "todos" and p.get("marco") != marco:
-                continue
-            if tramo and tramo != "todos" and p.get("tramo") != tramo:
-                continue
-
-            piezas_sin_produccion.append(p)
-
-    if not piezas_sin_produccion:
-        flash("No hay datos para exportar con estos filtros.", "warning")
-        return redirect(url_for('informe_piezas_sin_produccion'))
-
-    # Preparar data para Excel
     data = []
-    for p in piezas_sin_produccion:
+    total_general = 0
+    for p in produccion:
+        codigo = p.get("codigo_pieza")
+        modo = p.get("modo")
+        if not codigo:
+            continue
+        
+        # Lógica mejorada de búsqueda de pieza
+        pieza_info = None
+        corte_id_res = p.get("corte_id") or filtro.get("corte_id")
+        
+        if corte_id_res:
+            pieza_info = db.piezas_historicas.find_one({"codigo": codigo, "corte_id": corte_id_res})
+            
+        if not pieza_info:
+            pieza_info = db.piezas_historicas.find_one({"codigo": codigo}) or db.piezas.find_one({"codigo": codigo})
+
+        if not pieza_info:
+            continue
+        tipo_precio = pieza_info.get("tipo_precio", "metro")
+        user = users_map.get(p.get("usuario"))
+        if not user:
+            continue
+        if modo == "armador":
+            valor_unitario = user.get("precio_metro_armado", 0) if tipo_precio == "metro" else user.get("precio_avo_armado", 0)
+        else:
+            valor_unitario = user.get("precio_metro_remate", 0) if tipo_precio == "metro" else user.get("precio_avo_remate", 0)
+        peso = pieza_info.get("kilo_pieza") or 0
+        total = (peso or 0) * (valor_unitario or 0)
+
         data.append({
-            "Código": p.get("codigo", ""),
-            "Empresa": p.get("empresa", ""),
-            "Marco": p.get("marco", ""),
-            "Tramo": p.get("tramo", "")
+            "Fecha": to_cl(p.get("fecha")).strftime('%d-%m-%Y %H:%M') if p.get("fecha") else "",
+            "Código": codigo,
+            "Operador": p.get("usuario"),
+            "Modo": modo,
+            "Marco": pieza_info.get("marco"),
+            "Tramo": pieza_info.get("tramo"),
+            "Peso": peso,
+            "Precio Unit.": valor_unitario,
+            "Total": total
+        })
+        total_general += total
+
+    if data:
+        data.append({
+            "Fecha": "TOTAL", "Código": "", "Operador": "", "Modo": "", "Marco": "", "Tramo": "",
+            "Peso": "", "Precio Unit.": "", "Total": total_general
         })
 
     df = pd.DataFrame(data)
     output = BytesIO()
-
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="SinProduccion")
+        df.to_excel(writer, index=False, sheet_name="ValorOperadorArchivado")
 
     output.seek(0)
 
     return send_file(
         output,
+        download_name="valor_por_operador_archivado.xlsx",
         as_attachment=True,
-        download_name="informe_piezas_sin_produccion.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 
 
 
@@ -2001,6 +2576,7 @@ def informe_estado_piezas():
     marco = request.form.get("marco")
     tramo = request.form.get("tramo")
     codigo = request.form.get("codigo_pieza")
+    estado_filter = request.form.get("estado")  # Nuevo filtro
 
     filtros = {}
     if empresa and empresa != "todos":
@@ -2030,11 +2606,17 @@ def informe_estado_piezas():
         else:
             estado = "Sin producción"
 
+        # Aplicar filtro de estado si existe
+        if estado_filter and estado_filter != "todos" and estado != estado_filter:
+            continue
+
         listado.append({
             "codigo": p.get("codigo"),
             "cliente": p.get("empresa"),
             "marco": p.get("marco"),
             "tramo": p.get("tramo"),
+            "cuerda_interna": p.get("cuerda_interna", ""),
+            "cuerda_externa": p.get("cuerda_externa", ""),
             "estado": estado
         })
 
@@ -2051,7 +2633,79 @@ def informe_estado_piezas():
         empresa_sel=empresa,
         marco_sel=marco,
         tramo_sel=tramo,
-        codigo_sel=codigo
+        codigo_sel=codigo,
+        estado_sel=estado_filter
+    )
+
+
+@app.route('/admin/informes/piezas/estado/export', methods=['POST'])
+@login_required(["administrador", "supervisor", "soporte"])
+def exportar_estado_piezas_excel():
+    empresa = request.form.get("empresa")
+    marco = request.form.get("marco")
+    tramo = request.form.get("tramo")
+    codigo = request.form.get("codigo_pieza")
+    estado_filter = request.form.get("estado")
+
+    filtros = {}
+    if empresa and empresa != "todos":
+        filtros["empresa"] = empresa
+    if marco and marco != "todos":
+        filtros["marco"] = marco
+    if tramo and tramo != "todos":
+        filtros["tramo"] = tramo
+    if codigo:
+        try:
+            filtros["codigo"] = int(codigo)
+        except:
+            filtros["codigo"] = -1
+
+    piezas = list(db.piezas.find(filtros).sort("codigo", 1))
+
+    codigos_armado = set(db.produccion.distinct("codigo_pieza", {"modo": "armador"}))
+    codigos_remate = set(db.produccion.distinct("codigo_pieza", {"modo": "rematador"}))
+
+    data = []
+    for p in piezas:
+        cstr = str(p.get("codigo"))
+        if cstr in codigos_remate:
+            estado = "Rematado"
+        elif cstr in codigos_armado:
+            estado = "Armado"
+        else:
+            estado = "Sin producción"
+
+        if estado_filter and estado_filter != "todos" and estado != estado_filter:
+            continue
+
+        visto_bueno = "OK" if estado == "Rematado" else ""
+
+        data.append({
+            "Código": p.get("codigo"),
+            "Cliente": p.get("empresa"),
+            "Marco": p.get("marco"),
+            "Tramo": p.get("tramo"),
+            "Cuerda Int.": p.get("cuerda_interna", ""),
+            "Cuerda Ext.": p.get("cuerda_externa", ""),
+            "Estado": estado,
+            "Visto Bueno": visto_bueno
+        })
+
+    if not data:
+        flash("No hay datos para exportar con esos filtros.", "warning")
+        return redirect(url_for('informe_estado_piezas'))
+
+    df = pd.DataFrame(data)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="EstadoPiezas")
+    output.seek(0)
+
+    return send_file(
+        output,
+        download_name="informe_estado_piezas.xlsx",
+        as_attachment=True,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
 # ============================================================
@@ -2073,10 +2727,13 @@ def informe_piezas_tarjetas():
             for t in tramos:
                 total = db.piezas.count_documents({"empresa": cliente, "marco": m, "tramo": t})
                 rem = db.produccion.count_documents({"modo": "rematador", "empresa": cliente, "marco": m, "tramo": t})
+                arm = db.produccion.count_documents({"modo": "armador", "empresa": cliente, "marco": m, "tramo": t})
                 tramos_info.append({
                     "tramo": t, 
                     "total": total,
                     "rematadas": rem,
+                    "armadas": arm,
+                    "en_armado": max(arm - rem, 0),
                     "pendientes": max(total - rem, 0)
                 })
             marcos_info.append({
