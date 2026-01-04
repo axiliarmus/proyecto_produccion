@@ -2753,4 +2753,12 @@ def informe_piezas_tarjetas():
 # ============================================================
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
+    # Para permitir acceso a cámara en móviles (HTTPS requerido), usamos ssl_context='adhoc'.
+    # Esto requiere 'pip install pyopenssl'.
+    # El navegador mostrará advertencia de seguridad, hay que dar a "Avanzado -> Continuar".
+    try:
+        app.run(host='0.0.0.0', port=5000, ssl_context='adhoc')
+    except Exception as e:
+        print(f"No se pudo iniciar con SSL (HTTPS): {e}")
+        print("Iniciando en modo HTTP normal (la cámara podría no funcionar en móviles)...")
+        app.run(host='0.0.0.0', port=5000)
