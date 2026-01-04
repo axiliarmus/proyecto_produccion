@@ -2,6 +2,20 @@
 
 Esta guía te permitirá subir tu proyecto a un VPS (DigitalOcean, AWS, Vultr, etc.) y tener **HTTPS seguro** para que funcione la cámara, usando un subdominio gratuito de **DuckDNS**.
 
+## 🛑 Paso 0: ¡Importante! Liberar el puerto 80
+Muchos VPS vienen con **Nginx** o **Apache** preinstalado. Si ves una página que dice "Welcome to nginx", debes detenerlo para que Caddy funcione.
+
+Ejecuta esto en tu VPS:
+```bash
+# Detener Nginx y evitar que inicie solo
+sudo systemctl stop nginx
+sudo systemctl disable nginx
+
+# Si tienes Apache, deténlo también
+sudo systemctl stop apache2
+sudo systemctl disable apache2
+```
+
 ## Paso 1: Obtener un nombre de dominio gratuito
 1. Entra a [https://www.duckdns.org/](https://www.duckdns.org/).
 2. Inicia sesión (con Google/Github).
@@ -42,6 +56,7 @@ sudo apt update
 sudo apt install caddy
 
 # 2. Configurar Caddy (Reemplaza 'tudominio.duckdns.org' con el tuyo)
+# Asegúrate de haber hecho el Paso 0 primero
 sudo caddy reverse-proxy --from tudominio.duckdns.org --to 127.0.0.1:8000
 ```
 *Si todo sale bien, verás que Caddy activa el HTTPS. Luego puedes presionar `Ctrl+C` para detenerlo y configurarlo como servicio (opcional) o dejarlo corriendo en segundo plano.*
@@ -56,9 +71,13 @@ En la carpeta de tu proyecto (con el entorno virtual activado):
 gunicorn -w 4 -b 127.0.0.1:8000 app:app
 ```
 
-## Resumen
-1. El usuario entra a `https://mi-fabrica-2026.duckdns.org`.
-2. **Caddy** recibe la petición segura (HTTPS).
-3. **Caddy** la pasa internamente a **Gunicorn** (puerto 8000).
-4. **Gunicorn** ejecuta tu **Flask App**.
-5. ¡La cámara funciona perfecto!
+## Solución de Problemas Comunes
+
+### Veo "Welcome to Nginx"
+Significa que Nginx sigue corriendo. Ejecuta:
+`sudo systemctl stop nginx`
+
+### Error "Bind: address already in use"
+Algo está usando el puerto 80 (Caddy no puede iniciar). Verifica con:
+`sudo lsof -i :80`
+Y mata el proceso que lo esté usando.

@@ -11,7 +11,7 @@ pip install -r requirements.txt
 
 # Iniciar Gunicorn
 # -w 4: 4 workers (bueno para VPS de 1-2 CPUs)
-# -b 0.0.0.0:8000: Escuchar en puerto 8000
+# -b 127.0.0.1:8000: Escuchar solo localmente (más seguro, Caddy hace el resto)
 # --access-logfile -: Mostrar logs en consola
 echo "🚀 Iniciando Servidor de Producción..."
-exec gunicorn -w 4 -b 0.0.0.0:8000 --access-logfile - app:app
+exec gunicorn -w 4 -b 127.0.0.1:8000 --access-logfile - app:app
