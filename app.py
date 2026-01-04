@@ -3,7 +3,6 @@ import json
 from datetime import datetime, date, timedelta
 from bson import ObjectId
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
-from flask_pymongo import PyMongo
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from io import BytesIO
@@ -21,6 +20,9 @@ app.secret_key = os.getenv("SECRET_KEY") or os.urandom(24)
 
 client = MongoClient(os.getenv("MONGO_URI"))
 db = client["miBase"]
+
+# Variable global para almacenar la URL del túnel seguro
+tunnel_url = None
 
 
 
@@ -1955,7 +1957,8 @@ def operador_home():
         jornada=jornada,
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
-        total_general=total_general
+        total_general=total_general,
+        tunnel_url=tunnel_url
     )
 
 
@@ -2753,12 +2756,76 @@ def informe_piezas_tarjetas():
 # ============================================================
 
 if __name__ == "__main__":
-    # Para permitir acceso a cámara en móviles (HTTPS requerido), usamos ssl_context='adhoc'.
-    # Esto requiere 'pip install pyopenssl'.
-    # El navegador mostrará advertencia de seguridad, hay que dar a "Avanzado -> Continuar".
-    try:
-        app.run(host='0.0.0.0', port=5000, ssl_context='adhoc')
-    except Exception as e:
-        print(f"No se pudo iniciar con SSL (HTTPS): {e}")
-        print("Iniciando en modo HTTP normal (la cámara podría no funcionar en móviles)...")
-        app.run(host='0.0.0.0', port=5000)
+    # Intentar iniciar un túnel SSH seguro (localhost.run) para HTTPS
+    # Esto permite el uso de cámara en móviles sin configuración extra.
+    import threading
+    import subprocess
+    import time
+    import atexit
+    import re
+    import sys
+
+    def start_secure_tunnel():
+        global tunnel_url
+        print("⏳ Intentando establecer túnel HTTPS seguro...")
+        
+        # Intentamos primero con Serveo (suele ser más estable)
+        tunnel_cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ServerAliveInterval=60", "-R", "80:127.0.0.1:5000", "serveo.net"]
+        
+        try:
+            process = subprocess.Popen(
+                tunnel_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                encoding='utf-8',
+                errors='replace'
+            )
+            
+            atexit.register(lambda: process.terminate())
+
+            start_t = time.time()
+            while time.time() - start_t < 15:
+                line = process.stdout.readline()
+                if not line:
+                    break
+                
+                # Patrón Serveo: "Forwarding HTTP traffic from https://xyz.serveo.net"
+                if "Forwarding HTTP traffic from" in line:
+                    match = re.search(r'(https://[a-zA-Z0-9.-]+)', line)
+                    if match:
+                        url = match.group(1)
+                        tunnel_url = url
+                        print("\n" + "▒"*60)
+                        print(" ✅ TÚNEL HTTPS ACTIVO (Serveo)")
+                        print(f" 🔗 URL SEGURA: {url}")
+                        print(" 📱 ¡Usa este enlace en tu celular para activar la cámara!")
+                        print("▒"*60 + "\n")
+                        break
+                        
+                # Patrón localhost.run (fallback si cambiamos el comando)
+                if "tunneled with tls termination" in line:
+                    match = re.search(r'(https://[a-zA-Z0-9.-]+\.lhr\.life)', line)
+                    if match:
+                        url = match.group(1)
+                        tunnel_url = url
+                        print("\n" + "▒"*60)
+                        print(" ✅ TÚNEL HTTPS ACTIVO (Localhost.run)")
+                        print(f" 🔗 URL SEGURA: {url}")
+                        print(" 📱 ¡Usa este enlace en tu celular para activar la cámara!")
+                        print("▒"*60 + "\n")
+                        break
+        except Exception as e:
+            print(f"⚠️ No se pudo iniciar el túnel automático: {e}")
+
+    # Iniciar el túnel en segundo plano
+    threading.Thread(target=start_secure_tunnel, daemon=True).start()
+
+    print("================================================================")
+    print(" INICIANDO SERVIDOR LOCAL")
+    print(" Local: http://127.0.0.1:5000")
+    print(" LAN:   http://192.168.1.132:5000")
+    print("================================================================")
+    
+    app.run(host='0.0.0.0', port=5000)

@@ -9,3 +9,6 @@ XlsxWriter==3.2.0
 
 # Necesario para convertir ObjectId y manejar BSON
 bson==0.5.10
+
+# Servidor de producción
+gunicorn==21.2.0

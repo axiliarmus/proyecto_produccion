@@ -85,6 +85,11 @@
       <div class="modal-body text-center">
         <div id="reader" style="width: 100%;"></div>
         <p class="mt-2 text-muted small">Apunta la cámara al código de barras de la pieza</p>
+        
+        <!-- Debug Console Visible -->
+        <div id="debug-console" class="text-start mt-3 p-2 bg-black text-warning small border border-warning" style="font-family: monospace; max-height: 150px; overflow-y: auto; display: none;">
+            <div>> Listo para iniciar...</div>
+        </div>
       </div>
     </div>
   </div>
@@ -180,25 +185,112 @@ document.getElementById("modo").addEventListener("change", function () {
 document.getElementById("modo").dispatchEvent(new Event('change'));
 
 // Lógica de Escáner QR
-const html5QrCode = new Html5Qrcode("reader", { 
-    formatsToSupport: [ 
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.UPC_A
-    ]
-});
-const qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
+let configHtml5QrCode = {};
+if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+    configHtml5QrCode = { 
+        formatsToSupport: [ 
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.UPC_A
+        ]
+    };
+}
+
+const html5QrCode = new Html5Qrcode("reader", configHtml5QrCode);
+let qrModal; 
 let isScanning = false;
+const tunnelUrl = "{{ tunnel_url if tunnel_url else '' }}";
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof bootstrap !== 'undefined') {
+        qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
+    } else {
+        console.error("Bootstrap no está definido");
+    }
+
+    // Mostrar banner si hay túnel disponible y estamos en HTTP
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && tunnelUrl) {
+        const banner = document.createElement('div');
+        banner.className = 'alert alert-warning fixed-top text-center m-0 shadow-lg';
+        banner.style.zIndex = '9999';
+        banner.innerHTML = `
+           <div class="d-flex flex-column align-items-center gap-2">
+               <strong>⚠️ MODO INSEGURO DETECTADO</strong>
+               <span>La cámara no funcionará en esta dirección.</span>
+               <a href="${tunnelUrl}/operador" class="btn btn-success fw-bold pulse-button">
+                   🔒 CAMBIAR A VERSIÓN SEGURA
+               </a>
+           </div>
+        `;
+        document.body.prepend(banner);
+        
+        // Estilo para el botón pulsante
+        const style = document.createElement('style');
+        style.textContent = `
+            .pulse-button { animation: pulse 1.5s infinite; }
+            @keyframes pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+                100% { transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+});
+
+function debugLog(msg) {
+    const consoleDiv = document.getElementById('debug-console');
+    if (consoleDiv) {
+        consoleDiv.style.display = 'block';
+        const line = document.createElement('div');
+        line.innerText = `> ${msg}`;
+        consoleDiv.appendChild(line);
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    }
+    console.log(msg);
+}
 
 document.getElementById('btn-scan-qr').addEventListener('click', () => {
-    // Verificación de HTTPS para móviles
+    debugLog("Botón presionado. Verificando entorno...");
+    
+    // Verificación y ayuda para HTTP
     if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-        alert("⚠️ Advertencia de Seguridad: El navegador de tu celular podría bloquear la cámara porque no estás usando una conexión segura (HTTPS).\n\nSi la cámara no se abre, intenta acceder usando 'https://' o configura tu navegador.");
+        
+        if (tunnelUrl) {
+            // Ofrecer cambio a versión segura automáticamente
+            const userWantsSecure = confirm(
+                "⚠️ Estás en modo inseguro (HTTP) y la cámara fallará.\n\n" +
+                "✅ ¡Hay una conexión segura lista!\n\n" +
+                "¿Quieres cambiar a la versión segura ahora?"
+            );
+            if (userWantsSecure) {
+                // Redirigir a la misma ruta pero en el dominio seguro
+                // tunnelUrl es base (ej: https://xyz.lhr.life)
+                // location.pathname es /operador
+                location.href = tunnelUrl + location.pathname;
+                return;
+            }
+        }
+
+        const mensaje = "⚠️ Estás usando HTTP. Si la cámara no abre, sigue estos pasos:\n\n" +
+                        "1. Abre una nueva pestaña en Chrome y escribe: chrome://flags\n" +
+                        "2. Busca: unsafely-treat-insecure-origin-as-secure\n" +
+                        "3. Actívalo (Enabled) y agrega esta dirección: http://" + location.host + "\n" +
+                        "4. Reinicia Chrome e intenta de nuevo.";
+        
+        debugLog("Advertencia: Protocolo inseguro detectado (HTTP).");
+        console.warn("Advertencia HTTP: Cámara podría estar bloqueada.");
+    } else {
+        debugLog("Protocolo seguro detectado.");
     }
     
     qrModal.show();
-    startScanning();
+    
+    // Pequeño delay para asegurar que el modal esté visible antes de iniciar
+    setTimeout(() => {
+        startScanning();
+    }, 500);
 });
 
 document.getElementById('qrModal').addEventListener('hidden.bs.modal', () => {
@@ -208,53 +300,97 @@ document.getElementById('qrModal').addEventListener('hidden.bs.modal', () => {
 function startScanning() {
     if (isScanning) return;
     isScanning = true;
+    debugLog("Iniciando solicitud de cámara...");
     
     // Limpiar mensajes anteriores
     const readerDiv = document.getElementById('reader');
     
-    html5QrCode.start(
-        { facingMode: "environment" }, 
-        {
-            fps: 10,
-            qrbox: { width: 300, height: 150 }
-        },
-        (decodedText, decodedResult) => {
-            // Success callback
-            document.getElementById('codigo_pieza_input').value = decodedText;
-            
-            // Feedback visual de éxito (vibración si es posible)
-            if (navigator.vibrate) navigator.vibrate(200);
-            
-            stopScanning();
-            qrModal.hide();
-        },
-        (errorMessage) => {
-            // Error callback (ignorar errores de lectura continua)
-        }
-    ).catch(err => {
-        console.error("Error al iniciar cámara", err);
-        isScanning = false;
+    // Primero intentamos listar cámaras para ver si tenemos permisos
+    Html5Qrcode.getCameras().then(devices => {
+        debugLog(`Cámaras detectadas: ${devices.length}`);
         
-        // Mostrar error amigable al usuario
-        readerDiv.innerHTML = `
-            <div class="alert alert-danger">
-                <strong>No se pudo iniciar la cámara.</strong><br>
-                <small>${err}</small><br><br>
-                Posibles causas:<br>
-                1. No diste permiso a la cámara.<br>
-                2. Estás usando HTTP en lugar de HTTPS.<br>
-                3. Otra aplicación está usando la cámara.
-            </div>
-            <button class="btn btn-outline-light btn-sm mt-2" onclick="location.reload()">Recargar página</button>
-        `;
+        if (devices && devices.length) {
+            let cameraId = devices[0].id;
+            // Intentar buscar cámara trasera
+            for (const device of devices) {
+                if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('trasera') || device.label.toLowerCase().includes('environment')) {
+                    cameraId = device.id;
+                    debugLog(`Usando cámara trasera: ${device.label}`);
+                    break;
+                }
+            }
+            
+            // Iniciar con ID de cámara específico
+            html5QrCode.start(
+                cameraId, 
+                {
+                    fps: 10,
+                    qrbox: { width: 300, height: 150 }
+                },
+                (decodedText, decodedResult) => {
+                    debugLog("¡Código detectado!");
+                    document.getElementById('codigo_pieza_input').value = decodedText;
+                    if (navigator.vibrate) navigator.vibrate(200);
+                    stopScanning();
+                    qrModal.hide();
+                },
+                (errorMessage) => {
+                    // Ignorar errores de frame vacío
+                }
+            ).catch(err => {
+                isScanning = false;
+                debugLog(`ERROR al iniciar stream: ${err}`);
+                mostrarErrorUI(readerDiv, err);
+            });
+            
+        } else {
+            isScanning = false;
+            debugLog("ERROR: Lista de cámaras vacía.");
+            mostrarErrorUI(readerDiv, "No se encontraron cámaras.");
+        }
+    }).catch(err => {
+        isScanning = false;
+        debugLog(`ERROR CRÍTICO (Permisos/HTTPS): ${err}`);
+        mostrarErrorUI(readerDiv, err);
     });
+}
+
+function mostrarErrorUI(container, err) {
+    const esHttp = location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
+    let msgExtra = "";
+    
+    if (esHttp) {
+        msgExtra = `
+        <div class="mt-3 text-start small border p-2 bg-dark">
+            <strong>Solución para HTTP (Chrome/Android):</strong><br>
+            1. Ve a <code>chrome://flags</code><br>
+            2. Busca <code>unsafely-treat-insecure-origin-as-secure</code><br>
+            3. Actívalo y agrega: <code>http://${location.host}</code><br>
+            4. Reinicia Chrome.
+        </div>`;
+    }
+
+    container.innerHTML = `
+        <div class="alert alert-danger">
+            <strong>No se pudo iniciar la cámara.</strong><br>
+            <small>${err}</small><br><br>
+            Posibles causas:<br>
+            1. No diste permiso a la cámara.<br>
+            2. Estás usando HTTP sin configurar excepciones.<br>
+            3. Otra aplicación está usando la cámara.
+        </div>
+        ${msgExtra}
+        <button class="btn btn-outline-light btn-sm mt-2" onclick="location.reload()">Recargar página</button>
+    `;
 }
 
 function stopScanning() {
     if (isScanning) {
+        debugLog("Deteniendo cámara...");
         html5QrCode.stop().then(() => {
             isScanning = false;
             html5QrCode.clear();
+            debugLog("Cámara detenida.");
         }).catch(err => {
             console.error("Error al detener cámara", err);
         });
