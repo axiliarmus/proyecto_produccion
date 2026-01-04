@@ -162,7 +162,7 @@
 {% endif %}
 
 <!-- SCRIPT PARA MOSTRAR/OCULTAR CUERDAS Y ESCÁNER QR -->
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script src="{{ url_for('static', filename='js/html5-qrcode.min.js') }}"></script>
 <script>
 // Lógica de Cuerdas
 document.getElementById("modo").addEventListener("change", function () {
@@ -192,6 +192,11 @@ const qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
 let isScanning = false;
 
 document.getElementById('btn-scan-qr').addEventListener('click', () => {
+    // Verificación de HTTPS para móviles
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        alert("⚠️ Advertencia de Seguridad: El navegador de tu celular podría bloquear la cámara porque no estás usando una conexión segura (HTTPS).\n\nSi la cámara no se abre, intenta acceder usando 'https://' o configura tu navegador.");
+    }
+    
     qrModal.show();
     startScanning();
 });
@@ -204,6 +209,9 @@ function startScanning() {
     if (isScanning) return;
     isScanning = true;
     
+    // Limpiar mensajes anteriores
+    const readerDiv = document.getElementById('reader');
+    
     html5QrCode.start(
         { facingMode: "environment" }, 
         {
@@ -213,10 +221,12 @@ function startScanning() {
         (decodedText, decodedResult) => {
             // Success callback
             document.getElementById('codigo_pieza_input').value = decodedText;
+            
+            // Feedback visual de éxito (vibración si es posible)
+            if (navigator.vibrate) navigator.vibrate(200);
+            
             stopScanning();
             qrModal.hide();
-            // Opcional: Auto-submit o foco
-            // document.forms[0].submit(); 
         },
         (errorMessage) => {
             // Error callback (ignorar errores de lectura continua)
@@ -224,6 +234,19 @@ function startScanning() {
     ).catch(err => {
         console.error("Error al iniciar cámara", err);
         isScanning = false;
+        
+        // Mostrar error amigable al usuario
+        readerDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <strong>No se pudo iniciar la cámara.</strong><br>
+                <small>${err}</small><br><br>
+                Posibles causas:<br>
+                1. No diste permiso a la cámara.<br>
+                2. Estás usando HTTP en lugar de HTTPS.<br>
+                3. Otra aplicación está usando la cámara.
+            </div>
+            <button class="btn btn-outline-light btn-sm mt-2" onclick="location.reload()">Recargar página</button>
+        `;
     });
 }
 
