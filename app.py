@@ -2754,6 +2754,14 @@ def exportar_valor_operador_archivado():
         for h in hist_docs:
             key = (h.get("codigo"), h.get("corte_id"))
             piezas_hist_map[key] = h
+    piezas_hist_sin_corte_map = {}
+    if codigos_necesarios:
+        h_sin_corte = list(db.piezas_historicas.find({
+            "codigo": {"$in": list(codigos_necesarios)},
+            "corte_id": {"$exists": False}
+        }))
+        for h in h_sin_corte:
+            piezas_hist_sin_corte_map[h.get("codigo")] = h
             
     # Precargar piezas actuales (fallback)
     piezas_actuales_map = {} # codigo -> pieza
@@ -2788,8 +2796,10 @@ def exportar_valor_operador_archivado():
             for c in codigos_probar:
                 pieza_info = piezas_hist_map.get((c, corte_id_res))
                 if pieza_info: break
-            
-        # 2. Fallback a piezas actuales (usando variantes)
+        if not pieza_info:
+            for c in codigos_probar:
+                pieza_info = piezas_hist_sin_corte_map.get(c)
+                if pieza_info: break
         if not pieza_info:
             for c in codigos_probar:
                 pieza_info = piezas_actuales_map.get(c)
