@@ -1,17 +1,3 @@
-import os
-import json
-import secrets
-from datetime import datetime, date, timedelta
-from bson import ObjectId
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
-from werkzeug.security import generate_password_hash, check_password_hash
-from dotenv import load_dotenv
-from io import BytesIO
-import pandas as pd
-from pymongo import MongoClient
-from datetime import timezone
-from werkzeug.middleware.proxy_fix import ProxyFix
-
 # ==============================================================================
 # 1. CONFIGURACIÓN E IMPORTACIONES
 # ==============================================================================
@@ -1333,36 +1319,84 @@ def archivados_valor_operador():
         users_db = list(db.usuarios.find())
         users_map = {u.get('usuario'): u for u in users_db}
 
+    # --- OPTIMIZACIÓN DE CARGA (Bulk Loading) ---
+    # Recopilar todos los códigos necesarios para hacer pocas consultas
+    codigos_necesarios = set()
+    for p in produccion:
+        c = p.get("codigo_pieza")
+        if c:
+            codigos_necesarios.add(c)
+            # También añadir versión int/str por si acaso
+            if isinstance(c, str) and c.isdigit():
+                codigos_necesarios.add(int(c))
+            elif isinstance(c, int):
+                codigos_necesarios.add(str(c))
+    
+    piezas_hist_corte_map = {} # (codigo, corte_id) -> pieza
+    piezas_hist_gen_map = {}   # codigo -> pieza
+    piezas_actuales_map = {}   # codigo -> pieza
+
+    if codigos_necesarios:
+        lista_codigos = list(codigos_necesarios)
+        
+        # 1. Cargar Históricas del Corte (Prioridad Máxima)
+        if corte_id:
+            h_corte = list(db.piezas_historicas.find({
+                "codigo": {"$in": lista_codigos},
+                "corte_id": corte_id
+            }))
+            for h in h_corte:
+                piezas_hist_corte_map[h.get("codigo")] = h
+
+        # 2. Cargar Históricas Generales (Prioridad Media)
+        # Solo traemos las que coincidan en código, luego filtraremos en memoria
+        h_gen = list(db.piezas_historicas.find({
+            "codigo": {"$in": lista_codigos}
+        }))
+        for h in h_gen:
+            # Solo guardamos si no existe o sobrescribimos (la lógica de cual es "mejor" es difusa sin corte,
+            # así que tomamos el primero que aparezca o el último)
+            if h.get("codigo") not in piezas_hist_gen_map:
+                piezas_hist_gen_map[h.get("codigo")] = h
+        
+        # 3. Cargar Actuales (Fallback)
+        act = list(db.piezas.find({"codigo": {"$in": lista_codigos}}))
+        for a in act:
+            piezas_actuales_map[a.get("codigo")] = a
+    # ---------------------------------------------
+
     for p in produccion:
         codigo = p.get("codigo_pieza")
         modo = p.get("modo")
         if not codigo:
             continue
         
-        # Buscar pieza con robustez de tipos (str vs int)
+        # Resolver pieza usando los mapas precargados
         pieza_info = None
+        
+        # Intentar variaciones de tipo (str/int)
         codigos_probar = [codigo]
         if isinstance(codigo, str) and codigo.isdigit():
             codigos_probar.append(int(codigo))
         elif isinstance(codigo, int):
             codigos_probar.append(str(codigo))
             
-        # 1. Intentar buscar en históricas con corte_id (lo ideal)
+        # 1. Búsqueda en históricas del corte
         if corte_id:
             for c in codigos_probar:
-                pieza_info = db.piezas_historicas.find_one({"codigo": c, "corte_id": corte_id})
+                pieza_info = piezas_hist_corte_map.get(c)
                 if pieza_info: break
         
-        # 2. Si no, buscar en históricas sin corte (cualquier versión antigua)
+        # 2. Búsqueda en históricas generales
         if not pieza_info:
             for c in codigos_probar:
-                pieza_info = db.piezas_historicas.find_one({"codigo": c})
+                pieza_info = piezas_hist_gen_map.get(c)
                 if pieza_info: break
                 
-        # 3. Si no, buscar en piezas actuales (fallback final)
+        # 3. Búsqueda en actuales
         if not pieza_info:
             for c in codigos_probar:
-                pieza_info = db.piezas.find_one({"codigo": c})
+                pieza_info = piezas_actuales_map.get(c)
                 if pieza_info: break
             
         # Si no se encuentra info de pieza, intentar obtener datos del registro de producción (si existen)
@@ -2641,11 +2675,36 @@ def exportar_valor_operador_archivado():
     if operador_sel and operador_sel != "todos":
         filtro["usuario"] = operador_sel
 
-    if corte_nombre and not (fecha_inicio and fecha_fin):
+    corte_id = None
+    if corte_nombre and "corte_id" not in filtro:
         corte = db.cortes.find_one({'nombre': corte_nombre})
+        if not corte:
+             try:
+                 corte = db.cortes.find_one({'_id': ObjectId(corte_nombre)})
+             except:
+                 pass
+                 
         if corte:
-            filtro['corte_id'] = corte.get('_id')
-    elif fecha_inicio and fecha_fin:
+            corte_id = corte.get('_id')
+            corte_inicio = corte.get('inicio')
+            corte_fin = corte.get('fin')
+            
+            filtro_hibrido = []
+            if corte_id:
+                filtro_hibrido.append({"corte_id": corte_id})
+            if corte_inicio and corte_fin:
+                filtro_hibrido.append({"fecha": {"$gte": corte_inicio, "$lt": corte_fin}})
+            
+            if filtro_hibrido:
+                if len(filtro_hibrido) > 1:
+                    filtro["$or"] = filtro_hibrido
+                else:
+                    filtro.update(filtro_hibrido[0])
+            elif corte_id:
+                filtro['corte_id'] = corte_id
+    
+    # Si no hay corte pero sí fechas manuales
+    if not corte_nombre and fecha_inicio and fecha_fin:
         try:
             d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
             d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
@@ -2658,7 +2717,7 @@ def exportar_valor_operador_archivado():
     produccion = list(db.produccion_historica.find(filtro).sort("fecha", -1))
     
     # Lógica de usuarios históricos
-    corte_id_filtro = filtro.get('corte_id')
+    corte_id_filtro = corte_id
     users_map = {}
     if corte_id_filtro:
         users_hist = list(db.usuarios_historicos.find({"corte_id": corte_id_filtro}))
