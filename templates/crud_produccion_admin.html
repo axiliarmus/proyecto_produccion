@@ -48,6 +48,7 @@
     <div class="row mt-3 g-2">
       <div class="col-md-6">
         <form method="POST" action="{{ archived_view and url_for('exportar_produccion_archivada_excel') or url_for('exportar_produccion_excel') }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="operador" value="{{ operador_sel or 'todos' }}">
             <input type="hidden" name="codigo" value="{{ codigo_sel or '' }}">
             <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
