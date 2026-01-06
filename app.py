@@ -2716,11 +2716,10 @@ def exportar_valor_operador_archivado():
 
     produccion = list(db.produccion_historica.find(filtro).sort("fecha", -1))
     
-    # Lógica de usuarios históricos
-    corte_id_filtro = corte_id
+    # Lógica de usuarios históricos (mismo que View)
     users_map = {}
-    if corte_id_filtro:
-        users_hist = list(db.usuarios_historicos.find({"corte_id": corte_id_filtro}))
+    if corte_id:
+        users_hist = list(db.usuarios_historicos.find({"corte_id": corte_id}))
         if users_hist:
             users_map = {u.get('usuario'): u for u in users_hist}
             
@@ -2728,113 +2727,120 @@ def exportar_valor_operador_archivado():
         users_db = list(db.usuarios.find())
         users_map = {u.get('usuario'): u for u in users_db}
 
-    # --- OPTIMIZACIÓN: Precarga de piezas para evitar N+1 queries ---
+    # --- OPTIMIZACIÓN DE CARGA (Bulk Loading) ---
     codigos_necesarios = set()
-    cortes_necesarios = set()
-    
-    if corte_id_filtro:
-        cortes_necesarios.add(corte_id_filtro)
-        
     for p in produccion:
         c = p.get("codigo_pieza")
-        cid = p.get("corte_id")
         if c:
             codigos_necesarios.add(c)
-        if cid:
-            cortes_necesarios.add(cid)
-            
-    # Precargar piezas históricas
-    piezas_hist_map = {} # (codigo, corte_id) -> pieza
+            if isinstance(c, str) and c.isdigit():
+                codigos_necesarios.add(int(c))
+            elif isinstance(c, int):
+                codigos_necesarios.add(str(c))
+    
+    piezas_hist_corte_map = {} 
+    piezas_hist_gen_map = {}   
+    piezas_actuales_map = {}   
+
     if codigos_necesarios:
-        q_hist = {
-            "codigo": {"$in": list(codigos_necesarios)},
-            "corte_id": {"$in": list(cortes_necesarios)}
-        }
-        hist_docs = list(db.piezas_historicas.find(q_hist))
-        for h in hist_docs:
-            key = (h.get("codigo"), h.get("corte_id"))
-            piezas_hist_map[key] = h
-    piezas_hist_sin_corte_map = {}
-    if codigos_necesarios:
-        h_sin_corte = list(db.piezas_historicas.find({
-            "codigo": {"$in": list(codigos_necesarios)},
-            "corte_id": {"$exists": False}
+        lista_codigos = list(codigos_necesarios)
+        
+        # 1. Cargar Históricas del Corte
+        if corte_id:
+            h_corte = list(db.piezas_historicas.find({
+                "codigo": {"$in": lista_codigos},
+                "corte_id": corte_id
+            }))
+            for h in h_corte:
+                piezas_hist_corte_map[h.get("codigo")] = h
+
+        # 2. Cargar Históricas Generales
+        h_gen = list(db.piezas_historicas.find({
+            "codigo": {"$in": lista_codigos}
         }))
-        for h in h_sin_corte:
-            piezas_hist_sin_corte_map[h.get("codigo")] = h
-            
-    # Precargar piezas actuales (fallback)
-    piezas_actuales_map = {} # codigo -> pieza
-    if codigos_necesarios:
-        curr_docs = list(db.piezas.find({"codigo": {"$in": list(codigos_necesarios)}}))
-        for cur in curr_docs:
-            piezas_actuales_map[cur.get("codigo")] = cur
-    # ----------------------------------------------------------------
+        for h in h_gen:
+            if h.get("codigo") not in piezas_hist_gen_map:
+                piezas_hist_gen_map[h.get("codigo")] = h
+        
+        # 3. Cargar Actuales
+        act = list(db.piezas.find({"codigo": {"$in": lista_codigos}}))
+        for a in act:
+            piezas_actuales_map[a.get("codigo")] = a
 
     data = []
     total_general = 0
     for p in produccion:
         codigo = p.get("codigo_pieza")
         modo = p.get("modo")
-        if not codigo:
-            continue
-        
-        # Búsqueda optimizada en memoria
-        corte_id_res = p.get("corte_id") or corte_id_filtro
         
         pieza_info = None
-        
-        # Intentar variaciones de tipo (str/int) al buscar en los mapas
         codigos_probar = [codigo]
         if isinstance(codigo, str) and codigo.isdigit():
             codigos_probar.append(int(codigo))
         elif isinstance(codigo, int):
             codigos_probar.append(str(codigo))
             
-        # 1. Buscar en históricas del corte (usando variantes)
-        if corte_id_res:
+        # 1. Búsqueda en históricas del corte
+        if corte_id:
             for c in codigos_probar:
-                pieza_info = piezas_hist_map.get((c, corte_id_res))
+                pieza_info = piezas_hist_corte_map.get(c)
                 if pieza_info: break
+        
+        # 2. Búsqueda en históricas generales
         if not pieza_info:
             for c in codigos_probar:
-                pieza_info = piezas_hist_sin_corte_map.get(c)
+                pieza_info = piezas_hist_gen_map.get(c)
                 if pieza_info: break
+                
+        # 3. Búsqueda en actuales
         if not pieza_info:
             for c in codigos_probar:
                 pieza_info = piezas_actuales_map.get(c)
                 if pieza_info: break
 
-        if not pieza_info:
-            continue
-        tipo_precio = pieza_info.get("tipo_precio", "metro")
-        user = users_map.get(p.get("usuario"))
-        if not user:
-            continue
-        if modo == "armador":
-            valor_unitario = user.get("precio_metro_armado", 0) if tipo_precio == "metro" else user.get("precio_avo_armado", 0)
-        else:
-            valor_unitario = user.get("precio_metro_remate", 0) if tipo_precio == "metro" else user.get("precio_avo_remate", 0)
-        peso = pieza_info.get("kilo_pieza") or 0
-        total = (peso or 0) * (valor_unitario or 0)
+        # Si no hay info de pieza, intentar obtener datos del registro de producción (snapshot)
+        marco_val = (pieza_info.get("marco") if pieza_info else None) or p.get("marco") or ""
+        tramo_val = (pieza_info.get("tramo") if pieza_info else None) or p.get("tramo") or ""
+        
+        peso_val = p.get("kilo_pieza")
+        if peso_val is None:
+            peso_val = pieza_info.get("kilo_pieza", 0) if pieza_info else 0
 
+        tipo_precio = pieza_info.get("tipo_precio", "metro") if pieza_info else "metro"
+        user = users_map.get(p.get("usuario"))
+        
+        valor_unitario = 0
+        if user:
+            if modo == "armador":
+                valor_unitario = user.get("precio_metro_armado", 0) if tipo_precio == "metro" else user.get("precio_avo_armado", 0)
+            else:
+                valor_unitario = user.get("precio_metro_remate", 0) if tipo_precio == "metro" else user.get("precio_avo_remate", 0)
+        
+        total = (peso_val or 0) * (valor_unitario or 0)
+        
+        fecha_str = ""
+        if p.get("fecha"):
+            fecha_str = to_cl(p.get("fecha")).strftime('%d-%m-%Y %H:%M')
+        
         data.append({
-            "Fecha": to_cl(p.get("fecha")).strftime('%d-%m-%Y %H:%M') if p.get("fecha") else "",
+            "Fecha": fecha_str,
             "Código": codigo,
-            "Operador": p.get("usuario"),
+            "Operador": p.get("usuario", ""),
             "Modo": modo,
-            "Marco": pieza_info.get("marco"),
-            "Tramo": pieza_info.get("tramo"),
-            "Peso": peso,
+            "Marco": marco_val,
+            "Tramo": tramo_val,
+            "Cantidad": 1,
+            "Peso": peso_val,
             "Precio Unit.": valor_unitario,
+            "Tipo": tipo_precio,
             "Total": total
         })
         total_general += total
-
+        
     if data:
         data.append({
             "Fecha": "TOTAL", "Código": "", "Operador": "", "Modo": "", "Marco": "", "Tramo": "",
-            "Peso": "", "Precio Unit.": "", "Total": total_general
+            "Cantidad": "", "Peso": "", "Precio Unit.": "", "Tipo": "", "Total": total_general
         })
 
     df = pd.DataFrame(data)
