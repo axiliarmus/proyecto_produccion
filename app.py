@@ -2775,12 +2775,25 @@ def exportar_valor_operador_archivado():
         corte_id_res = p.get("corte_id") or corte_id_filtro
         
         pieza_info = None
-        if corte_id_res:
-            pieza_info = piezas_hist_map.get((codigo, corte_id_res))
+        
+        # Intentar variaciones de tipo (str/int) al buscar en los mapas
+        codigos_probar = [codigo]
+        if isinstance(codigo, str) and codigo.isdigit():
+            codigos_probar.append(int(codigo))
+        elif isinstance(codigo, int):
+            codigos_probar.append(str(codigo))
             
+        # 1. Buscar en históricas del corte (usando variantes)
+        if corte_id_res:
+            for c in codigos_probar:
+                pieza_info = piezas_hist_map.get((c, corte_id_res))
+                if pieza_info: break
+            
+        # 2. Fallback a piezas actuales (usando variantes)
         if not pieza_info:
-            # Fallback a piezas actuales
-            pieza_info = piezas_actuales_map.get(codigo)
+            for c in codigos_probar:
+                pieza_info = piezas_actuales_map.get(c)
+                if pieza_info: break
 
         if not pieza_info:
             continue
