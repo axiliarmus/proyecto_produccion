@@ -3,7 +3,7 @@
 Esta guía te permitirá subir tu proyecto a un VPS (DigitalOcean, AWS, Vultr, etc.) y tener **HTTPS seguro** para que funcione la cámara, usando un subdominio gratuito de **DuckDNS**.
 
 ## 🛑 Paso 0: ¡Importante! Liberar el puerto 80
-Muchos VPS vienen con **Nginx** o **Apache** preinstalado. Si ves una página que dice "Welcome to nginx", debes detenerlo para que Caddy funcione.
+Si al entrar a tu IP ves "Welcome to Nginx", debes detenerlo obligatoriamente.
 
 Ejecuta esto en tu VPS:
 ```bash
@@ -18,66 +18,91 @@ sudo systemctl disable apache2
 
 ## Paso 1: Obtener un nombre de dominio gratuito
 1. Entra a [https://www.duckdns.org/](https://www.duckdns.org/).
-2. Inicia sesión (con Google/Github).
-3. En "subdomains", escribe un nombre para tu proyecto (ej: `mi-fabrica-2026`) y presiona **add domain**.
-4. Copia la **IP Address** de tu VPS y pégala en el campo "current ip" de DuckDNS. Presiona **update ip**.
-   * Ahora, `mi-fabrica-2026.duckdns.org` apunta a tu VPS.
+2. Inicia sesión.
+3. Crea un subdominio (ej: `mi-fabrica-2026`) y apúntalo a la **IP de tu VPS**.
 
-## Paso 2: Preparar el VPS
-Accede a tu VPS por terminal (SSH) y ejecuta:
+## Paso 2: Instalar y Configurar Caddy (Modo Permanente)
+Usaremos el archivo de configuración oficial para que el sitio no se caiga al cerrar la consola.
 
+### 1. Instalar Caddy
 ```bash
-# 1. Actualizar sistema
-sudo apt update && sudo apt upgrade -y
-
-# 2. Instalar Python y herramientas
-sudo apt install python3-pip python3-venv git -y
-
-# 3. Clonar tu proyecto (o subirlo por SFTP/FileZilla)
-git clone https://github.com/tu-usuario/tu-repo.git
-cd tu-repo
-
-# 4. Crear entorno virtual e instalar dependencias
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-pip install gunicorn  # Servidor de producción
-```
-
-## Paso 3: Configurar Servidor Web (Caddy)
-Usaremos **Caddy** en lugar de Nginx porque configura el HTTPS automáticamente sin tocar nada.
-
-```bash
-# 1. Instalar Caddy (Comandos para Debian/Ubuntu)
+sudo apt update
 sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
 sudo apt update
 sudo apt install caddy
-
-# 2. Configurar Caddy (Reemplaza 'tudominio.duckdns.org' con el tuyo)
-# Asegúrate de haber hecho el Paso 0 primero
-sudo caddy reverse-proxy --from tudominio.duckdns.org --to 127.0.0.1:8000
 ```
-*Si todo sale bien, verás que Caddy activa el HTTPS. Luego puedes presionar `Ctrl+C` para detenerlo y configurarlo como servicio (opcional) o dejarlo corriendo en segundo plano.*
 
-## Paso 4: Ejecutar tu Aplicación
-En la carpeta de tu proyecto (con el entorno virtual activado):
+### 2. Editar el archivo Caddyfile
+Abre el archivo de configuración:
+```bash
+sudo nano /etc/caddy/Caddyfile
+```
+
+Borra todo lo que hay y pega esto (cambia el dominio por el tuyo):
+
+```caddy
+mi-fabrica-2026.duckdns.org {
+    reverse_proxy 127.0.0.1:8000
+}
+```
+
+*   Guarda con `Ctrl+O`, `Enter`.
+*   Sal con `Ctrl+X`.
+
+### 3. Reiniciar Caddy para aplicar cambios
+```bash
+sudo systemctl restart caddy
+```
+
+## 🚑 Solución de Problemas (Troubleshooting)
+
+### Error: "Job for caddy.service failed"
+Esto significa que Caddy no pudo iniciar. Sigue estos pasos para arreglarlo:
+
+**1. Ver el error real:**
+Ejecuta este comando para ver qué pasó:
+```bash
+sudo journalctl -u caddy --no-pager | tail -n 20
+```
+
+**2. Causa Probable A: Error de escritura en Caddyfile**
+Asegúrate de que el archivo `/etc/caddy/Caddyfile` esté bien escrito.
+*   Verifica que pusiste tu dominio real.
+*   Verifica que las llaves `{ }` están bien puestas.
+*   Valida el archivo con: `caddy validate --config /etc/caddy/Caddyfile`
+
+**3. Causa Probable B: El puerto 80 sigue ocupado**
+A veces Nginx no se muere del todo. Ejecuta esto para ver quién usa el puerto:
+```bash
+sudo lsof -i :80
+```
+Si ves `nginx` o `apache2` en la lista, mátalos con:
+```bash
+sudo killall nginx
+sudo killall apache2
+```
+Y luego intenta reiniciar Caddy de nuevo: `sudo systemctl restart caddy`
+
+## Paso 3: Preparar tu Aplicación
+```bash
+# Clonar y preparar entorno
+git clone https://github.com/tu-usuario/tu-repo.git
+cd tu-repo
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+pip install gunicorn
+```
+
+## Paso 4: Iniciar la Aplicación (Modo Servicio)
+Para que tu app no se cierre, usa `tmux` o crea un servicio, pero la forma rápida es usar el script en segundo plano:
 
 ```bash
-# Ejecutar con Gunicorn (Servidor robusto)
-# -w 4: Número de trabajadores (ajustar según CPU)
-# -b :8000: Puerto interno (Caddy redirige aquí)
-gunicorn -w 4 -b 127.0.0.1:8000 app:app
+# Dar permisos al script
+chmod +x start_production.sh
+
+# Ejecutar en segundo plano con nohup
+nohup ./start_production.sh > logs.txt 2>&1 &
 ```
-
-## Solución de Problemas Comunes
-
-### Veo "Welcome to Nginx"
-Significa que Nginx sigue corriendo. Ejecuta:
-`sudo systemctl stop nginx`
-
-### Error "Bind: address already in use"
-Algo está usando el puerto 80 (Caddy no puede iniciar). Verifica con:
-`sudo lsof -i :80`
-Y mata el proceso que lo esté usando.

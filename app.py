@@ -1,5 +1,6 @@
 import os
 import json
+import secrets
 from datetime import datetime, date, timedelta
 from bson import ObjectId
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
@@ -8,21 +9,124 @@ from dotenv import load_dotenv
 from io import BytesIO
 import pandas as pd
 from pymongo import MongoClient
-from datetime import timezone, timedelta
+from datetime import timezone
+from werkzeug.middleware.proxy_fix import ProxyFix
 
-# Zona horaria Chile (UTC-3)
-CL = timezone(timedelta(hours=-3))
+# ==============================================================================
+# 1. CONFIGURACIÓN E IMPORTACIONES
+# ==============================================================================
+# Importamos las librerías necesarias para el funcionamiento de la aplicación.
+import os
+import json
+import secrets
+from datetime import datetime, date, timedelta
+from bson import ObjectId
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
+from werkzeug.security import generate_password_hash, check_password_hash
+from dotenv import load_dotenv
+from io import BytesIO
+import pandas as pd
+from pymongo import MongoClient
+from datetime import timezone
+from werkzeug.middleware.proxy_fix import ProxyFix
 
+# ==============================================================================
+# 2. CARGA DE VARIABLES DE ENTORNO
+# ==============================================================================
+# Cargamos el archivo .env para obtener credenciales y configuraciones sensibles.
 load_dotenv()
 
+# ==============================================================================
+# 3. INICIALIZACIÓN DE LA APP FLASK
+# ==============================================================================
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY") or os.urandom(24)
 
+# Configuración de la clave secreta para firmar sesiones y cookies.
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY no definida en .env")
+
+app.secret_key = SECRET_KEY
+
+# ==============================================================================
+# 4. CONFIGURACIÓN DE PROXY (IMPORTANTE PARA PRODUCCIÓN)
+# ==============================================================================
+# Esto es necesario cuando la app corre detrás de un proxy inverso (como Nginx o Caddy).
+# Asegura que Flask reciba la IP real del usuario y el protocolo correcto (HTTPS).
+app.wsgi_app = ProxyFix(
+    app.wsgi_app,
+    x_for=1,
+    x_proto=1,
+    x_host=1,
+    x_port=1
+)
+
+# ==============================================================================
+# 5. SEGURIDAD DE COOKIES
+# ==============================================================================
+# Configuramos las cookies para que sean seguras (solo HTTPS, HttpOnly).
+app.config.update(
+    SESSION_COOKIE_SECURE=True,   # Solo enviar cookies sobre HTTPS
+    SESSION_COOKIE_HTTPONLY=True, # No accesible via JavaScript
+    SESSION_COOKIE_SAMESITE="Lax" # Protección contra CSRF
+)
+
+# ==============================================================================
+# 6. PROTECCIÓN CSRF (Cross-Site Request Forgery)
+# ==============================================================================
+def _get_csrf_token():
+    """Genera o recupera el token CSRF para la sesión actual."""
+    token = session.get('_csrf_token')
+    if not token:
+        token = secrets.token_hex(32)
+        session['_csrf_token'] = token
+    return token
+
+@app.context_processor
+def inject_csrf():
+    """Inyecta el token CSRF en todas las plantillas HTML automáticamente."""
+    return {'csrf_token': session.get('_csrf_token') or _get_csrf_token()}
+
+@app.before_request
+def csrf_protect():
+    """Verifica el token CSRF en cada petición POST para evitar ataques."""
+    if request.method == 'POST':
+        token = request.form.get('_csrf_token') or request.headers.get('X-CSRFToken')
+        expected = session.get('_csrf_token') or _get_csrf_token()
+        if not token or token != expected:
+            return "CSRF token inválido", 400
+
+# ==============================================================================
+# 7. CONFIGURACIÓN REGIONAL (HORA CHILE)
+# ==============================================================================
+CL = timezone(timedelta(hours=-3))
+
+# ==============================================================================
+# 8. CONEXIÓN A BASE DE DATOS (MONGODB)
+# ==============================================================================
 client = MongoClient(os.getenv("MONGO_URI"))
 db = client["miBase"]
 
-# Variable global para almacenar la URL del túnel seguro
+
+# ==============================================================================
+# 9. VARIABLES GLOBALES Y HELPERS DE SEGURIDAD
+# ==============================================================================
+# Variable para almacenar la URL del túnel (si se activa)
 tunnel_url = None
+
+# Diccionario para controlar intentos de login fallidos (Rate Limiting)
+# Formato: { 'ip_address': (intentos, datetime_ultimo_intento) }
+login_attempts = {}
+
+def log_audit(accion, detalle):
+    """
+    Sistema de Auditoría Simple.
+    Registra acciones críticas (como borrar/editar históricos) en la consola.
+    Esto permite rastrear quién hizo qué cambios importantes.
+    """
+    user = session.get('username', 'Desconocido')
+    timestamp = now_cl().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[AUDIT] {timestamp} | USER: {user} | ACTION: {accion} | DETAILS: {detalle}")
 
 
 
@@ -160,10 +264,10 @@ def seed_soporte():
 
 @app.before_request
 def ensure_seed():
-    """Asegura que el admin siempre exista."""
-    if request.endpoint not in ('static',):
-        seed_admin()
-        seed_soporte()
+    if os.getenv("ENABLE_SEED", "false").lower() == "true":
+        if request.endpoint not in ('static',):
+            seed_admin()
+            seed_soporte()
 
 
 # ============================================================
@@ -199,18 +303,44 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        # ---------------------------------------------------------
+        # SEGURIDAD: PROTECCIÓN CONTRA FUERZA BRUTA
+        # ---------------------------------------------------------
+        ip = request.remote_addr
+        now = datetime.now()
+        
+        # Verificar si la IP está bloqueada temporalmente
+        if ip in login_attempts:
+            attempts, last_time = login_attempts[ip]
+            if attempts >= 5:
+                # Si falló 5 veces, bloquear por 15 minutos
+                if now - last_time < timedelta(minutes=15):
+                    remaining = 15 - (now - last_time).seconds // 60
+                    flash(f"Demasiados intentos fallidos. Inténtalo de nuevo en {remaining} minutos.", "danger")
+                    return render_template('login.html')
+                else:
+                    # Desbloquear si ya pasó el tiempo
+                    login_attempts[ip] = (0, now)
+
+        # ---------------------------------------------------------
+        # PROCESO DE LOGIN
+        # ---------------------------------------------------------
         usuario = request.form.get('usuario', '').strip()
         password = request.form.get('password')
 
         user = db.usuarios.find_one({'usuario': usuario})
 
         if user and check_password_hash(user['password'], password):
+            # Login exitoso: limpiar contador de intentos fallidos para esta IP
+            if ip in login_attempts:
+                del login_attempts[ip]
 
             session['user_id'] = str(user['_id'])
             session['username'] = user['usuario']
             session['nombre'] = user.get('nombre', user['usuario'])
             session['role'] = user['tipo']
 
+            # Verificar caducidad de contraseña (30 días)
             pw_date = to_cl(user.get("password_changed_at"))
 
             if not pw_date or (now_cl() - pw_date) > timedelta(days=30):
@@ -220,6 +350,10 @@ def login():
             flash(f"Bienvenido, {session['nombre']}", 'success')
             return redirect(url_for('index'))
 
+        # Login fallido: registrar intento
+        attempts, _ = login_attempts.get(ip, (0, now))
+        login_attempts[ip] = (attempts + 1, now)
+        
         flash('Usuario o contraseña inválidos', 'danger')
 
     return render_template('login.html')
@@ -617,6 +751,11 @@ def piezas_masivo_confirmar():
     campo = request.form.get("campo")
     valor = request.form.get("valor")
 
+    permitidos = ["empresa", "marco", "tramo", "kilo_pieza", "cuerda_interna", "cuerda_externa", "tipo_precio"]
+    if campo not in permitidos:
+        flash("Campo no permitido para edición masiva.", "danger")
+        return redirect(url_for("piezas_masivo"))
+
     if not campo or not valor:
         flash("Debes indicar el campo y el valor a modificar.", "warning")
         return redirect(url_for("piezas_masivo"))
@@ -632,6 +771,13 @@ def piezas_masivo_confirmar():
     # Campos nuevos: cadenas simples
     if campo in ["cuerda_interna", "cuerda_externa"]:
         valor = valor.strip()
+
+    # Campo Tipo de Precio
+    if campo == "tipo_precio":
+        valor = valor.strip().lower()
+        if valor not in ["metro", "avo"]:
+            flash("El tipo de precio debe ser 'metro' o 'avo'.", "danger")
+            return redirect(url_for("piezas_masivo"))
 
     resultado = db.piezas.update_many(filtros, {"$set": {campo: valor}})
 
@@ -2394,6 +2540,27 @@ def exportar_valor_operador_excel():
 
     produccion = list(db.produccion.find(filtro).sort("fecha", -1))
 
+    # --- OPTIMIZACIÓN: Precarga de piezas ---
+    codigos_raw = set()
+    for p in produccion:
+        c = p.get("codigo_pieza")
+        if c:
+            codigos_raw.add(c)
+            if str(c).isdigit():
+                codigos_raw.add(int(c))
+            codigos_raw.add(str(c))
+
+    map_piezas = {}
+    if codigos_raw:
+        piezas_db = list(db.piezas.find({"codigo": {"$in": list(codigos_raw)}}))
+        for pi in piezas_db:
+            map_piezas[pi.get("codigo")] = pi
+            c_val = pi.get("codigo")
+            map_piezas[str(c_val)] = pi
+            if isinstance(c_val, (int, float)):
+                map_piezas[int(c_val)] = pi
+    # ----------------------------------------
+
     data = []
 
     for p in produccion:
@@ -2403,10 +2570,11 @@ def exportar_valor_operador_excel():
         if not codigo:
             continue
 
-        # Buscar pieza por código alfanumérico, con fallback a entero
-        pieza_info = db.piezas.find_one({"codigo": codigo}) or (
-            db.piezas.find_one({"codigo": int(codigo)}) if str(codigo).isdigit() else None
-        )
+        # Buscar pieza optimizada
+        pieza_info = map_piezas.get(codigo)
+        if not pieza_info and str(codigo).isdigit():
+            pieza_info = map_piezas.get(int(codigo))
+
         if not pieza_info:
             continue
 
@@ -2501,6 +2669,41 @@ def exportar_valor_operador_archivado():
         users_db = list(db.usuarios.find())
         users_map = {u.get('usuario'): u for u in users_db}
 
+    # --- OPTIMIZACIÓN: Precarga de piezas para evitar N+1 queries ---
+    codigos_necesarios = set()
+    cortes_necesarios = set()
+    
+    if corte_id_filtro:
+        cortes_necesarios.add(corte_id_filtro)
+        
+    for p in produccion:
+        c = p.get("codigo_pieza")
+        cid = p.get("corte_id")
+        if c:
+            codigos_necesarios.add(c)
+        if cid:
+            cortes_necesarios.add(cid)
+            
+    # Precargar piezas históricas
+    piezas_hist_map = {} # (codigo, corte_id) -> pieza
+    if codigos_necesarios:
+        q_hist = {
+            "codigo": {"$in": list(codigos_necesarios)},
+            "corte_id": {"$in": list(cortes_necesarios)}
+        }
+        hist_docs = list(db.piezas_historicas.find(q_hist))
+        for h in hist_docs:
+            key = (h.get("codigo"), h.get("corte_id"))
+            piezas_hist_map[key] = h
+            
+    # Precargar piezas actuales (fallback)
+    piezas_actuales_map = {} # codigo -> pieza
+    if codigos_necesarios:
+        curr_docs = list(db.piezas.find({"codigo": {"$in": list(codigos_necesarios)}}))
+        for cur in curr_docs:
+            piezas_actuales_map[cur.get("codigo")] = cur
+    # ----------------------------------------------------------------
+
     data = []
     total_general = 0
     for p in produccion:
@@ -2509,15 +2712,16 @@ def exportar_valor_operador_archivado():
         if not codigo:
             continue
         
-        # Lógica mejorada de búsqueda de pieza
-        pieza_info = None
-        corte_id_res = p.get("corte_id") or filtro.get("corte_id")
+        # Búsqueda optimizada en memoria
+        corte_id_res = p.get("corte_id") or corte_id_filtro
         
+        pieza_info = None
         if corte_id_res:
-            pieza_info = db.piezas_historicas.find_one({"codigo": codigo, "corte_id": corte_id_res})
+            pieza_info = piezas_hist_map.get((codigo, corte_id_res))
             
         if not pieza_info:
-            pieza_info = db.piezas_historicas.find_one({"codigo": codigo}) or db.piezas.find_one({"codigo": codigo})
+            # Fallback a piezas actuales
+            pieza_info = piezas_actuales_map.get(codigo)
 
         if not pieza_info:
             continue
@@ -2751,13 +2955,154 @@ def informe_piezas_tarjetas():
     return render_template("informe_piezas_tarjetas.html", grupos=resultado)
 
 
-# ============================================================
-#                       RUN APP
-# ============================================================
+# ==============================================================================
+# 15. GESTIÓN DE ARCHIVOS HISTÓRICOS (SOLO SOPORTE)
+# ==============================================================================
+# Estas rutas permiten al rol 'soporte' modificar datos de cortes anteriores.
+# Es útil para corregir errores en pagos o informes de meses pasados.
+# Se trabaja sobre las colecciones: usuarios_historicos, produccion_historica, piezas_historicas.
+
+@app.route('/soporte/archivados/usuarios', methods=['GET'])
+@login_required('soporte')
+def soporte_archivados_usuarios():
+    """Muestra y filtra usuarios históricos por corte (fecha de cierre)."""
+    cortes = list(db.cortes.find().sort("inicio", -1))
+    corte_sel = request.args.get("corte_id")
+    usuarios = []
+
+    if corte_sel:
+        try:
+            usuarios = list(db.usuarios_historicos.find({"corte_id": ObjectId(corte_sel)}))
+        except:
+            pass
+            
+    return render_template('soporte_archivados_usuarios.html', cortes=cortes, corte_sel=corte_sel, usuarios=usuarios)
+
+@app.route('/soporte/archivados/usuarios/editar', methods=['POST'])
+@login_required('soporte')
+def soporte_archivados_usuarios_editar():
+    """Actualiza precios o datos de un usuario en un corte histórico."""
+    user_id = request.form.get("user_id")
+    corte_id = request.form.get("corte_id")
+    
+    # Recopilar datos a actualizar (precios históricos)
+    update_data = {
+        "precio_metro_armado": float(request.form.get("precio_metro_armado", 0)),
+        "precio_metro_remate": float(request.form.get("precio_metro_remate", 0)),
+        "precio_avo_armado": float(request.form.get("precio_avo_armado", 0)),
+        "precio_avo_remate": float(request.form.get("precio_avo_remate", 0))
+    }
+    
+    # Actualizar en BD y registrar auditoría
+    db.usuarios_historicos.update_one({"_id": ObjectId(user_id)}, {"$set": update_data})
+    log_audit("EDIT_USER_HIST", f"ID: {user_id}, Data: {update_data}")
+    
+    flash("Usuario histórico actualizado.", "success")
+    return redirect(url_for('soporte_archivados_usuarios', corte_id=corte_id))
+
+
+@app.route('/soporte/archivados/produccion', methods=['GET'])
+@login_required('soporte')
+def soporte_archivados_produccion():
+    """Muestra y filtra registros de producción históricos."""
+    cortes = list(db.cortes.find().sort("inicio", -1))
+
+    corte_sel = request.args.get("corte_id")
+    codigo_sel = request.args.get("codigo")
+    produccion = []
+
+    if corte_sel:
+        filtro = {"corte_id": ObjectId(corte_sel)}
+        if codigo_sel:
+            filtro["codigo_pieza"] = codigo_sel.strip()
+            
+        produccion = list(db.produccion_historica.find(filtro).sort("fecha", -1))
+
+    return render_template('soporte_archivados_produccion.html', cortes=cortes, corte_sel=corte_sel, produccion=produccion, codigo_sel=codigo_sel)
+
+@app.route('/soporte/archivados/produccion/editar', methods=['POST'])
+@login_required('soporte')
+def soporte_archivados_produccion_editar():
+    prod_id = request.form.get("prod_id")
+    corte_id = request.form.get("corte_id")
+    
+    update_data = {
+        "codigo_pieza": request.form.get("codigo_pieza"),
+        "usuario": request.form.get("usuario"),
+        "modo": request.form.get("modo")
+    }
+    m = update_data.get("modo")
+    if m not in ("armador", "rematador"):
+        flash("Modo inválido.", "danger")
+        return redirect(url_for('soporte_archivados_produccion', corte_id=corte_id))
+    
+    db.produccion_historica.update_one({"_id": ObjectId(prod_id)}, {"$set": update_data})
+    log_audit("EDIT_PROD_HIST", f"ID: {prod_id}, Data: {update_data}")
+    flash("Registro de producción histórico actualizado.", "success")
+    return redirect(url_for('soporte_archivados_produccion', corte_id=corte_id))
+
+@app.route('/soporte/archivados/produccion/eliminar', methods=['POST'])
+@login_required('soporte')
+def soporte_archivados_produccion_eliminar():
+    prod_id = request.form.get("prod_id")
+    corte_id = request.form.get("corte_id")
+    
+    db.produccion_historica.delete_one({"_id": ObjectId(prod_id)})
+    log_audit("DELETE_PROD_HIST", f"ID: {prod_id}")
+    flash("Registro histórico eliminado.", "info")
+    return redirect(url_for('soporte_archivados_produccion', corte_id=corte_id))
+
+
+@app.route('/soporte/archivados/piezas', methods=['GET'])
+@login_required('soporte')
+def soporte_archivados_piezas():
+    cortes = list(db.cortes.find().sort("inicio", -1))
+    corte_sel = request.args.get("corte_id")
+    codigo_sel = request.args.get("codigo")
+    piezas = []
+
+    if corte_sel:
+        filtro = {"corte_id": ObjectId(corte_sel)}
+        if codigo_sel:
+            # Intentar buscar como número si es posible
+            if codigo_sel.isdigit():
+                filtro["codigo"] = int(codigo_sel)
+            else:
+                 # Fallback o si es string
+                 filtro["codigo"] = codigo_sel
+            
+        piezas = list(db.piezas_historicas.find(filtro).sort("codigo", 1))
+
+    return render_template('soporte_archivados_piezas.html', cortes=cortes, corte_sel=corte_sel, piezas=piezas, codigo_sel=codigo_sel)
+
+@app.route('/soporte/archivados/piezas/editar', methods=['POST'])
+@login_required('soporte')
+def soporte_archivados_piezas_editar():
+    pieza_id = request.form.get("pieza_id")
+    corte_id = request.form.get("corte_id")
+    
+    update_data = {
+        "kilo_pieza": float(request.form.get("kilo_pieza", 0)),
+        "tipo_precio": request.form.get("tipo_precio"),
+        "marco": request.form.get("marco"),
+        "tramo": request.form.get("tramo")
+    }
+    tp = update_data.get("tipo_precio")
+    if tp not in ("metro", "avo"):
+        flash("Tipo de precio inválido.", "danger")
+        return redirect(url_for('soporte_archivados_piezas', corte_id=corte_id))
+    
+    db.piezas_historicas.update_one({"_id": ObjectId(pieza_id)}, {"$set": update_data})
+    log_audit("EDIT_PIEZA_HIST", f"ID: {pieza_id}, Data: {update_data}")
+    flash("Pieza histórica actualizada.", "success")
+    return redirect(url_for('soporte_archivados_piezas', corte_id=corte_id))
+
+
+# ==============================================================================
+# 16. EJECUCIÓN DE LA APLICACIÓN
+# ==============================================================================
 
 if __name__ == "__main__":
-    # Intentar iniciar un túnel SSH seguro (localhost.run) para HTTPS
-    # Esto permite el uso de cámara en móviles sin configuración extra.
     import threading
     import subprocess
     import time
@@ -2766,6 +3111,11 @@ if __name__ == "__main__":
     import sys
 
     def start_secure_tunnel():
+        """
+        Inicia un túnel SSH reverso (Serveo/Localhost.run) para exponer el puerto 5000 a internet.
+        Esto es necesario para probar funcionalidades que requieren HTTPS (como la cámara)
+        desde dispositivos móviles sin desplegar en un servidor real.
+        """
         global tunnel_url
         print("⏳ Intentando establecer túnel HTTPS seguro...")
         
@@ -2783,6 +3133,7 @@ if __name__ == "__main__":
                 errors='replace'
             )
             
+            # Asegurar que el túnel se cierre al apagar la app
             atexit.register(lambda: process.terminate())
 
             start_t = time.time()
@@ -2819,13 +3170,15 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"⚠️ No se pudo iniciar el túnel automático: {e}")
 
-    # Iniciar el túnel en segundo plano
-    threading.Thread(target=start_secure_tunnel, daemon=True).start()
+    # Iniciar túnel solo si la variable de entorno lo permite (Seguridad)
+    if os.getenv("ENABLE_TUNNEL") == "true":
+        threading.Thread(target=start_secure_tunnel, daemon=True).start()
 
     print("================================================================")
     print(" INICIANDO SERVIDOR LOCAL")
     print(" Local: http://127.0.0.1:5000")
-    print(" LAN:   http://192.168.1.132:5000")
+    print(" LAN:   http://0.0.0.0:5000")
     print("================================================================")
     
+    # Ejecutar servidor Flask escuchando en todas las interfaces (0.0.0.0)
     app.run(host='0.0.0.0', port=5000)

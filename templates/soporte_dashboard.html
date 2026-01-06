@@ -34,6 +34,25 @@
       </div>
     </div>
   </div>
+
+  <!-- NUEVO: GESTIÓN DE ARCHIVADOS -->
+  <div class="col-md-4 col-lg-3">
+    <div class="card bg-dark border-light shadow text-center h-100">
+      <div class="card-body d-flex flex-column justify-content-between">
+        <div>
+          <div class="display-6">🗂️</div>
+          <h5 class="card-title text-light mt-2">Archivos Históricos</h5>
+          <p class="text-secondary">Modificar usuarios, producción y piezas de cortes anteriores.</p>
+        </div>
+        <div class="d-grid gap-2 mt-3">
+            <a href="{{ url_for('soporte_archivados_usuarios') }}" class="btn btn-outline-info btn-sm">Usuarios Archivados</a>
+            <a href="{{ url_for('soporte_archivados_produccion') }}" class="btn btn-outline-info btn-sm">Producción Archivada</a>
+            <a href="{{ url_for('soporte_archivados_piezas') }}" class="btn btn-outline-info btn-sm">Piezas Archivadas</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <div class="text-center mt-5">

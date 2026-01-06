@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}Usuarios Archivados{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Usuarios Archivados</h2>
+    <a href="{{ url_for('soporte_dashboard') }}" class="btn btn-secondary">← Volver</a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label">Seleccione Corte (Mes/Rango)</label>
+                <select name="corte_id" class="form-select" onchange="this.form.submit()">
+                    <option value="">-- Seleccione --</option>
+                    {% for c in cortes %}
+                        <option value="{{ c._id }}" {% if c._id|string == corte_sel %}selected{% endif %}>
+                            {{ c.nombre }} ({{ c.inicio.strftime('%d/%m/%Y') }} - {{ c.fin.strftime('%d/%m/%Y') }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if usuarios %}
+<div class="table-responsive">
+    <table class="table table-dark table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Usuario</th>
+                <th>Rol</th>
+                <th>$ Metro Armado</th>
+                <th>$ Metro Remate</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in usuarios %}
+            <tr>
+                <td>{{ u.usuario }}</td>
+                <td>{{ u.rol }}</td>
+                <td>{{ u.precio_metro_armado }}</td>
+                <td>{{ u.precio_metro_remate }}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editUserModal{{ loop.index }}">
+                        Editar
+                    </button>
+
+                    <!-- Modal Edición -->
+                    <div class="modal fade" id="editUserModal{{ loop.index }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content bg-dark text-light">
+                                <form method="POST" action="{{ url_for('soporte_archivados_usuarios_editar') }}">
+                                    <input type="hidden" name="user_id" value="{{ u._id }}">
+                                    <input type="hidden" name="corte_id" value="{{ corte_sel }}">
+                                    
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Editar Usuario Histórico</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body text-start">
+                                        <div class="mb-3">
+                                            <label class="form-label">Usuario</label>
+                                            <input type="text" class="form-control" value="{{ u.usuario }}" disabled>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">$ Metro Armado</label>
+                                                <input type="number" step="0.01" name="precio_metro_armado" class="form-control" value="{{ u.precio_metro_armado }}">
+                                            </div>
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">$ Metro Remate</label>
+                                                <input type="number" step="0.01" name="precio_metro_remate" class="form-control" value="{{ u.precio_metro_remate }}">
+                                            </div>
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">$ Avo Armado</label>
+                                                <input type="number" step="0.01" name="precio_avo_armado" class="form-control" value="{{ u.precio_avo_armado }}">
+                                            </div>
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">$ Avo Remate</label>
+                                                <input type="number" step="0.01" name="precio_avo_remate" class="form-control" value="{{ u.precio_avo_remate }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-success">Guardar Cambios</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}
