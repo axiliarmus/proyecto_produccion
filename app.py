@@ -2204,7 +2204,7 @@ def operador_registrar():
 
     modo = request.form["modo"]                  # armador / rematador
     box = request.form["box"]
-    codigo_pieza = request.form["codigo_pieza"].strip()
+    codigo_pieza = request.form["codigo_pieza"].strip().lower()
 
     # Cuerdas ingresadas SOLO si es armador
     cuerda_interna_raw = request.form.get("cuerda_interna")
