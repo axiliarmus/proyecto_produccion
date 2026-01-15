@@ -54,6 +54,7 @@
                         <div class="modal-dialog">
                             <div class="modal-content bg-dark text-light">
                                 <form method="POST" action="{{ url_for('soporte_archivados_usuarios_editar') }}">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                                     <input type="hidden" name="user_id" value="{{ u._id }}">
                                     <input type="hidden" name="corte_id" value="{{ corte_sel }}">
                                     

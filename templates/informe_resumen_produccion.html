@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block title %}Resumen de Producción{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Resumen de Producción</h2>
+    <a href="{{ url_for('admin_informes') }}" class="btn btn-secondary">← Volver a Informes</a>
+</div>
+
+<!-- TARJETAS DE KILOS -->
+<div class="row g-4 mb-5">
+    
+    <!-- HOY -->
+    <div class="col-md-6">
+        <div class="card bg-dark border-light shadow h-100">
+            <div class="card-header bg-transparent border-light">
+                <h5 class="card-title mb-0 text-center">📅 Producción Hoy</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 border-end border-secondary">
+                        <h6 class="text-secondary">AVO</h6>
+                        <h3 class="text-success">{{ "%.2f"|format(kilos_hoy.avo) }} kg</h3>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-secondary">METRO</h6>
+                        <h3 class="text-info">{{ "%.2f"|format(kilos_hoy.metro) }} kg</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MES ACTUAL -->
+    <div class="col-md-6">
+        <div class="card bg-dark border-light shadow h-100">
+            <div class="card-header bg-transparent border-light">
+                <h5 class="card-title mb-0 text-center">🗓️ Mes Actual</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 border-end border-secondary">
+                        <h6 class="text-secondary">AVO</h6>
+                        <h3 class="text-success">{{ "%.2f"|format(kilos_mes.avo) }} kg</h3>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-secondary">METRO</h6>
+                        <h3 class="text-info">{{ "%.2f"|format(kilos_mes.metro) }} kg</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- GRÁFICO HISTÓRICO -->
+<div class="card bg-dark border-light shadow mb-4">
+    <div class="card-header bg-transparent border-light">
+        <h5 class="card-title mb-0">📈 Evolución Producción (Últimos 6 Meses)</h5>
+    </div>
+    <div class="card-body">
+        <div style="height: 400px;">
+            <canvas id="productionChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('productionChart').getContext('2d');
+    
+    const labels = {{ chart_labels | tojson }};
+    const dataAvo = {{ chart_avo | tojson }};
+    const dataMetro = {{ chart_metro | tojson }};
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Kilos AVO',
+                    data: dataAvo,
+                    borderColor: '#198754', // success
+                    backgroundColor: 'rgba(25, 135, 84, 0.2)',
+                    tension: 0.3,
+                    fill: true
+                },
+                {
+                    label: 'Kilos METRO',
+                    data: dataMetro,
+                    borderColor: '#0dcaf0', // info
+                    backgroundColor: 'rgba(13, 202, 240, 0.2)',
+                    tension: 0.3,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { color: '#f8f9fa' }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#ced4da' },
+                    grid: { color: '#495057' }
+                },
+                y: {
+                    ticks: { color: '#ced4da' },
+                    grid: { color: '#495057' },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+
+{% endblock %}

@@ -3043,6 +3043,121 @@ def informe_piezas_tarjetas():
     return render_template("informe_piezas_tarjetas.html", grupos=resultado)
 
 
+# ============================================================
+# INFORME RESUMEN PRODUCCIÓN (DASHBOARD CLIENTE/ADMIN)
+# ============================================================
+
+@app.route('/admin/informes/resumen-produccion', methods=['GET'])
+@login_required(['administrador', 'cliente', 'soporte'])
+def informe_resumen_produccion():
+    today_real = now_cl().date()
+    
+    # ------------------ RANGOS DE FECHA ------------------
+    # Hoy
+    start_today = datetime.combine(today_real, datetime.min.time()).replace(tzinfo=CL).astimezone(timezone.utc)
+    end_today = datetime.combine(today_real, datetime.max.time()).replace(tzinfo=CL).astimezone(timezone.utc)
+
+    # Mes Actual
+    start_month = datetime(today_real.year, today_real.month, 1).replace(tzinfo=CL).astimezone(timezone.utc)
+    
+    # Últimos 6 meses
+    # Calculamos fecha de inicio: Hoy - 6 meses (aprox 180 días)
+    date_6m = today_real - timedelta(days=180)
+    start_6m = datetime.combine(date_6m, datetime.min.time()).replace(tzinfo=CL).astimezone(timezone.utc)
+    
+    # ------------------ CONSULTAS ------------------
+    
+    # Helper para sumar kilos por tipo
+    def calcular_kilos(query):
+        pipeline = [
+            {"$match": query},
+            {"$group": {
+                "_id": "$tipo_precio", # "metro" o "avo"
+                "total_kilos": {"$sum": "$kilo_pieza"}
+            }}
+        ]
+        res = list(db.produccion.aggregate(pipeline))
+        
+        # Mapear resultado
+        datos = {"metro": 0.0, "avo": 0.0}
+        for r in res:
+            tipo = r["_id"] or "metro"
+            datos[tipo] = datos.get(tipo, 0.0) + (r.get("total_kilos") or 0.0)
+        return datos
+
+    # 1. Kilos Hoy
+    kilos_hoy = calcular_kilos({"fecha": {"$gte": start_today, "$lte": end_today}})
+    
+    # 2. Kilos Mes Actual
+    kilos_mes = calcular_kilos({"fecha": {"$gte": start_month}})
+    
+    # 3. Histórico 6 Meses (Activa + Histórica)
+    pipeline_hist = [
+        {"$match": {"fecha": {"$gte": start_6m}}},
+        {"$project": {
+            "year": {"$year": {"date": "$fecha", "timezone": "America/Santiago"}},
+            "month": {"$month": {"date": "$fecha", "timezone": "America/Santiago"}},
+            "tipo_precio": 1,
+            "kilo_pieza": 1
+        }},
+        {"$group": {
+            "_id": {"year": "$year", "month": "$month", "tipo": "$tipo_precio"},
+            "total": {"$sum": "$kilo_pieza"}
+        }},
+        {"$sort": {"_id.year": 1, "_id.month": 1}}
+    ]
+    
+    # Ejecutar en ambas colecciones
+    raw_active = list(db.produccion.aggregate(pipeline_hist))
+    raw_archived = list(db.produccion_historica.aggregate(pipeline_hist))
+    
+    # Unificar datos
+    data_map = {} # "YYYY-MM" -> {"avo": 0, "metro": 0}
+    
+    def process_agg(rows):
+        for r in rows:
+            y = r["_id"]["year"]
+            m = r["_id"]["month"]
+            t = r["_id"].get("tipo") or "metro"
+            k = r.get("total") or 0.0
+            
+            key = f"{y}-{m:02d}"
+            if key not in data_map:
+                data_map[key] = {"avo": 0.0, "metro": 0.0}
+            
+            if t not in ["avo", "metro"]: t = "metro"
+            
+            data_map[key][t] += k
+
+    process_agg(raw_active)
+    process_agg(raw_archived)
+    
+    # Ordenar claves cronológicamente
+    sorted_keys = sorted(data_map.keys())
+    
+    chart_labels = []
+    chart_avo = []
+    chart_metro = []
+    
+    meses_es = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    
+    for k in sorted_keys:
+        y, m = map(int, k.split("-"))
+        label = f"{meses_es[m]} {y}"
+        chart_labels.append(label)
+        chart_avo.append(round(data_map[k]["avo"], 2))
+        chart_metro.append(round(data_map[k]["metro"], 2))
+
+    return render_template(
+        "informe_resumen_produccion.html",
+        kilos_hoy=kilos_hoy,
+        kilos_mes=kilos_mes,
+        chart_labels=chart_labels,
+        chart_avo=chart_avo,
+        chart_metro=chart_metro
+    )
+
+
 # ==============================================================================
 # 15. GESTIÓN DE ARCHIVOS HISTÓRICOS (SOLO SOPORTE)
 # ==============================================================================
