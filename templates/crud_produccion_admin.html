@@ -59,45 +59,9 @@
             <button class="btn btn-success w-100">📥 Exportar a Excel</button>
         </form>
       </div>
-      {% if not archived_view %}
-      <div class="col-md-6">
-        <button class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#modalCorte">
-          ✂ Corte Mensual
-        </button>
-      </div>
-      {% endif %}
     </div>
   </div>
 </div>
-
-{% if not archived_view %}
-<!-- Modal Corte Mensual -->
-<div class="modal fade" id="modalCorte" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content bg-dark text-white">
-      <form method="POST" action="{{ url_for('admin_corte_mensual') }}">
-        <div class="modal-header border-secondary">
-          <h5 class="modal-title">Realizar Corte Mensual</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <p class="text-danger small">
-            ⚠️ Esta acción archivará todos los registros del mes seleccionado y los eliminará de esta lista principal.
-          </p>
-          <div class="mb-3">
-            <label class="form-label">Seleccionar Mes</label>
-            <input type="month" name="mes" class="form-control" required>
-          </div>
-        </div>
-        <div class="modal-footer border-secondary">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button class="btn btn-danger">Confirmar Corte</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-{% endif %}
 
 <div class="table-responsive">
   <table class="table table-dark table-striped align-middle">

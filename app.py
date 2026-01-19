@@ -839,17 +839,56 @@ def soporte_dashboard():
 @login_required('soporte')
 def soporte_produccion_list():
     codigo = None
+    operador_sel = None
+    fecha_inicio = None
+    fecha_fin = None
     filtro = {}
+
     if request.method == 'POST':
         codigo = (request.form.get('codigo_pieza') or '').strip()
+        operador_sel = request.form.get('operador')
+        fecha_inicio = request.form.get('fecha_inicio')
+        fecha_fin = request.form.get('fecha_fin')
+
         if codigo:
             filtro['codigo_pieza'] = str(codigo)
+        
+        if operador_sel and operador_sel != 'todos':
+            filtro['usuario'] = operador_sel
+        
+        if fecha_inicio or fecha_fin:
+            start_cl = None
+            end_cl = None
+            if fecha_inicio:
+                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            if fecha_fin:
+                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            rango = {}
+            if start_cl:
+                rango["$gte"] = start_cl.astimezone(timezone.utc)
+            if end_cl:
+                rango["$lte"] = end_cl.astimezone(timezone.utc)
+            if rango:
+                filtro["fecha"] = rango
 
     registros = list(db.produccion.find(filtro).sort('fecha', -1))
+    
+    # Obtener lista de operadores para el filtro
+    operadores = db.produccion.distinct("usuario")
+
     for r in registros:
         if r.get('fecha'):
             r['fecha'] = to_cl(r.get('fecha'))
-    return render_template('crud_produccion.html', registros=registros, codigo_sel=codigo)
+            
+    return render_template('crud_produccion.html', 
+                           registros=registros, 
+                           codigo_sel=codigo,
+                           operadores=sorted(operadores),
+                           operador_sel=operador_sel,
+                           fecha_inicio=fecha_inicio,
+                           fecha_fin=fecha_fin)
 
 @app.route('/admin/corte_mensual', methods=['POST'])
 @login_required(['administrador', 'soporte'])

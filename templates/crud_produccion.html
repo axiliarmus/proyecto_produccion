@@ -13,8 +13,25 @@
   <div class="card-body">
     <form method="post" class="row g-3">
       <div class="col-md-3">
+        <label class="form-label text-light">Operador</label>
+        <select name="operador" class="form-select">
+          <option value="todos">Todos</option>
+          {% for op in operadores %}
+            <option value="{{ op }}" {% if operador_sel == op %}selected{% endif %}>{{ op }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
         <label class="form-label text-light">Código pieza</label>
-        <input type="text" name="codigo_pieza" value="{{ codigo_sel or '' }}" class="form-control" placeholder="Ej: 1001 (vacío = todas)">
+        <input type="text" name="codigo_pieza" value="{{ codigo_sel or '' }}" class="form-control" placeholder="Ej: 1001">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label text-light">Desde</label>
+        <input type="date" name="fecha_inicio" value="{{ fecha_inicio or '' }}" class="form-control">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label text-light">Hasta</label>
+        <input type="date" name="fecha_fin" value="{{ fecha_fin or '' }}" class="form-control">
       </div>
       <div class="col-md-12">
         <button class="btn btn-accent w-100">🔍 Filtrar</button>
