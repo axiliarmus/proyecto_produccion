@@ -22,10 +22,32 @@
       <div class="collapse navbar-collapse" id="navbarContent">
         <ul class="navbar-nav ms-auto align-items-center gap-3">
           {% if session.get('nombre') %}
+            {% set current_ep = request.endpoint or '' %}
+            {% set back_url = 'javascript:history.back()' %}
+            
+            {# Lógica del botón Volver #}
+            {% if session.get('role') == 'supervisor' and 'informe_' in current_ep %}
+                {% set back_url = url_for('supervisor_home') %}
+            
+            {# --- NUEVA LÓGICA ARCHIVADOS --- #}
+            {% elif current_ep == 'admin_archivados_menu' %}
+                {% set back_url = url_for('admin_dashboard') %}
+            {% elif ('archivados_' in current_ep or 'produccion_archivada' in current_ep) and current_ep != 'admin_archivados_menu' %}
+                {% set back_url = url_for('admin_archivados_menu') %}
+            {# ------------------------------- #}
+
+            {% elif current_ep == 'admin_informes' %}
+                {% set back_url = url_for('admin_dashboard') %}
+            {% elif 'informe_' in current_ep %}
+                {% set back_url = url_for('admin_informes') %}
+            {% elif 'piezas_' in current_ep or 'boxes_' in current_ep or 'usuarios_' in current_ep %}
+                {% set back_url = url_for('admin_dashboard') %}
+            {% endif %}
+
             <li class="nav-item">
-                <button class="btn btn-outline-secondary btn-lg px-4 fw-bold" onclick="history.back()">
+                <a class="btn btn-outline-secondary btn-lg px-4 fw-bold" href="{{ back_url }}">
                     ⬅ VOLVER
-                </button>
+                </a>
             </li>
             <li class="nav-item">
                 <a class="btn btn-outline-danger btn-lg px-4 fw-bold" href="{{ url_for('logout') }}">

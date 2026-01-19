@@ -43,8 +43,8 @@
               <tbody>
                 {% for t in m.tramos %}
                 <tr class="{% if t.pendientes <= 0 %}table-success text-dark fw-bold{% endif %}">
-                  <td class="align-middle ps-3">{{ t.tramo }}</td>
-                  <td class="num-col text-center py-2">
+                  <td class="align-middle text-center">{{ t.tramo }}</td>
+                  <td class="num-col text-center py-2 align-middle">
                     <div class="fs-6">{{ t.total }} - {{ t.rematadas }} = {{ t.pendientes }}</div>
                     <div class="small text-warning">En armado: {{ t.en_armado }}</div>
                   </td>

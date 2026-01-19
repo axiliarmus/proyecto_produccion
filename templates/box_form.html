@@ -9,6 +9,7 @@
     </h3>
 
     <form method="post" action="">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <div class="mb-3">
         <label class="form-label">Código</label>
         <input type="text" class="form-control bg-secondary text-light" name="codigo" value="{{ box.codigo if box else '' }}" required>

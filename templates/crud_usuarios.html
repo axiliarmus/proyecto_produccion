@@ -28,6 +28,7 @@
         <td class="text-end">
           <a href="{{ url_for('usuarios_editar_form', id=u._id) }}" class="btn btn-sm btn-warning">Editar</a>
           <form action="{{ url_for('usuarios_delete', id=u._id) }}" method="post" class="d-inline">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
             <button class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar este usuario?')">Eliminar</button>
           </form>
         </td>

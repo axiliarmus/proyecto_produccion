@@ -5,18 +5,10 @@
   --accent-2: #60a5fa;
   --text: #e5e7eb;
 }
-body { 
-  background: linear-gradient(120deg, var(--bg), #1c2235); 
-  color: var(--text);
-  padding-top: 80px; /* Espacio para la navbar fija */
-}
+body { background: linear-gradient(120deg, var(--bg), #1c2235); color: var(--text); }
 .navbar-brand svg { height: 28px; margin-right: 8px; }
 .card-lift:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.25); }
 .table thead th { background:#0f172a; color:#cbd5e1; }
 .btn-accent { background: var(--accent); border: none; color:#0b0f1a; }
 .btn-accent-2 { background: var(--accent-2); border: none; color:#0b0f1a; }
 .badge-soft { background: rgba(96,165,250,.15); color:#93c5fd; }
-/* Cards grid polish */
-.fixed-card { min-height: 280px; }
-.table-fixed { table-layout: fixed; }
-.num-col { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }

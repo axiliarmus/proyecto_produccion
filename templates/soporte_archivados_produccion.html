@@ -56,6 +56,7 @@
                         Editar
                     </button>
                     <form method="POST" action="{{ url_for('soporte_archivados_produccion_eliminar') }}" class="d-inline" onsubmit="return confirm('¿Seguro que deseas eliminar este registro histórico?');">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                         <input type="hidden" name="prod_id" value="{{ p._id }}">
                         <input type="hidden" name="corte_id" value="{{ corte_sel }}">
                         <button class="btn btn-sm btn-danger">🗑️</button>
@@ -66,6 +67,7 @@
                         <div class="modal-dialog">
                             <div class="modal-content bg-dark text-light">
                                 <form method="POST" action="{{ url_for('soporte_archivados_produccion_editar') }}">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                                     <input type="hidden" name="prod_id" value="{{ p._id }}">
                                     <input type="hidden" name="corte_id" value="{{ corte_sel }}">
                                     

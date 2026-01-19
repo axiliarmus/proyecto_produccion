@@ -586,6 +586,7 @@ def piezas_nuevo_post():
     empresa = request.form['empresa'].strip()
     marco = request.form['marco'].strip()
     tramo = request.form['tramo'].strip()
+    tipo_precio = request.form['tipo_precio']
     kilo_pieza = float(request.form['kilo_pieza'])
     cantidad = int(request.form['cantidad'])
 
@@ -606,6 +607,7 @@ def piezas_nuevo_post():
             "empresa": empresa,
             "marco": marco,
             "tramo": tramo,
+            "tipo_precio": tipo_precio,
             "kilo_pieza": kilo_pieza,
             "cuerda_interna": cuerda_interna,
             "cuerda_externa": cuerda_externa,
@@ -643,6 +645,9 @@ def piezas_editar_post(id):
     cuerda_interna = request.form.get("cuerda_interna", "").strip()
     cuerda_externa = request.form.get("cuerda_externa", "").strip()
 
+    # Obtener el código de la pieza antes de actualizar (para propagar cambios)
+    pieza_actual = db.piezas.find_one({'_id': ObjectId(id)})
+    
     db.piezas.update_one(
         {'_id': ObjectId(id)},
         {'$set': {
@@ -655,6 +660,17 @@ def piezas_editar_post(id):
             "cuerda_externa": cuerda_externa
         }}
     )
+
+    # Si se cambió el tipo de precio, propagar a la producción histórica (activa y archivada)
+    if pieza_actual and pieza_actual.get("codigo"):
+        db.produccion.update_many(
+            {"codigo_pieza": pieza_actual["codigo"]},
+            {"$set": {"tipo_precio": tipo_precio}}
+        )
+        db.produccion_historica.update_many(
+            {"codigo_pieza": pieza_actual["codigo"]},
+            {"$set": {"tipo_precio": tipo_precio}}
+        )
 
     flash('✅ Pieza actualizada con éxito', 'success')
     return redirect(url_for('piezas_list'))
@@ -764,6 +780,22 @@ def piezas_masivo_confirmar():
         if valor not in ["metro", "avo"]:
             flash("El tipo de precio debe ser 'metro' o 'avo'.", "danger")
             return redirect(url_for("piezas_masivo"))
+        
+        # 🔥 Propagar cambio a producción activa
+        # 1. Buscar los códigos de las piezas que se van a actualizar
+        piezas_afectadas = list(db.piezas.find(filtros, {"codigo": 1}))
+        codigos = [p["codigo"] for p in piezas_afectadas if "codigo" in p]
+        
+        # 2. Actualizar producción (activa y archivada)
+        if codigos:
+            db.produccion.update_many(
+                {"codigo_pieza": {"$in": codigos}},
+                {"$set": {"tipo_precio": valor}}
+            )
+            db.produccion_historica.update_many(
+                {"codigo_pieza": {"$in": codigos}},
+                {"$set": {"tipo_precio": valor}}
+            )
 
     resultado = db.piezas.update_many(filtros, {"$set": {campo: valor}})
 
@@ -807,17 +839,56 @@ def soporte_dashboard():
 @login_required('soporte')
 def soporte_produccion_list():
     codigo = None
+    operador_sel = None
+    fecha_inicio = None
+    fecha_fin = None
     filtro = {}
+
     if request.method == 'POST':
         codigo = (request.form.get('codigo_pieza') or '').strip()
+        operador_sel = request.form.get('operador')
+        fecha_inicio = request.form.get('fecha_inicio')
+        fecha_fin = request.form.get('fecha_fin')
+
         if codigo:
             filtro['codigo_pieza'] = str(codigo)
+        
+        if operador_sel and operador_sel != 'todos':
+            filtro['usuario'] = operador_sel
+        
+        if fecha_inicio or fecha_fin:
+            start_cl = None
+            end_cl = None
+            if fecha_inicio:
+                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            if fecha_fin:
+                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            rango = {}
+            if start_cl:
+                rango["$gte"] = start_cl.astimezone(timezone.utc)
+            if end_cl:
+                rango["$lte"] = end_cl.astimezone(timezone.utc)
+            if rango:
+                filtro["fecha"] = rango
 
     registros = list(db.produccion.find(filtro).sort('fecha', -1))
+    
+    # Obtener lista de operadores para el filtro
+    operadores = db.produccion.distinct("usuario")
+
     for r in registros:
         if r.get('fecha'):
             r['fecha'] = to_cl(r.get('fecha'))
-    return render_template('crud_produccion.html', registros=registros, codigo_sel=codigo)
+            
+    return render_template('crud_produccion.html', 
+                           registros=registros, 
+                           codigo_sel=codigo,
+                           operadores=sorted(operadores),
+                           operador_sel=operador_sel,
+                           fecha_inicio=fecha_inicio,
+                           fecha_fin=fecha_fin)
 
 @app.route('/admin/corte_mensual', methods=['POST'])
 @login_required(['administrador', 'soporte'])
@@ -3011,36 +3082,196 @@ def exportar_estado_piezas_excel():
 @app.route('/admin/informes/piezas/tarjetas', methods=['GET'])
 @login_required(["administrador", "supervisor", "soporte", "cliente"])
 def informe_piezas_tarjetas():
-    clientes = db.piezas.distinct("empresa")
+    produccion = list(db.produccion.find({}))
+    cod_armadas = set()
+    cod_remates = set()
+    for p in produccion:
+        c = p.get("codigo_pieza")
+        if not c:
+            continue
+        cstr = str(c)
+        if p.get("modo") == "armador":
+            cod_armadas.add(cstr)
+        elif p.get("modo") == "rematador":
+            cod_remates.add(cstr)
+
+    piezas = list(db.piezas.find())
+
+    grupos_map = {}
+    for pi in piezas:
+        cli = pi.get("empresa")
+        mar = pi.get("marco")
+        tr = pi.get("tramo")
+
+        key_cli = cli
+        key_mar = (cli, mar)
+
+        if key_cli not in grupos_map:
+            grupos_map[key_cli] = {}
+        if key_mar not in grupos_map[key_cli]:
+            grupos_map[key_cli][key_mar] = {}
+
+        grupos_map[key_cli][key_mar].setdefault(tr, {"total": 0, "armadas": 0, "rematadas": 0})
+        grupos_map[key_cli][key_mar][tr]["total"] += 1
+
+        cstr = str(pi.get("codigo"))
+        if cstr in cod_armadas:
+            grupos_map[key_cli][key_mar][tr]["armadas"] += 1
+        if cstr in cod_remates:
+            grupos_map[key_cli][key_mar][tr]["rematadas"] += 1
+
     resultado = []
-    for cliente in clientes:
-        marcos = db.piezas.distinct("marco", {"empresa": cliente})
-        marcos_info = []
-        for m in marcos:
-            tramos = db.piezas.distinct("tramo", {"empresa": cliente, "marco": m})
-            tramos_info = []
-            for t in tramos:
-                total = db.piezas.count_documents({"empresa": cliente, "marco": m, "tramo": t})
-                rem = db.produccion.count_documents({"modo": "rematador", "empresa": cliente, "marco": m, "tramo": t})
-                arm = db.produccion.count_documents({"modo": "armador", "empresa": cliente, "marco": m, "tramo": t})
-                tramos_info.append({
-                    "tramo": t, 
-                    "total": total,
-                    "rematadas": rem,
-                    "armadas": arm,
-                    "en_armado": max(arm - rem, 0),
-                    "pendientes": max(total - rem, 0)
-                })
-            marcos_info.append({
-                "marco": m,
-                "tramos": sorted(tramos_info, key=lambda x: str(x["tramo"]))
+    for cli, marcos in grupos_map.items():
+        obj = {"cliente": cli, "marcos": []}
+        for (cli2, marco), tramos in marcos.items():
+            obj["marcos"].append({
+                "marco": marco,
+                "tramos": [{
+                    "tramo": t,
+                    "total": v["total"],
+                    "armadas": v["armadas"],
+                    "rematadas": v["rematadas"],
+                    "en_armado": max(v["armadas"] - v["rematadas"], 0),
+                    "pendientes": v["total"] - v["rematadas"],
+                } for t, v in tramos.items()]
             })
-        resultado.append({
-            "cliente": cliente,
-            "marcos": sorted(marcos_info, key=lambda x: str(x["marco"]))
-        })
+        obj["marcos"] = sorted(obj["marcos"], key=lambda x: str(x["marco"]))
+        for m in obj["marcos"]:
+            m["tramos"] = sorted(m["tramos"], key=lambda x: str(x["tramo"]))
+        resultado.append(obj)
 
     return render_template("informe_piezas_tarjetas.html", grupos=resultado)
+
+
+# ============================================================
+# INFORME RESUMEN PRODUCCIÓN (DASHBOARD CLIENTE/ADMIN)
+# ============================================================
+
+@app.route('/admin/informes/resumen-produccion', methods=['GET'])
+@login_required(['administrador', 'cliente', 'soporte'])
+def informe_resumen_produccion():
+    today_real = now_cl().date()
+    
+    # ------------------ RANGOS DE FECHA ------------------
+    # Hoy
+    start_today = datetime.combine(today_real, datetime.min.time()).replace(tzinfo=CL).astimezone(timezone.utc)
+    end_today = datetime.combine(today_real, datetime.max.time()).replace(tzinfo=CL).astimezone(timezone.utc)
+
+    # Mes Actual
+    start_month = datetime(today_real.year, today_real.month, 1).replace(tzinfo=CL).astimezone(timezone.utc)
+    
+    # Últimos 6 meses
+    # Calculamos fecha de inicio: Hoy - 6 meses (aprox 180 días)
+    date_6m = today_real - timedelta(days=180)
+    start_6m = datetime.combine(date_6m, datetime.min.time()).replace(tzinfo=CL).astimezone(timezone.utc)
+    
+    # ------------------ CONSULTAS ------------------
+    
+    # Helper para sumar kilos por tipo
+    def calcular_kilos(query):
+        pipeline = [
+            {"$match": query},
+            {"$group": {
+                "_id": "$tipo_precio", # "metro" o "avo"
+                "total_kilos": {"$sum": "$kilo_pieza"}
+            }}
+        ]
+        res = list(db.produccion.aggregate(pipeline))
+        
+        # Mapear resultado
+        datos = {"metro": 0.0, "avo": 0.0}
+        for r in res:
+            raw_tipo = r["_id"]
+            if not raw_tipo:
+                tipo = "metro"
+            else:
+                tipo = str(raw_tipo).lower().strip()
+            
+            # Si por alguna razón llega algo distinto a avo/metro, lo mandamos a metro (o podríamos loguearlo)
+            if tipo not in ["metro", "avo"]:
+                tipo = "metro"
+                
+            datos[tipo] = datos.get(tipo, 0.0) + (r.get("total_kilos") or 0.0)
+        return datos
+
+    # 1. Kilos Hoy
+    kilos_hoy = calcular_kilos({"fecha": {"$gte": start_today, "$lte": end_today}})
+    
+    # 2. Kilos Mes Actual
+    kilos_mes = calcular_kilos({"fecha": {"$gte": start_month}})
+    
+    # 3. Histórico 6 Meses (Activa + Histórica)
+    pipeline_hist = [
+        {"$match": {"fecha": {"$gte": start_6m}}},
+        {"$project": {
+            "year": {"$year": {"date": "$fecha", "timezone": "America/Santiago"}},
+            "month": {"$month": {"date": "$fecha", "timezone": "America/Santiago"}},
+            "tipo_precio": 1,
+            "kilo_pieza": 1
+        }},
+        {"$group": {
+            "_id": {"year": "$year", "month": "$month", "tipo": "$tipo_precio"},
+            "total": {"$sum": "$kilo_pieza"}
+        }},
+        {"$sort": {"_id.year": 1, "_id.month": 1}}
+    ]
+    
+    # Ejecutar en ambas colecciones
+    raw_active = list(db.produccion.aggregate(pipeline_hist))
+    raw_archived = list(db.produccion_historica.aggregate(pipeline_hist))
+    
+    # Unificar datos
+    data_map = {} # "YYYY-MM" -> {"avo": 0, "metro": 0}
+    
+    def process_agg(rows):
+        for r in rows:
+            y = r["_id"]["year"]
+            m = r["_id"]["month"]
+            raw_t = r["_id"].get("tipo")
+            
+            if not raw_t:
+                t = "metro"
+            else:
+                t = str(raw_t).lower().strip()
+
+            k = r.get("total") or 0.0
+            
+            key = f"{y}-{m:02d}"
+            if key not in data_map:
+                data_map[key] = {"avo": 0.0, "metro": 0.0}
+            
+            if t not in ["avo", "metro"]: 
+                t = "metro"
+            
+            data_map[key][t] += k
+
+    process_agg(raw_active)
+    process_agg(raw_archived)
+    
+    # Ordenar claves cronológicamente
+    sorted_keys = sorted(data_map.keys())
+    
+    chart_labels = []
+    chart_avo = []
+    chart_metro = []
+    
+    meses_es = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    
+    for k in sorted_keys:
+        y, m = map(int, k.split("-"))
+        label = f"{meses_es[m]} {y}"
+        chart_labels.append(label)
+        chart_avo.append(round(data_map[k]["avo"], 2))
+        chart_metro.append(round(data_map[k]["metro"], 2))
+
+    return render_template(
+        "informe_resumen_produccion.html",
+        kilos_hoy=kilos_hoy,
+        kilos_mes=kilos_mes,
+        chart_labels=chart_labels,
+        chart_avo=chart_avo,
+        chart_metro=chart_metro
+    )
 
 
 # ==============================================================================
