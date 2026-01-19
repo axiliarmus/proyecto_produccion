@@ -26,16 +26,16 @@
                 <col style="width: 50%">
               </colgroup>
               <thead>
-                <tr class="text-secondary small">
+                <tr class="text-secondary small text-center">
                     <th>Tramo</th>
-                    <th class="text-end">Total - Rem = Faltan</th>
+                    <th>Total - Rem = Faltan</th>
                 </tr>
               </thead>
               <tbody>
                 {% for t in m.tramos %}
                 <tr class="{% if t.pendientes <= 0 %}table-success text-dark fw-bold{% endif %}">
-                  <td>{{ t.tramo }}</td>
-                  <td class="num-col">
+                  <td class="text-center align-middle">{{ t.tramo }}</td>
+                  <td class="num-col text-center align-middle">
                     <div>{{ t.total }} - {{ t.rematadas }} = {{ t.pendientes }}</div>
                     <div class="small text-warning">En armado: {{ t.en_armado }}</div>
                   </td>

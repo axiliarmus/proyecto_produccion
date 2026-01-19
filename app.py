@@ -586,6 +586,7 @@ def piezas_nuevo_post():
     empresa = request.form['empresa'].strip()
     marco = request.form['marco'].strip()
     tramo = request.form['tramo'].strip()
+    tipo_precio = request.form['tipo_precio']
     kilo_pieza = float(request.form['kilo_pieza'])
     cantidad = int(request.form['cantidad'])
 
@@ -606,6 +607,7 @@ def piezas_nuevo_post():
             "empresa": empresa,
             "marco": marco,
             "tramo": tramo,
+            "tipo_precio": tipo_precio,
             "kilo_pieza": kilo_pieza,
             "cuerda_interna": cuerda_interna,
             "cuerda_externa": cuerda_externa,
@@ -643,6 +645,9 @@ def piezas_editar_post(id):
     cuerda_interna = request.form.get("cuerda_interna", "").strip()
     cuerda_externa = request.form.get("cuerda_externa", "").strip()
 
+    # Obtener el código de la pieza antes de actualizar (para propagar cambios)
+    pieza_actual = db.piezas.find_one({'_id': ObjectId(id)})
+    
     db.piezas.update_one(
         {'_id': ObjectId(id)},
         {'$set': {
@@ -655,6 +660,17 @@ def piezas_editar_post(id):
             "cuerda_externa": cuerda_externa
         }}
     )
+
+    # Si se cambió el tipo de precio, propagar a la producción histórica (activa y archivada)
+    if pieza_actual and pieza_actual.get("codigo"):
+        db.produccion.update_many(
+            {"codigo_pieza": pieza_actual["codigo"]},
+            {"$set": {"tipo_precio": tipo_precio}}
+        )
+        db.produccion_historica.update_many(
+            {"codigo_pieza": pieza_actual["codigo"]},
+            {"$set": {"tipo_precio": tipo_precio}}
+        )
 
     flash('✅ Pieza actualizada con éxito', 'success')
     return redirect(url_for('piezas_list'))
@@ -764,6 +780,22 @@ def piezas_masivo_confirmar():
         if valor not in ["metro", "avo"]:
             flash("El tipo de precio debe ser 'metro' o 'avo'.", "danger")
             return redirect(url_for("piezas_masivo"))
+        
+        # 🔥 Propagar cambio a producción activa
+        # 1. Buscar los códigos de las piezas que se van a actualizar
+        piezas_afectadas = list(db.piezas.find(filtros, {"codigo": 1}))
+        codigos = [p["codigo"] for p in piezas_afectadas if "codigo" in p]
+        
+        # 2. Actualizar producción (activa y archivada)
+        if codigos:
+            db.produccion.update_many(
+                {"codigo_pieza": {"$in": codigos}},
+                {"$set": {"tipo_precio": valor}}
+            )
+            db.produccion_historica.update_many(
+                {"codigo_pieza": {"$in": codigos}},
+                {"$set": {"tipo_precio": valor}}
+            )
 
     resultado = db.piezas.update_many(filtros, {"$set": {campo: valor}})
 
@@ -3011,34 +3043,63 @@ def exportar_estado_piezas_excel():
 @app.route('/admin/informes/piezas/tarjetas', methods=['GET'])
 @login_required(["administrador", "supervisor", "soporte", "cliente"])
 def informe_piezas_tarjetas():
-    clientes = db.piezas.distinct("empresa")
+    produccion = list(db.produccion.find({}))
+    cod_armadas = set()
+    cod_remates = set()
+    for p in produccion:
+        c = p.get("codigo_pieza")
+        if not c:
+            continue
+        cstr = str(c)
+        if p.get("modo") == "armador":
+            cod_armadas.add(cstr)
+        elif p.get("modo") == "rematador":
+            cod_remates.add(cstr)
+
+    piezas = list(db.piezas.find())
+
+    grupos_map = {}
+    for pi in piezas:
+        cli = pi.get("empresa")
+        mar = pi.get("marco")
+        tr = pi.get("tramo")
+
+        key_cli = cli
+        key_mar = (cli, mar)
+
+        if key_cli not in grupos_map:
+            grupos_map[key_cli] = {}
+        if key_mar not in grupos_map[key_cli]:
+            grupos_map[key_cli][key_mar] = {}
+
+        grupos_map[key_cli][key_mar].setdefault(tr, {"total": 0, "armadas": 0, "rematadas": 0})
+        grupos_map[key_cli][key_mar][tr]["total"] += 1
+
+        cstr = str(pi.get("codigo"))
+        if cstr in cod_armadas:
+            grupos_map[key_cli][key_mar][tr]["armadas"] += 1
+        if cstr in cod_remates:
+            grupos_map[key_cli][key_mar][tr]["rematadas"] += 1
+
     resultado = []
-    for cliente in clientes:
-        marcos = db.piezas.distinct("marco", {"empresa": cliente})
-        marcos_info = []
-        for m in marcos:
-            tramos = db.piezas.distinct("tramo", {"empresa": cliente, "marco": m})
-            tramos_info = []
-            for t in tramos:
-                total = db.piezas.count_documents({"empresa": cliente, "marco": m, "tramo": t})
-                rem = db.produccion.count_documents({"modo": "rematador", "empresa": cliente, "marco": m, "tramo": t})
-                arm = db.produccion.count_documents({"modo": "armador", "empresa": cliente, "marco": m, "tramo": t})
-                tramos_info.append({
-                    "tramo": t, 
-                    "total": total,
-                    "rematadas": rem,
-                    "armadas": arm,
-                    "en_armado": max(arm - rem, 0),
-                    "pendientes": max(total - rem, 0)
-                })
-            marcos_info.append({
-                "marco": m,
-                "tramos": sorted(tramos_info, key=lambda x: str(x["tramo"]))
+    for cli, marcos in grupos_map.items():
+        obj = {"cliente": cli, "marcos": []}
+        for (cli2, marco), tramos in marcos.items():
+            obj["marcos"].append({
+                "marco": marco,
+                "tramos": [{
+                    "tramo": t,
+                    "total": v["total"],
+                    "armadas": v["armadas"],
+                    "rematadas": v["rematadas"],
+                    "en_armado": max(v["armadas"] - v["rematadas"], 0),
+                    "pendientes": v["total"] - v["rematadas"],
+                } for t, v in tramos.items()]
             })
-        resultado.append({
-            "cliente": cliente,
-            "marcos": sorted(marcos_info, key=lambda x: str(x["marco"]))
-        })
+        obj["marcos"] = sorted(obj["marcos"], key=lambda x: str(x["marco"]))
+        for m in obj["marcos"]:
+            m["tramos"] = sorted(m["tramos"], key=lambda x: str(x["tramo"]))
+        resultado.append(obj)
 
     return render_template("informe_piezas_tarjetas.html", grupos=resultado)
 
@@ -3081,7 +3142,16 @@ def informe_resumen_produccion():
         # Mapear resultado
         datos = {"metro": 0.0, "avo": 0.0}
         for r in res:
-            tipo = r["_id"] or "metro"
+            raw_tipo = r["_id"]
+            if not raw_tipo:
+                tipo = "metro"
+            else:
+                tipo = str(raw_tipo).lower().strip()
+            
+            # Si por alguna razón llega algo distinto a avo/metro, lo mandamos a metro (o podríamos loguearlo)
+            if tipo not in ["metro", "avo"]:
+                tipo = "metro"
+                
             datos[tipo] = datos.get(tipo, 0.0) + (r.get("total_kilos") or 0.0)
         return datos
 
@@ -3118,14 +3188,21 @@ def informe_resumen_produccion():
         for r in rows:
             y = r["_id"]["year"]
             m = r["_id"]["month"]
-            t = r["_id"].get("tipo") or "metro"
+            raw_t = r["_id"].get("tipo")
+            
+            if not raw_t:
+                t = "metro"
+            else:
+                t = str(raw_t).lower().strip()
+
             k = r.get("total") or 0.0
             
             key = f"{y}-{m:02d}"
             if key not in data_map:
                 data_map[key] = {"avo": 0.0, "metro": 0.0}
             
-            if t not in ["avo", "metro"]: t = "metro"
+            if t not in ["avo", "metro"]: 
+                t = "metro"
             
             data_map[key][t] += k
 
