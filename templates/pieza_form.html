@@ -108,7 +108,7 @@
 
       <div class="d-flex justify-content-between mt-4">
         <a href="{{ url_for('piezas_list') }}" class="btn btn-secondary">← Volver</a>
-        <button type="submit" class="btn btn-accent">
+        <button type="submit" class="btn btn-accent" id="btnSubmit">
           {{ 'Guardar' if modo == 'nuevo' else 'Actualizar' }}
         </button>
       </div>
@@ -116,5 +116,15 @@
     </form>
   </div>
 </div>
+
+<script>
+  document.querySelector("form").addEventListener("submit", function(e) {
+      // La validación HTML5 previene el envío si faltan campos, 
+      // así que si llegamos aquí, el form es válido.
+      const btn = document.getElementById("btnSubmit");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...';
+  });
+</script>
 
 {% endblock %}

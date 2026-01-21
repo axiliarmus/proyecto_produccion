@@ -12,7 +12,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from io import BytesIO
 import pandas as pd
-from pymongo import MongoClient
+from pymongo import MongoClient, ReturnDocument
 from datetime import timezone
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -596,14 +596,57 @@ def piezas_nuevo_post():
     # Prefijo de ciclo actual
     conf = db.config.find_one({"key": "ciclo_actual"}) or {"value": "a"}
     prefijo = conf.get("value", "a")
-    # Calcular siguiente secuencia dentro del prefijo actual
-    count_prefijo = db.piezas.count_documents({"codigo": {"$regex": f"^{prefijo}"}})
-    next_seq = count_prefijo + 1
+    
+    # ------------------------------------------------------------
+    # MIGRACIÓN AUTOMÁTICA A CONTADORES ATÓMICOS
+    # ------------------------------------------------------------
+    # Verifica si existe un contador para este prefijo. Si no, lo inicializa
+    # buscando el número más alto existente en la colección de piezas.
+    counter_id = f"piezas_seq_{prefijo}"
+    if not db.counters.find_one({"_id": counter_id}):
+        # Buscar el máximo actual (costoso pero solo se hace una vez)
+        max_seq = 0
+        existing = list(db.piezas.find({"codigo": {"$regex": f"^{prefijo}"}}))
+        for p in existing:
+            try:
+                # Asumiendo formato "a123" -> quitar "a" y parsear "123"
+                num_part = int(p["codigo"][len(prefijo):])
+                if num_part > max_seq:
+                    max_seq = num_part
+            except:
+                pass
+        
+        # Inicializar contador
+        db.counters.insert_one({"_id": counter_id, "seq": max_seq})
 
+    # ------------------------------------------------------------
+    # GENERACIÓN ATÓMICA DE CÓDIGOS
+    # ------------------------------------------------------------
     docs = []
+    
+    # Reservar un bloque de IDs de una sola vez si cantidad > 1?
+    # No, find_one_and_update incrementa de a 1.
+    # Para optimizar, podríamos incrementar en 'cantidad' de golpe.
+    
+    # Incremento atómico en bloque
+    counter_doc = db.counters.find_one_and_update(
+        {"_id": counter_id},
+        {"$inc": {"seq": cantidad}},
+        return_document=ReturnDocument.AFTER
+    )
+    
+    # El valor retornado es el FINAL del rango.
+    # Ejemplo: Si estaba en 10 y pido 5. Nuevo seq = 15.
+    # Los IDs asignados son: 11, 12, 13, 14, 15.
+    # Rango: (end - cantidad + 1) hasta end
+    
+    end_seq = counter_doc["seq"]
+    start_seq = end_seq - cantidad + 1
+
     for i in range(cantidad):
+        current_seq = start_seq + i
         docs.append({
-            "codigo": f"{prefijo}{next_seq + i}",
+            "codigo": f"{prefijo}{current_seq}",
             "empresa": empresa,
             "marco": marco,
             "tramo": tramo,
@@ -2110,39 +2153,45 @@ def operador_home():
         peso = 0.0
         tipo_precio = "metro" # Default
         
-        # Intento 1: Leer del registro (si existen)
-        if "kilo_pieza" in p:
-             try: peso = float(p["kilo_pieza"])
-             except: peso = 0.0
+        # --- LÓGICA CORREGIDA ---
+        # Si es producción ACTIVA (sin corte_id), SIEMPRE usar datos actuales de la pieza
+        # para reflejar cambios de precio/peso en tiempo real.
+        if not corte_id:
+            pieza_doc = mapa_piezas_active.get(cod)
+            if pieza_doc:
+                try: peso = float(pieza_doc.get("kilo_pieza") or 0)
+                except: peso = 0.0
+                tipo_precio = pieza_doc.get("tipo_precio", "metro")
+            else:
+                # Fallback: si borraron la pieza, usar lo guardado en registro
+                peso = float(p.get("kilo_pieza") or 0)
+                tipo_precio = p.get("tipo_precio", "metro")
         
-        if "tipo_precio" in p:
-             tipo_precio = p["tipo_precio"]
-        
-        # Intento 2: Buscar en Piezas (Activas o Históricas) si falta info
-        # Si ya tengo peso y tipo_precio del registro, no necesito buscar pieza, 
-        # PERO records viejos no tienen tipo_precio.
-        
-        pieza_doc = None
-        if peso == 0 or "tipo_precio" not in p:
-            if corte_id:
-                # Buscar en histórico
+        else:
+            # Si es HISTÓRICO (archivado), respetar snapshot o buscar en histórico
+            # Intento 1: Leer del registro
+            if "kilo_pieza" in p:
+                 try: peso = float(p["kilo_pieza"])
+                 except: peso = 0.0
+            
+            if "tipo_precio" in p:
+                 tipo_precio = p["tipo_precio"]
+            
+            # Intento 2: Buscar en Piezas Históricas si falta info
+            if peso == 0 or "tipo_precio" not in p:
                 if (corte_id, cod) not in cache_piezas_hist:
-                    # Intenta string e int
                     pz = db.piezas_historicas.find_one({"corte_id": corte_id, "codigo": cod})
                     if not pz and cod.isdigit():
                          pz = db.piezas_historicas.find_one({"corte_id": corte_id, "codigo": int(cod)})
                     cache_piezas_hist[(corte_id, cod)] = pz
+                
                 pieza_doc = cache_piezas_hist[(corte_id, cod)]
-            else:
-                # Buscar en activo
-                pieza_doc = mapa_piezas_active.get(cod)
-            
-            if pieza_doc:
-                if peso == 0:
-                    try: peso = float(pieza_doc.get("kilo_pieza") or 0)
-                    except: peso = 0.0
-                if "tipo_precio" not in p:
-                    tipo_precio = pieza_doc.get("tipo_precio", "metro")
+                if pieza_doc:
+                    if peso == 0:
+                        try: peso = float(pieza_doc.get("kilo_pieza") or 0)
+                        except: peso = 0.0
+                    if "tipo_precio" not in p:
+                        tipo_precio = pieza_doc.get("tipo_precio", "metro")
 
         # Determinar Precios del Usuario
         # Si es histórico, buscar snapshot de usuario. Si no, usar actual.
@@ -3119,6 +3168,52 @@ def informe_piezas_tarjetas():
             grupos_map[key_cli][key_mar][tr]["armadas"] += 1
         if cstr in cod_remates:
             grupos_map[key_cli][key_mar][tr]["rematadas"] += 1
+
+    # --- NUEVO: Incluir piezas que existen en PRODUCCIÓN pero NO en PIEZAS (borradas) ---
+    # Convertir piezas a diccionario para acceso rápido
+    mapa_piezas_existentes = {str(p["codigo"]): True for p in piezas}
+    
+    # Recorrer producción para encontrar huérfanas
+    orphans_processed = set()
+    for p in produccion:
+        c = p.get("codigo_pieza")
+        if not c: continue
+        cstr = str(c)
+        
+        # Si ya existe en el mapa de piezas, ignorar
+        if cstr in mapa_piezas_existentes:
+            continue
+            
+        # Si ya procesamos este huérfano, ignorar
+        if cstr in orphans_processed:
+            continue
+            
+        orphans_processed.add(cstr)
+        
+        # Recuperar datos del registro de producción para reconstruir la "tarjeta"
+        cli = p.get("empresa") or "Sin Cliente"
+        mar = p.get("marco") or "Sin Marco"
+        tr = p.get("tramo") or "Sin Tramo"
+        
+        key_cli = cli
+        key_mar = (cli, mar)
+
+        if key_cli not in grupos_map:
+            grupos_map[key_cli] = {}
+        if key_mar not in grupos_map[key_cli]:
+            grupos_map[key_cli][key_mar] = {}
+
+        grupos_map[key_cli][key_mar].setdefault(tr, {"total": 0, "armadas": 0, "rematadas": 0})
+        
+        # Como es huérfana (no está en piezas), NO la sumamos al total
+        # grupos_map[key_cli][key_mar][tr]["total"] += 1
+
+        if cstr in cod_armadas:
+            grupos_map[key_cli][key_mar][tr]["armadas"] += 1
+        if cstr in cod_remates:
+            grupos_map[key_cli][key_mar][tr]["rematadas"] += 1
+            
+    # ------------------------------------------------------------------------------------
 
     resultado = []
     for cli, marcos in grupos_map.items():
