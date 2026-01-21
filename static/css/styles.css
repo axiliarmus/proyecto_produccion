@@ -5,7 +5,7 @@
   --accent-2: #60a5fa;
   --text: #e5e7eb;
 }
-body { background: linear-gradient(120deg, var(--bg), #1c2235); color: var(--text); }
+body { background: linear-gradient(120deg, var(--bg), #1c2235); color: var(--text); padding-top: 80px; }
 .navbar-brand svg { height: 28px; margin-right: 8px; }
 .card-lift:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.25); }
 .table thead th { background:#0f172a; color:#cbd5e1; }
