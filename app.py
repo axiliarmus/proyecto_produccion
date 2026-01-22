@@ -3134,11 +3134,14 @@ def informe_piezas_tarjetas():
     produccion = list(db.produccion.find({}))
     cod_armadas = set()
     cod_remates = set()
+    
+    # 1. Normalizar códigos de producción
     for p in produccion:
         c = p.get("codigo_pieza")
         if not c:
             continue
-        cstr = str(c)
+        # Convertir a string, quitar espacios y pasar a minúsculas
+        cstr = str(c).strip().lower()
         if p.get("modo") == "armador":
             cod_armadas.add(cstr)
         elif p.get("modo") == "rematador":
@@ -3163,28 +3166,30 @@ def informe_piezas_tarjetas():
         grupos_map[key_cli][key_mar].setdefault(tr, {"total": 0, "armadas": 0, "rematadas": 0})
         grupos_map[key_cli][key_mar][tr]["total"] += 1
 
-        cstr = str(pi.get("codigo"))
+        # 2. Normalizar código de pieza existente
+        cstr = str(pi.get("codigo")).strip().lower()
         if cstr in cod_armadas:
             grupos_map[key_cli][key_mar][tr]["armadas"] += 1
         if cstr in cod_remates:
             grupos_map[key_cli][key_mar][tr]["rematadas"] += 1
 
     # --- NUEVO: Incluir piezas que existen en PRODUCCIÓN pero NO en PIEZAS (borradas) ---
-    # Convertir piezas a diccionario para acceso rápido
-    mapa_piezas_existentes = {str(p["codigo"]): True for p in piezas}
+    # 3. Mapa normalizado de existencia
+    mapa_piezas_existentes = {str(p["codigo"]).strip().lower(): True for p in piezas}
     
-    # Recorrer producción para encontrar huérfanas
     orphans_processed = set()
     for p in produccion:
         c = p.get("codigo_pieza")
         if not c: continue
-        cstr = str(c)
         
-        # Si ya existe en el mapa de piezas, ignorar
+        # 4. Normalizar al buscar huérfanas
+        cstr = str(c).strip().lower()
+        
+        # Si ya existe en el mapa de piezas, ignorar (ya fue contada arriba)
         if cstr in mapa_piezas_existentes:
             continue
             
-        # Si ya procesamos este huérfano, ignorar
+        # Si ya procesamos este huérfano, ignorar (para no sumar el total múltiples veces)
         if cstr in orphans_processed:
             continue
             
