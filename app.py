@@ -3205,8 +3205,8 @@ def informe_piezas_tarjetas():
 
         grupos_map[key_cli][key_mar].setdefault(tr, {"total": 0, "armadas": 0, "rematadas": 0})
         
-        # Como es huérfana (no está en piezas), NO la sumamos al total
-        # grupos_map[key_cli][key_mar][tr]["total"] += 1
+        # Como es huérfana, la sumamos al total para reflejar que EXISTIÓ y fue producida
+        grupos_map[key_cli][key_mar][tr]["total"] += 1
 
         if cstr in cod_armadas:
             grupos_map[key_cli][key_mar][tr]["armadas"] += 1
