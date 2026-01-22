@@ -57,6 +57,23 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax" # Protección contra CSRF
 )
 
+@app.after_request
+def add_security_headers(response):
+    # Política CSP que permite 'unsafe-eval' para evitar bloqueo de librerías (Chart.js, etc.)
+    # Se permiten scripts inline y desde CDN conocidos.
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net blob: data:; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data: https://cdn.jsdelivr.net; "
+        "connect-src 'self' https://cdn.jsdelivr.net;"
+    )
+    response.headers['Content-Security-Policy'] = csp
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    return response
+
 # ==============================================================================
 # 6. PROTECCIÓN CSRF (Cross-Site Request Forgery)
 # ==============================================================================
@@ -660,7 +677,7 @@ def piezas_nuevo_post():
     if docs:
         db.piezas.insert_many(docs)
 
-    flash(f'✅ Se crearon {cantidad} piezas correctamente (desde código {prefijo}{next_seq}).', 'success')
+    flash(f'✅ Se crearon {cantidad} piezas correctamente (desde código {prefijo}{start_seq}).', 'success')
     return redirect(url_for('piezas_list'))
 
 
@@ -3001,10 +3018,11 @@ def informe_estado_piezas():
     if tramo and tramo != "todos":
         filtros["tramo"] = tramo
     if codigo:
+        # Normalizar filtro: convertir a string, quitar espacios y minúsculas
         try:
-            filtros["codigo"] = int(codigo)
+            filtros["codigo"] = {"$regex": f"^{str(codigo).strip()}$", "$options": "i"}
         except:
-            filtros["codigo"] = -1
+            pass
 
     piezas = list(db.piezas.find(filtros).sort("codigo", 1))
 

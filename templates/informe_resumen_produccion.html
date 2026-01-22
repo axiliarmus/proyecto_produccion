@@ -14,18 +14,22 @@
     <div class="col-md-6">
         <div class="card bg-dark border-light shadow h-100">
             <div class="card-header bg-transparent border-light">
-                <h5 class="card-title mb-0 text-center">📅 Producción Hoy</h5>
+                <h5 class="card-title mb-0 text-center text-white">📅 Producción Hoy</h5>
             </div>
             <div class="card-body">
-                <div class="row text-center">
+                <div class="row text-center mb-3">
                     <div class="col-6 border-end border-secondary">
-                        <h6 class="text-secondary">AVO</h6>
+                        <h6 class="text-light">AVO</h6>
                         <h3 class="text-success">{{ "%.2f"|format(kilos_hoy.avo) }} kg</h3>
                     </div>
                     <div class="col-6">
-                        <h6 class="text-secondary">METRO</h6>
+                        <h6 class="text-light">METRO</h6>
                         <h3 class="text-info">{{ "%.2f"|format(kilos_hoy.metro) }} kg</h3>
                     </div>
+                </div>
+                <div class="text-center pt-3 border-top border-secondary">
+                    <h6 class="text-light">TOTAL</h6>
+                    <h2 class="text-white fw-bold">{{ "%.2f"|format(kilos_hoy.avo + kilos_hoy.metro) }} kg</h2>
                 </div>
             </div>
         </div>
@@ -35,18 +39,22 @@
     <div class="col-md-6">
         <div class="card bg-dark border-light shadow h-100">
             <div class="card-header bg-transparent border-light">
-                <h5 class="card-title mb-0 text-center">🗓️ Mes Actual</h5>
+                <h5 class="card-title mb-0 text-center text-white">🗓️ Mes Actual</h5>
             </div>
             <div class="card-body">
-                <div class="row text-center">
+                <div class="row text-center mb-3">
                     <div class="col-6 border-end border-secondary">
-                        <h6 class="text-secondary">AVO</h6>
+                        <h6 class="text-light">AVO</h6>
                         <h3 class="text-success">{{ "%.2f"|format(kilos_mes.avo) }} kg</h3>
                     </div>
                     <div class="col-6">
-                        <h6 class="text-secondary">METRO</h6>
+                        <h6 class="text-light">METRO</h6>
                         <h3 class="text-info">{{ "%.2f"|format(kilos_mes.metro) }} kg</h3>
                     </div>
+                </div>
+                <div class="text-center pt-3 border-top border-secondary">
+                    <h6 class="text-light">TOTAL</h6>
+                    <h2 class="text-white fw-bold">{{ "%.2f"|format(kilos_mes.avo + kilos_mes.metro) }} kg</h2>
                 </div>
             </div>
         </div>
