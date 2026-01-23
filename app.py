@@ -52,7 +52,7 @@ app.wsgi_app = ProxyFix(
 # ==============================================================================
 # Configuramos las cookies para que sean seguras (solo HTTPS, HttpOnly).
 app.config.update(
-    SESSION_COOKIE_SECURE=True,   # Solo enviar cookies sobre HTTPS
+    SESSION_COOKIE_SECURE=False,  # Permitir cookies en HTTP (para acceso por IP local)
     SESSION_COOKIE_HTTPONLY=True, # No accesible via JavaScript
     SESSION_COOKIE_SAMESITE="Lax" # Protección contra CSRF
 )
