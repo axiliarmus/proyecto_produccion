@@ -898,46 +898,49 @@ def soporte_dashboard():
 @app.route('/soporte/piezas/duplicadas', methods=['GET', 'POST'])
 @login_required('soporte')
 def soporte_piezas_duplicadas():
-    # Pipeline para encontrar duplicados (case-insensitive)
-    # Convertimos a string primero por si hay códigos numéricos
-    pipeline = [
-        # 1. Asegurar que tenemos un código válido para procesar
-        {
-            "$addFields": {
-                "codigo_str": {"$toString": {"$ifNull": ["$codigo", ""]}}
-            }
-        },
-        # 2. Convertir a minúsculas
-        {
-            "$project": {
-                "codigo_lower": {"$toLower": "$codigo_str"},
-                "doc": "$$ROOT"
-            }
-        },
-        # 3. Filtrar códigos vacíos
-        {
-            "$match": {
-                "codigo_lower": {"$ne": ""}
-            }
-        },
-        # 4. Agrupar
-        {
-            "$group": {
-                "_id": "$codigo_lower",
-                "count": {"$sum": 1},
-                "docs": {"$push": "$doc"}
-            }
-        },
-        {
-            "$match": {
-                "count": {"$gt": 1}
-            }
-        },
-        {"$sort": {"count": -1}}
-    ]
+    # Enfoque simplificado sin agregación compleja para evitar errores de versión
+    # 1. Traer todas las piezas (solo ID y código)
+    todas = list(db.piezas.find({}, {"codigo": 1}))
+    
+    # 2. Procesar en Python
+    conteo = {}
+    for p in todas:
+        # Manejo robusto de nulos/tipos
+        raw = p.get("codigo")
+        if raw is None:
+            continue
+        c_str = str(raw).strip().lower()
+        if not c_str:
+            continue
+            
+        if c_str not in conteo:
+            conteo[c_str] = []
+        conteo[c_str].append(p["_id"])
+        
+    # 3. Filtrar solo los que tienen más de 1
+    codigos_duplicados = [c for c, ids in conteo.items() if len(ids) > 1]
+    
+    # 4. Si hay duplicados, traer la info completa
+    resultado = []
+    if codigos_duplicados:
+        # Para cada código duplicado, buscamos sus documentos completos
+        for cod in codigos_duplicados:
+            # Buscamos documentos cuyo código (string lower) coincida
+            # Esto requiere traer documentos y filtrar, o hacer query con regex
+            # Para ser eficientes y exactos con lo que encontró Python:
+            ids_duplicados = conteo[cod]
+            docs = list(db.piezas.find({"_id": {"$in": ids_duplicados}}))
+            
+            resultado.append({
+                "_id": cod,
+                "count": len(docs),
+                "docs": docs
+            })
+            
+    # Ordenar por cantidad de duplicados
+    resultado.sort(key=lambda x: x["count"], reverse=True)
 
-    duplicados = list(db.piezas.aggregate(pipeline))
-    return render_template('soporte_piezas_duplicadas.html', duplicados=duplicados)
+    return render_template('soporte_piezas_duplicadas.html', duplicados=resultado)
 
 @app.route('/soporte/piezas/duplicadas/eliminar/<id_pieza>', methods=['POST'])
 @login_required('soporte')
