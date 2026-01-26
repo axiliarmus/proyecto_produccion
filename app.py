@@ -898,53 +898,50 @@ def soporte_dashboard():
 @app.route('/soporte/piezas/duplicadas', methods=['GET', 'POST'])
 @login_required('soporte')
 def soporte_piezas_duplicadas():
-    # Optimización para GRAN VOLUMEN de datos
-    # En lugar de traer todo a memoria (que causa el 500 por timeout/memoria),
-    # usamos agregación nativa de MongoDB pero simplificada al máximo.
+    # Optimización EXTREMA para evitar timeouts
+    # Solo buscamos los primeros 20 códigos duplicados sin traer detalles pesados
     
-    # 1. Pipeline para detectar códigos duplicados EXACTOS (es lo más rápido)
     pipeline = [
-        # Filtrar nulos para no procesar basura
         {"$match": {"codigo": {"$ne": None}}},
-        # Agrupar por código exacto
         {"$group": {
             "_id": "$codigo", 
-            "count": {"$sum": 1},
-            "ids": {"$push": "$_id"}
+            "count": {"$sum": 1}
         }},
-        # Filtrar solo duplicados
         {"$match": {"count": {"$gt": 1}}},
-        # Limitar resultados para no saturar la vista (top 50 casos más graves)
         {"$sort": {"count": -1}},
-        {"$limit": 50}
+        {"$limit": 20}  # Límite estricto para que la query sea instantánea
     ]
     
-    # Ejecutamos agregación (muy rápida en servidor DB)
-    raw_duplicados = list(db.piezas.aggregate(pipeline, allowDiskUse=True))
+    # Solo traemos los códigos duplicados (sin los IDs todavía)
+    try:
+        raw_duplicados = list(db.piezas.aggregate(pipeline, allowDiskUse=True))
+    except Exception as e:
+        flash(f"Error al procesar duplicados: {str(e)}", "danger")
+        return render_template('soporte_piezas_duplicadas.html', duplicados=[])
     
     resultado = []
     
     if raw_duplicados:
-        # Extraemos todos los IDs de los documentos duplicados encontrados
-        all_ids = []
-        for d in raw_duplicados:
-            all_ids.extend(d["ids"])
-            
-        # Traemos los documentos completos en UNA sola consulta
-        docs_map = {doc["_id"]: doc for doc in db.piezas.find({"_id": {"$in": all_ids}})}
+        # Ahora, para esos 20 códigos, buscamos sus detalles en una segunda consulta
+        codigos_problematicos = [d["_id"] for d in raw_duplicados]
         
-        # Reconstruimos la estructura para la plantilla
+        # Traemos todas las piezas que coincidan con esos códigos
+        detalles = list(db.piezas.find({"codigo": {"$in": codigos_problematicos}}))
+        
+        # Agrupamos en memoria (Python) que es rápido para solo 20 grupos
+        grupos = {c: [] for c in codigos_problematicos}
+        for pieza in detalles:
+            c = pieza.get("codigo")
+            if c in grupos:
+                grupos[c].append(pieza)
+                
+        # Formateamos para la vista
         for d in raw_duplicados:
-            codigo = d["_id"]
-            ids = d["ids"]
-            
-            # Recuperar documentos del mapa en memoria
-            docs_completos = [docs_map.get(uid) for uid in ids if uid in docs_map]
-            
+            cod = d["_id"]
             resultado.append({
-                "_id": str(codigo), # Convertir a string para visualización
+                "_id": str(cod),
                 "count": d["count"],
-                "docs": docs_completos
+                "docs": grupos.get(cod, [])
             })
 
     return render_template('soporte_piezas_duplicadas.html', duplicados=resultado)
