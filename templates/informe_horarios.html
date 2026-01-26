@@ -7,6 +7,7 @@
 <div class="card bg-dark border-light shadow-lg mx-auto" style="max-width: 900px;">
   <div class="card-body">
     <form method="POST" action="{{ url_for('informe_horarios') }}" class="row g-3 align-items-end mb-4">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <div class="col-md-8">
         <label class="form-label text-light">Seleccionar Operador:</label>
         <select name="operador" class="form-select bg-secondary text-light">
@@ -25,6 +26,7 @@
 
     {% if jornadas %}
     <form method="POST" action="{{ url_for('exportar_horarios_excel') }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="operador" value="{{ operador_sel or 'todos' }}">
       <div class="text-end mb-3">
         <button type="submit" class="btn btn-success">📤 Exportar a Excel</button>

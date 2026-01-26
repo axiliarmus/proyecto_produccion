@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block title %}Gestión Masiva de Piezas{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>🗑️ Gestión Masiva de Piezas</h2>
+    <a href="{{ url_for('soporte_dashboard') }}" class="btn btn-secondary">← Volver al Panel</a>
+</div>
+
+<div class="card bg-dark border-light shadow mb-4">
+    <div class="card-body">
+        <form method="POST" class="row g-3">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="col-md-9">
+                <input type="text" name="search" class="form-control form-control-lg" 
+                       placeholder="Buscar por código, cliente o marco..." 
+                       value="{{ search }}">
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-accent w-100 btn-lg">🔍 Buscar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form method="POST" action="{{ url_for('soporte_eliminar_masivo') }}" id="deleteForm">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    
+    {% if piezas %}
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="text-light">
+            <span id="selectedCount">0</span> piezas seleccionadas
+        </div>
+        <button type="submit" class="btn btn-danger" id="btnDelete" disabled onclick="return confirm('¿Estás SEGURO de eliminar las piezas seleccionadas? Esta acción NO se puede deshacer.')">
+            🗑️ Eliminar Seleccionadas
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">
+                        <input type="checkbox" class="form-check-input" id="selectAll">
+                    </th>
+                    <th>Código</th>
+                    <th>Cliente</th>
+                    <th>Marco</th>
+                    <th>Tramo</th>
+                    <th>Tipo</th>
+                    <th>Peso</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in piezas %}
+                <tr>
+                    <td>
+                        <input type="checkbox" name="ids[]" value="{{ p._id }}" class="form-check-input item-check">
+                    </td>
+                    <td class="fw-bold">{{ p.codigo }}</td>
+                    <td>{{ p.empresa }}</td>
+                    <td>{{ p.marco }}</td>
+                    <td>{{ p.tramo }}</td>
+                    <td>
+                        {% if p.tipo_precio == 'avo' %}
+                        <span class="badge bg-success">Avo</span>
+                        {% else %}
+                        <span class="badge bg-info text-dark">Metro</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ p.kilo_pieza }} kg</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-secondary text-center">
+        No se encontraron piezas. Intenta realizar una búsqueda.
+    </div>
+    {% endif %}
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.item-check');
+    const btnDelete = document.getElementById('btnDelete');
+    const selectedCountSpan = document.getElementById('selectedCount');
+
+    function updateState() {
+        const checkedCount = document.querySelectorAll('.item-check:checked').length;
+        selectedCountSpan.textContent = checkedCount;
+        btnDelete.disabled = checkedCount === 0;
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(cb => cb.checked = this.checked);
+            updateState();
+        });
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateState);
+    });
+});
+</script>
+
+{% endblock %}

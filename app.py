@@ -956,6 +956,50 @@ def soporte_eliminar_duplicado(id_pieza):
         flash(f"Error al eliminar: {str(e)}", "danger")
     return redirect(url_for('soporte_piezas_duplicadas'))
 
+@app.route('/soporte/piezas/masivas', methods=['GET', 'POST'])
+@login_required('soporte')
+def soporte_piezas_masivas():
+    filtro = {}
+    search_query = ""
+    limit = 100
+    
+    if request.method == 'POST':
+        search_query = (request.form.get('search') or "").strip()
+        if search_query:
+            # Buscar por código, cliente o marco
+            filtro["$or"] = [
+                {"codigo": {"$regex": search_query, "$options": "i"}},
+                {"empresa": {"$regex": search_query, "$options": "i"}},
+                {"marco": {"$regex": search_query, "$options": "i"}}
+            ]
+            # Si busca algo específico, aumentamos el límite
+            limit = 500
+            
+    # Traemos las piezas (limitado para no colapsar)
+    piezas = list(db.piezas.find(filtro).limit(limit).sort("_id", -1))
+    
+    return render_template('soporte_piezas_masivas.html', piezas=piezas, search=search_query)
+
+@app.route('/soporte/piezas/masivas/eliminar', methods=['POST'])
+@login_required('soporte')
+def soporte_eliminar_masivo():
+    ids_to_delete = request.form.getlist('ids[]')
+    
+    if not ids_to_delete:
+        flash("No seleccionaste ninguna pieza para eliminar.", "warning")
+        return redirect(url_for('soporte_piezas_masivas'))
+        
+    try:
+        # Convertir a ObjectId
+        object_ids = [ObjectId(uid) for uid in ids_to_delete]
+        result = db.piezas.delete_many({"_id": {"$in": object_ids}})
+        
+        flash(f"✅ Se eliminaron {result.deleted_count} piezas correctamente.", "success")
+    except Exception as e:
+        flash(f"Error al eliminar piezas: {str(e)}", "danger")
+        
+    return redirect(url_for('soporte_piezas_masivas'))
+
 @app.route('/soporte/produccion', methods=['GET', 'POST'])
 @login_required('soporte')
 def soporte_produccion_list():
@@ -3403,6 +3447,32 @@ def informe_resumen_produccion():
     # 2. Kilos Mes Actual
     kilos_mes = calcular_kilos({"fecha": {"$gte": start_month}})
     
+    # --- NUEVO: RESUMEN GLOBAL (Total Programado / Armado / Rematado) ---
+    # Calcular Total Programado (Suma de kilo_pieza de TODAS las piezas en la base de datos)
+    pipeline_total = [
+        {"$group": {"_id": None, "total": {"$sum": "$kilo_pieza"}}}
+    ]
+    res_total = list(db.piezas.aggregate(pipeline_total))
+    total_programado = res_total[0]["total"] if res_total else 0.0
+
+    # Calcular Kilos Armados (Histórico completo)
+    # Sumamos kilo_pieza donde modo = "armador"
+    pipeline_armados = [
+        {"$match": {"modo": "armador"}},
+        {"$group": {"_id": None, "total": {"$sum": "$kilo_pieza"}}}
+    ]
+    res_armados = list(db.produccion.aggregate(pipeline_armados))
+    kilos_armados = res_armados[0]["total"] if res_armados else 0.0
+
+    # Calcular Kilos Rematados (Histórico completo)
+    # Sumamos kilo_pieza donde modo = "rematador"
+    pipeline_rematados = [
+        {"$match": {"modo": "rematador"}},
+        {"$group": {"_id": None, "total": {"$sum": "$kilo_pieza"}}}
+    ]
+    res_rematados = list(db.produccion.aggregate(pipeline_rematados))
+    kilos_rematados = res_rematados[0]["total"] if res_rematados else 0.0
+    
     # 3. Histórico 6 Meses (Activa + Histórica)
     pipeline_hist = [
         {"$match": {"fecha": {"$gte": start_6m}}},
@@ -3473,7 +3543,10 @@ def informe_resumen_produccion():
         kilos_mes=kilos_mes,
         chart_labels=chart_labels,
         chart_avo=chart_avo,
-        chart_metro=chart_metro
+        chart_metro=chart_metro,
+        total_programado=total_programado,
+        kilos_armados=kilos_armados,
+        kilos_rematados=kilos_rematados
     )
 
 

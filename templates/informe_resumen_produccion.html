@@ -11,7 +11,7 @@
 <div class="row g-4 mb-5">
     
     <!-- HOY -->
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card bg-dark border-light shadow h-100">
             <div class="card-header bg-transparent border-light">
                 <h5 class="card-title mb-0 text-center text-white">📅 Producción Hoy</h5>
@@ -36,7 +36,7 @@
     </div>
 
     <!-- MES ACTUAL -->
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card bg-dark border-light shadow h-100">
             <div class="card-header bg-transparent border-light">
                 <h5 class="card-title mb-0 text-center text-white">🗓️ Mes Actual</h5>
@@ -55,6 +55,31 @@
                 <div class="text-center pt-3 border-top border-secondary">
                     <h6 class="text-light">TOTAL</h6>
                     <h2 class="text-white fw-bold">{{ "%.2f"|format(kilos_mes.avo + kilos_mes.metro) }} kg</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RESUMEN GLOBAL -->
+    <div class="col-md-4">
+        <div class="card bg-dark border-light shadow h-100">
+            <div class="card-header bg-transparent border-light">
+                <h5 class="card-title mb-0 text-center text-white">🌍 Resumen Global</h5>
+            </div>
+            <div class="card-body d-flex flex-column justify-content-center">
+                <div class="row text-center">
+                    <div class="col-12 mb-3">
+                        <h6 class="text-secondary">TOTAL PROGRAMADO</h6>
+                        <h3 class="text-white fw-bold">{{ "%.2f"|format(total_programado) }} kg</h3>
+                    </div>
+                    <div class="col-6 border-end border-secondary">
+                        <h6 class="text-warning">ARMADO</h6>
+                        <h4 class="text-light">{{ "%.2f"|format(kilos_armados) }} kg</h4>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-success">REMATADO</h6>
+                        <h4 class="text-light">{{ "%.2f"|format(kilos_rematados) }} kg</h4>
+                    </div>
                 </div>
             </div>
         </div>
