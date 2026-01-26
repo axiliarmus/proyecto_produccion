@@ -9,6 +9,7 @@
     
     <!-- Filtros -->
     <form method="POST" action="{{ url_for('informe_operadores') }}" class="row g-3 align-items-end mb-4">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <div class="col-md-4">
         <label class="form-label text-light">Operador:</label>
         <select name="operador" class="form-select bg-secondary text-light">
@@ -41,6 +42,7 @@
     {% if datos_tabla %}
     <!-- Exportar -->
     <form method="POST" action="{{ url_for('exportar_operadores_excel') }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="operador" value="{{ operador_sel or 'todos' }}">
       <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
       <input type="hidden" name="fecha_fin" value="{{ fecha_fin or '' }}">

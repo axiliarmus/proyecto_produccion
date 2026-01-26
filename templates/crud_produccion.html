@@ -12,6 +12,7 @@
 <div class="card bg-dark border-light shadow mb-4">
   <div class="card-body">
     <form method="post" class="row g-3">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <div class="col-md-3">
         <label class="form-label text-light">Operador</label>
         <select name="operador" class="form-select">
@@ -75,6 +76,7 @@
         <td class="text-end">
           <a href="{{ url_for('soporte_produccion_editar_form', id=r._id) }}" class="btn btn-sm btn-warning">Editar</a>
           <form action="{{ url_for('soporte_produccion_delete', id=r._id) }}" method="post" class="d-inline">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
             <button class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar este registro?')">Eliminar</button>
           </form>
         </td>
