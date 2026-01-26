@@ -899,11 +899,18 @@ def soporte_dashboard():
 @login_required('soporte')
 def soporte_piezas_duplicadas():
     # Pipeline para encontrar duplicados (case-insensitive)
+    # Convertimos a string primero por si hay códigos numéricos
     pipeline = [
         {
             "$project": {
-                "codigo_lower": {"$toLower": "$codigo"},
+                "codigo_str": {"$toString": "$codigo"},
                 "doc": "$$ROOT"
+            }
+        },
+        {
+            "$project": {
+                "codigo_lower": {"$toLower": "$codigo_str"},
+                "doc": 1
             }
         },
         {
@@ -3346,8 +3353,12 @@ def informe_resumen_produccion():
     
     # Helper para sumar kilos por tipo
     def calcular_kilos(query):
+        # SOLO sumar kilos de piezas 'rematador' (excluye 'armador' y otros)
+        query_final = query.copy()
+        query_final["modo"] = "rematador"
+
         pipeline = [
-            {"$match": query},
+            {"$match": query_final},
             {"$group": {
                 "_id": "$tipo_precio", # "metro" o "avo"
                 "total_kilos": {"$sum": "$kilo_pieza"}
