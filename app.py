@@ -63,11 +63,11 @@ def add_security_headers(response):
     # Se permiten scripts inline y desde CDN conocidos.
     csp = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net blob: data:; "
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-        "img-src 'self' data: blob:; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net blob: data: https://translate.googleapis.com; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com; "
+        "img-src 'self' data: blob: https://www.gstatic.com; "
         "font-src 'self' data: https://cdn.jsdelivr.net; "
-        "connect-src 'self' https://cdn.jsdelivr.net;"
+        "connect-src 'self' https://cdn.jsdelivr.net https://translate.googleapis.com;"
     )
     response.headers['Content-Security-Policy'] = csp
     response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -901,18 +901,26 @@ def soporte_piezas_duplicadas():
     # Pipeline para encontrar duplicados (case-insensitive)
     # Convertimos a string primero por si hay códigos numéricos
     pipeline = [
+        # 1. Asegurar que tenemos un código válido para procesar
         {
-            "$project": {
-                "codigo_str": {"$toString": "$codigo"},
-                "doc": "$$ROOT"
+            "$addFields": {
+                "codigo_str": {"$toString": {"$ifNull": ["$codigo", ""]}}
             }
         },
+        # 2. Convertir a minúsculas
         {
             "$project": {
                 "codigo_lower": {"$toLower": "$codigo_str"},
-                "doc": 1
+                "doc": "$$ROOT"
             }
         },
+        # 3. Filtrar códigos vacíos
+        {
+            "$match": {
+                "codigo_lower": {"$ne": ""}
+            }
+        },
+        # 4. Agrupar
         {
             "$group": {
                 "_id": "$codigo_lower",
