@@ -895,6 +895,45 @@ def admin_dashboard():
 def soporte_dashboard():
     return render_template('soporte_dashboard.html')
 
+@app.route('/soporte/piezas/duplicadas', methods=['GET', 'POST'])
+@login_required('soporte')
+def soporte_piezas_duplicadas():
+    # Pipeline para encontrar duplicados (case-insensitive)
+    pipeline = [
+        {
+            "$project": {
+                "codigo_lower": {"$toLower": "$codigo"},
+                "doc": "$$ROOT"
+            }
+        },
+        {
+            "$group": {
+                "_id": "$codigo_lower",
+                "count": {"$sum": 1},
+                "docs": {"$push": "$doc"}
+            }
+        },
+        {
+            "$match": {
+                "count": {"$gt": 1}
+            }
+        },
+        {"$sort": {"count": -1}}
+    ]
+
+    duplicados = list(db.piezas.aggregate(pipeline))
+    return render_template('soporte_piezas_duplicadas.html', duplicados=duplicados)
+
+@app.route('/soporte/piezas/duplicadas/eliminar/<id_pieza>', methods=['POST'])
+@login_required('soporte')
+def soporte_eliminar_duplicado(id_pieza):
+    try:
+        db.piezas.delete_one({"_id": ObjectId(id_pieza)})
+        flash("Pieza duplicada eliminada correctamente.", "success")
+    except Exception as e:
+        flash(f"Error al eliminar: {str(e)}", "danger")
+    return redirect(url_for('soporte_piezas_duplicadas'))
+
 @app.route('/soporte/produccion', methods=['GET', 'POST'])
 @login_required('soporte')
 def soporte_produccion_list():
@@ -911,7 +950,8 @@ def soporte_produccion_list():
         fecha_fin = request.form.get('fecha_fin')
 
         if codigo:
-            filtro['codigo_pieza'] = str(codigo)
+            # Normalizar filtro: convertir a string, quitar espacios y regex insensible a mayúsculas
+            filtro['codigo_pieza'] = {"$regex": f"^{str(codigo).strip()}$", "$options": "i"}
         
         if operador_sel and operador_sel != 'todos':
             filtro['usuario'] = operador_sel
@@ -3029,6 +3069,24 @@ def informe_estado_piezas():
     codigos_armado = set(db.produccion.distinct("codigo_pieza", {"modo": "armador"}))
     codigos_remate = set(db.produccion.distinct("codigo_pieza", {"modo": "rematador"}))
 
+    # --- NUEVO: Calcular estadísticas globales (antes de filtro estado) ---
+    stats = {
+        "total": len(piezas),
+        "sin_produccion": 0,
+        "armado": 0,
+        "rematado": 0
+    }
+    
+    # Calcular stats sobre las piezas filtradas por cliente/marco/tramo/código (pero NO por estado)
+    for p in piezas:
+        cstr = str(p.get("codigo"))
+        if cstr in codigos_remate:
+            stats["rematado"] += 1
+        elif cstr in codigos_armado:
+            stats["armado"] += 1
+        else:
+            stats["sin_produccion"] += 1
+            
     listado = []
     for p in piezas:
         cstr = str(p.get("codigo"))
@@ -3039,7 +3097,7 @@ def informe_estado_piezas():
         else:
             estado = "Sin producción"
 
-        # Aplicar filtro de estado si existe
+        # Aplicar filtro de estado si existe (solo afecta al listado, no al gráfico)
         if estado_filter and estado_filter != "todos" and estado != estado_filter:
             continue
 
@@ -3060,6 +3118,7 @@ def informe_estado_piezas():
     return render_template(
         "informe_estado_piezas.html",
         piezas=listado,
+        stats=stats,  # Pasar stats al template
         empresas=empresas,
         marcos=marcos,
         tramos=tramos,

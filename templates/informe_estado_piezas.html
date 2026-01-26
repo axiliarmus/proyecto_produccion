@@ -9,6 +9,47 @@
   
   </div>
 
+<!-- ================= GRÁFICO DE ESTADO ================= -->
+<div class="row mb-4">
+    <div class="col-md-6 mx-auto">
+        <div class="card bg-dark border-light shadow">
+            <div class="card-header border-light text-center">
+                <h5 class="card-title text-light mb-0">Resumen de Estado</h5>
+            </div>
+            <div class="card-body">
+                <div style="height: 300px;">
+                    <canvas id="estadoChart"></canvas>
+                </div>
+                
+                <!-- Resumen de Totales -->
+                <div class="row text-center mt-4 border-top border-secondary pt-3">
+                    <div class="col-4 border-end border-secondary">
+                        <div class="mb-1">
+                            <span class="d-inline-block rounded-circle me-1" style="width: 10px; height: 10px; background-color: #6c757d;"></span>
+                            <small class="text-secondary">Sin Prod.</small>
+                        </div>
+                        <h4 class="text-white fw-bold mb-0">{{ stats.sin_produccion }}</h4>
+                    </div>
+                    <div class="col-4 border-end border-secondary">
+                        <div class="mb-1">
+                            <span class="d-inline-block rounded-circle me-1" style="width: 10px; height: 10px; background-color: #ffc107;"></span>
+                            <small class="text-warning">Armado</small>
+                        </div>
+                        <h4 class="text-white fw-bold mb-0">{{ stats.armado }}</h4>
+                    </div>
+                    <div class="col-4">
+                        <div class="mb-1">
+                            <span class="d-inline-block rounded-circle me-1" style="width: 10px; height: 10px; background-color: #198754;"></span>
+                            <small class="text-success">Rematado</small>
+                        </div>
+                        <h4 class="text-white fw-bold mb-0">{{ stats.rematado }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ================= FILTROS ================= -->
 <div class="card bg-dark border-light shadow mb-4">
   <div class="card-body">
@@ -156,6 +197,49 @@ selMarco && selMarco.addEventListener('change', async function() {
     setOptions(selTramo, []);
   }
 });
+
+// Gráfico de Estado
+document.addEventListener("DOMContentLoaded", function() {
+    const canvas = document.getElementById('estadoChart');
+    if (canvas) {
+        const ctxEstado = canvas.getContext('2d');
+        new Chart(ctxEstado, {
+            type: 'doughnut',
+            data: {
+                labels: ['Sin Producción', 'Armado', 'Rematado'],
+                datasets: [{
+                    data: [
+                        {{ stats.sin_produccion }}, 
+                        {{ stats.armado }}, 
+                        {{ stats.rematado }}
+                    ],
+                    backgroundColor: [
+                        '#6c757d', // secondary (gris)
+                        '#ffc107', // warning (amarillo)
+                        '#198754'  // success (verde)
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'Total Piezas: {{ stats.total }}',
+                        color: '#f8f9fa',
+                        font: { size: 16 }
+                    }
+                }
+            }
+        });
+    }
+});
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}
