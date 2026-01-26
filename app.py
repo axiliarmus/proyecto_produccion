@@ -961,10 +961,13 @@ def soporte_eliminar_duplicado(id_pieza):
 def soporte_piezas_masivas():
     filtro = {}
     search_query = ""
+    estado_filter = "todos"
     limit = 100
     
     if request.method == 'POST':
         search_query = (request.form.get('search') or "").strip()
+        estado_filter = request.form.get('estado') or "todos"
+        
         if search_query:
             # Buscar por código, cliente o marco
             filtro["$or"] = [
@@ -978,7 +981,34 @@ def soporte_piezas_masivas():
     # Traemos las piezas (limitado para no colapsar)
     piezas = list(db.piezas.find(filtro).limit(limit).sort("_id", -1))
     
-    return render_template('soporte_piezas_masivas.html', piezas=piezas, search=search_query)
+    # Obtener estado de producción para cada pieza
+    # Optimización: traer todos los códigos de producción en una sola query
+    codigos_en_pantalla = [p.get("codigo") for p in piezas if p.get("codigo")]
+    
+    # Sets de búsqueda rápida
+    set_armado = set(db.produccion.distinct("codigo_pieza", {"codigo_pieza": {"$in": codigos_en_pantalla}, "modo": "armador"}))
+    set_remate = set(db.produccion.distinct("codigo_pieza", {"codigo_pieza": {"$in": codigos_en_pantalla}, "modo": "rematador"}))
+    
+    piezas_filtradas = []
+    
+    for p in piezas:
+        codigo = p.get("codigo")
+        estado = "Sin producción"
+        
+        if codigo in set_remate:
+            estado = "Rematado"
+        elif codigo in set_armado:
+            estado = "Armado"
+            
+        p["estado_prod"] = estado # Inyectar estado al objeto
+        
+        # Aplicar filtro de estado en memoria (ya que estado no está en db.piezas)
+        if estado_filter != "todos" and estado != estado_filter:
+            continue
+            
+        piezas_filtradas.append(p)
+    
+    return render_template('soporte_piezas_masivas.html', piezas=piezas_filtradas, search=search_query, estado_sel=estado_filter)
 
 @app.route('/soporte/piezas/masivas/eliminar', methods=['POST'])
 @login_required('soporte')

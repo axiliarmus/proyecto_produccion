@@ -11,10 +11,18 @@
     <div class="card-body">
         <form method="POST" class="row g-3">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-            <div class="col-md-9">
+            <div class="col-md-6">
                 <input type="text" name="search" class="form-control form-control-lg" 
                        placeholder="Buscar por código, cliente o marco..." 
                        value="{{ search }}">
+            </div>
+            <div class="col-md-3">
+                <select name="estado" class="form-select form-select-lg">
+                    <option value="todos" {% if estado_sel == 'todos' %}selected{% endif %}>Todos los estados</option>
+                    <option value="Sin producción" {% if estado_sel == 'Sin producción' %}selected{% endif %}>Sin producción</option>
+                    <option value="Armado" {% if estado_sel == 'Armado' %}selected{% endif %}>Armado</option>
+                    <option value="Rematado" {% if estado_sel == 'Rematado' %}selected{% endif %}>Rematado</option>
+                </select>
             </div>
             <div class="col-md-3">
                 <button class="btn btn-accent w-100 btn-lg">🔍 Buscar</button>
@@ -47,6 +55,7 @@
                     <th>Cliente</th>
                     <th>Marco</th>
                     <th>Tramo</th>
+                    <th>Estado</th>
                     <th>Tipo</th>
                     <th>Peso</th>
                 </tr>
@@ -61,6 +70,15 @@
                     <td>{{ p.empresa }}</td>
                     <td>{{ p.marco }}</td>
                     <td>{{ p.tramo }}</td>
+                    <td>
+                        {% if p.estado_prod == 'Rematado' %}
+                            <span class="badge bg-success">Rematado</span>
+                        {% elif p.estado_prod == 'Armado' %}
+                            <span class="badge bg-warning text-dark">Armado</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Sin Prod.</span>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if p.tipo_precio == 'avo' %}
                         <span class="badge bg-success">Avo</span>
