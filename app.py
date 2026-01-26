@@ -960,55 +960,79 @@ def soporte_eliminar_duplicado(id_pieza):
 @login_required('soporte')
 def soporte_piezas_masivas():
     filtro = {}
-    search_query = ""
-    estado_filter = "todos"
-    limit = 100
+    search_query = request.args.get('search', "")
+    estado_filter = request.args.get('estado', "todos")
     
+    # Manejo de POST -> Redirigir a GET para mantener la URL limpia (sin paginación)
     if request.method == 'POST':
         search_query = (request.form.get('search') or "").strip()
         estado_filter = request.form.get('estado') or "todos"
+        return redirect(url_for('soporte_piezas_masivas', search=search_query, estado=estado_filter))
+
+    # Construir filtro de búsqueda
+    if search_query:
+        filtro["$or"] = [
+            {"codigo": {"$regex": search_query, "$options": "i"}},
+            {"empresa": {"$regex": search_query, "$options": "i"}},
+            {"marco": {"$regex": search_query, "$options": "i"}}
+        ]
+
+    # NOTA: El filtro de 'estado' requiere procesar datos de producción.
+    if estado_filter != "todos":
+        modo_buscado = "rematador" if estado_filter == "Rematado" else "armador" if estado_filter == "Armado" else None
         
-        if search_query:
-            # Buscar por código, cliente o marco
-            filtro["$or"] = [
-                {"codigo": {"$regex": search_query, "$options": "i"}},
-                {"empresa": {"$regex": search_query, "$options": "i"}},
-                {"marco": {"$regex": search_query, "$options": "i"}}
-            ]
-            # Si busca algo específico, aumentamos el límite
-            limit = 500
+        if modo_buscado:
+            codigos_con_estado = db.produccion.distinct("codigo_pieza", {"modo": modo_buscado})
             
-    # Traemos las piezas (limitado para no colapsar)
-    piezas = list(db.piezas.find(filtro).limit(limit).sort("_id", -1))
-    
-    # Obtener estado de producción para cada pieza
-    # Optimización: traer todos los códigos de producción en una sola query
-    codigos_en_pantalla = [p.get("codigo") for p in piezas if p.get("codigo")]
-    
-    # Sets de búsqueda rápida
-    set_armado = set(db.produccion.distinct("codigo_pieza", {"codigo_pieza": {"$in": codigos_en_pantalla}, "modo": "armador"}))
-    set_remate = set(db.produccion.distinct("codigo_pieza", {"codigo_pieza": {"$in": codigos_en_pantalla}, "modo": "rematador"}))
-    
-    piezas_filtradas = []
-    
-    for p in piezas:
-        codigo = p.get("codigo")
-        estado = "Sin producción"
+            if estado_filter == "Rematado":
+                filtro["codigo"] = {"$in": codigos_con_estado}
+            elif estado_filter == "Armado":
+                filtro["codigo"] = {"$in": codigos_con_estado}
         
-        if codigo in set_remate:
-            estado = "Rematado"
-        elif codigo in set_armado:
-            estado = "Armado"
-            
-        p["estado_prod"] = estado # Inyectar estado al objeto
-        
-        # Aplicar filtro de estado en memoria (ya que estado no está en db.piezas)
-        if estado_filter != "todos" and estado != estado_filter:
-            continue
-            
-        piezas_filtradas.append(p)
+        elif estado_filter == "Sin producción":
+            # "Sin producción" es costoso de filtrar en DB directamente.
+            # Lo manejaremos en memoria tras obtener los resultados.
+            pass
+
+    # SIN PAGINACIÓN: Traer todo (con un límite de seguridad alto para evitar crash del navegador)
+    limit_safety = 5000 
+    piezas = list(db.piezas.find(filtro).limit(limit_safety).sort("_id", -1))
     
-    return render_template('soporte_piezas_masivas.html', piezas=piezas_filtradas, search=search_query, estado_sel=estado_filter)
+    # Optimización: Cargar estados en memoria
+    if piezas:
+        codigos_en_pantalla = [p.get("codigo") for p in piezas if p.get("codigo")]
+        
+        # Traer TODOS los estados relevantes en una sola consulta
+        set_armado = set(db.produccion.distinct("codigo_pieza", {"codigo_pieza": {"$in": codigos_en_pantalla}, "modo": "armador"}))
+        set_remate = set(db.produccion.distinct("codigo_pieza", {"codigo_pieza": {"$in": codigos_en_pantalla}, "modo": "rematador"}))
+        
+        piezas_finales = []
+        for p in piezas:
+            codigo = p.get("codigo")
+            estado = "Sin producción"
+            if codigo in set_remate:
+                estado = "Rematado"
+            elif codigo in set_armado:
+                estado = "Armado"
+            p["estado_prod"] = estado
+            
+            # Filtro visual para "Sin producción" o refinamiento de otros
+            if estado_filter == "Sin producción" and estado != "Sin producción":
+                continue
+            if estado_filter == "Armado" and estado != "Armado":
+                continue
+            if estado_filter == "Rematado" and estado != "Rematado":
+                continue
+                
+            piezas_finales.append(p)
+    else:
+        piezas_finales = []
+
+    return render_template('soporte_piezas_masivas.html', 
+                           piezas=piezas_finales, 
+                           search=search_query, 
+                           estado_sel=estado_filter,
+                           total_registros=len(piezas_finales))
 
 @app.route('/soporte/piezas/masivas/eliminar', methods=['POST'])
 @login_required('soporte')
@@ -2474,6 +2498,33 @@ def operador_salida():
 def operador_registrar():
     user_id = session.get("user_id")
     usuario = session.get("nombre")
+    role = session.get("role")
+
+    # ==============================================================================
+    # BLOQUEO DE 5 MINUTOS ENTRE REGISTROS PARA OPERADORES
+    # ==============================================================================
+    if role == "operador":
+        ultimo_registro = db.produccion.find_one(
+            {"user_id": user_id},
+            sort=[("fecha", -1)]
+        )
+        if ultimo_registro:
+            ultima_fecha = ultimo_registro.get("fecha")
+            if ultima_fecha:
+                # Asegurar timezone UTC para comparación
+                if ultima_fecha.tzinfo is None:
+                    ultima_fecha = ultima_fecha.replace(tzinfo=timezone.utc)
+                
+                ahora_utc = datetime.now(timezone.utc)
+                diferencia = ahora_utc - ultima_fecha
+                
+                # 5 minutos = 300 segundos
+                if diferencia.total_seconds() < 300:
+                    tiempo_restante = int(300 - diferencia.total_seconds())
+                    min_rest = tiempo_restante // 60
+                    seg_rest = tiempo_restante % 60
+                    flash(f"⏳ Debes esperar {min_rest}m {seg_rest}s para registrar otra pieza.", "warning")
+                    return redirect(url_for("operador_home"))
 
     modo = request.form["modo"]                  # armador / rematador
     box = request.form["box"]
@@ -3487,12 +3538,14 @@ def informe_resumen_produccion():
 
     # Calcular Kilos Armados (Histórico completo)
     # Sumamos kilo_pieza donde modo = "armador"
+    # IMPORTANTE: Dividir por 2 porque siempre lo hacen 2 personas
     pipeline_armados = [
         {"$match": {"modo": "armador"}},
         {"$group": {"_id": None, "total": {"$sum": "$kilo_pieza"}}}
     ]
     res_armados = list(db.produccion.aggregate(pipeline_armados))
-    kilos_armados = res_armados[0]["total"] if res_armados else 0.0
+    raw_armados = res_armados[0]["total"] if res_armados else 0.0
+    kilos_armados = raw_armados / 2.0
 
     # Calcular Kilos Rematados (Histórico completo)
     # Sumamos kilo_pieza donde modo = "rematador"
