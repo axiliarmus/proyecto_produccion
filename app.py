@@ -1062,22 +1062,34 @@ def soporte_eliminar_masivo():
 @login_required(['soporte', 'administrador'])
 def soporte_etiquetas():
     filtro = {}
-    search_query = request.args.get('search', "")
+    
+    # Obtener parámetros de filtros (GET o POST)
+    cliente_sel = request.args.get('cliente', "")
+    marco_sel = request.args.get('marco', "")
+    tramo_sel = request.args.get('tramo', "")
     estado_filter = request.args.get('estado', "todos")
     
-    # POST -> GET
+    # POST -> GET (Redirección para limpiar URL y evitar reenvíos)
     if request.method == 'POST':
-        search_query = (request.form.get('search') or "").strip()
+        cliente_sel = request.form.get('cliente') or ""
+        marco_sel = request.form.get('marco') or ""
+        tramo_sel = request.form.get('tramo') or ""
         estado_filter = request.form.get('estado') or "todos"
-        return redirect(url_for('soporte_etiquetas', search=search_query, estado=estado_filter))
+        return redirect(url_for('soporte_etiquetas', 
+                                cliente=cliente_sel, 
+                                marco=marco_sel, 
+                                tramo=tramo_sel, 
+                                estado=estado_filter))
 
-    # Construir filtro
-    if search_query:
-        filtro["$or"] = [
-            {"codigo": {"$regex": search_query, "$options": "i"}},
-            {"empresa": {"$regex": search_query, "$options": "i"}},
-            {"marco": {"$regex": search_query, "$options": "i"}}
-        ]
+    # Construir filtro de MongoDB
+    if cliente_sel and cliente_sel != "todos":
+        filtro["empresa"] = cliente_sel
+    
+    if marco_sel and marco_sel != "todos":
+        filtro["marco"] = marco_sel
+        
+    if tramo_sel and tramo_sel != "todos":
+        filtro["tramo"] = tramo_sel
 
     # Lógica de filtro por estado (idéntica a masivas)
     if estado_filter != "todos":
@@ -1085,6 +1097,15 @@ def soporte_etiquetas():
         if modo_buscado:
             codigos_con_estado = db.produccion.distinct("codigo_pieza", {"modo": modo_buscado})
             filtro["codigo"] = {"$in": codigos_con_estado}
+
+    # Obtener listas para los dropdowns
+    try:
+        clientes = sorted([x for x in db.piezas.distinct("empresa") if x], key=str)
+        marcos = sorted([x for x in db.piezas.distinct("marco") if x], key=str)
+        tramos = sorted([x for x in db.piezas.distinct("tramo") if x], key=str)
+    except Exception as e:
+        print(f"Error obteniendo filtros: {e}")
+        clientes, marcos, tramos = [], [], []
 
     # Cargar piezas (limitadas por seguridad)
     limit_safety = 5000
@@ -1119,7 +1140,12 @@ def soporte_etiquetas():
 
     return render_template('soporte_etiquetas.html', 
                            piezas=piezas_finales, 
-                           search=search_query, 
+                           clientes=clientes,
+                           marcos=marcos,
+                           tramos=tramos,
+                           cliente_sel=cliente_sel,
+                           marco_sel=marco_sel,
+                           tramo_sel=tramo_sel,
                            estado_sel=estado_filter)
 
 @app.route('/soporte/produccion', methods=['GET', 'POST'])

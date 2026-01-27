@@ -11,12 +11,35 @@
     <div class="card-body">
         <form method="POST" class="row g-3">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-            <div class="col-md-6">
-                <input type="text" name="search" class="form-control form-control-lg" 
-                       placeholder="Buscar por código, cliente o marco..." 
-                       value="{{ search }}">
+            <div class="col-md-4">
+                <label class="form-label text-light">Cliente</label>
+                <select name="cliente" class="form-select form-select-lg">
+                    <option value="todos">Todos los Clientes</option>
+                    {% for c in clientes %}
+                    <option value="{{ c }}" {% if cliente_sel == c|string %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
+                <label class="form-label text-light">Marco</label>
+                <select name="marco" class="form-select form-select-lg">
+                    <option value="todos">Todos los Marcos</option>
+                    {% for m in marcos %}
+                    <option value="{{ m }}" {% if marco_sel == m|string %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label text-light">Tramo</label>
+                <select name="tramo" class="form-select form-select-lg">
+                    <option value="todos">Todos los Tramos</option>
+                    {% for t in tramos %}
+                    <option value="{{ t }}" {% if tramo_sel == t|string %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label text-light">Estado</label>
                 <select name="estado" class="form-select form-select-lg">
                     <option value="todos" {% if estado_sel == 'todos' %}selected{% endif %}>Todos los estados</option>
                     <option value="Sin producción" {% if estado_sel == 'Sin producción' %}selected{% endif %}>Sin producción</option>
@@ -24,7 +47,7 @@
                     <option value="Rematado" {% if estado_sel == 'Rematado' %}selected{% endif %}>Rematado</option>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-6 d-flex align-items-end">
                 <button class="btn btn-accent w-100 btn-lg">🔍 Buscar</button>
             </div>
         </form>
