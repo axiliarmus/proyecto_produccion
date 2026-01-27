@@ -436,6 +436,7 @@ def usuarios_nuevo_post():
     precio_metro_remate = float(request.form.get('precio_metro_remate', 0))
     precio_avo_armado = float(request.form.get('precio_avo_armado', 0))
     precio_avo_remate = float(request.form.get('precio_avo_remate', 0))
+    sin_restriccion = True if request.form.get('sin_restriccion') else False
 
     password = generate_password_hash(request.form['password'])
 
@@ -451,6 +452,7 @@ def usuarios_nuevo_post():
         'precio_metro_remate': precio_metro_remate,
         'precio_avo_armado': precio_avo_armado,
         'precio_avo_remate': precio_avo_remate,
+        'sin_restriccion': sin_restriccion,
         'password': password
     })
 
@@ -479,6 +481,7 @@ def usuarios_editar_post(id):
     precio_metro_remate = float(request.form.get('precio_metro_remate', 0))
     precio_avo_armado = float(request.form.get('precio_avo_armado', 0))
     precio_avo_remate = float(request.form.get('precio_avo_remate', 0))
+    sin_restriccion = True if request.form.get('sin_restriccion') else False
 
     pwd = request.form.get('password', '').strip()
 
@@ -488,7 +491,8 @@ def usuarios_editar_post(id):
         'precio_metro_armado': precio_metro_armado,
         'precio_metro_remate': precio_metro_remate,
         'precio_avo_armado': precio_avo_armado,
-        'precio_avo_remate': precio_avo_remate
+        'precio_avo_remate': precio_avo_remate,
+        'sin_restriccion': sin_restriccion
     }
     if pwd:
         update['password'] = generate_password_hash(pwd)
@@ -1053,6 +1057,70 @@ def soporte_eliminar_masivo():
         flash(f"Error al eliminar piezas: {str(e)}", "danger")
         
     return redirect(url_for('soporte_piezas_masivas'))
+
+@app.route('/soporte/etiquetas', methods=['GET', 'POST'])
+@login_required(['soporte', 'administrador'])
+def soporte_etiquetas():
+    filtro = {}
+    search_query = request.args.get('search', "")
+    estado_filter = request.args.get('estado', "todos")
+    
+    # POST -> GET
+    if request.method == 'POST':
+        search_query = (request.form.get('search') or "").strip()
+        estado_filter = request.form.get('estado') or "todos"
+        return redirect(url_for('soporte_etiquetas', search=search_query, estado=estado_filter))
+
+    # Construir filtro
+    if search_query:
+        filtro["$or"] = [
+            {"codigo": {"$regex": search_query, "$options": "i"}},
+            {"empresa": {"$regex": search_query, "$options": "i"}},
+            {"marco": {"$regex": search_query, "$options": "i"}}
+        ]
+
+    # Lógica de filtro por estado (idéntica a masivas)
+    if estado_filter != "todos":
+        modo_buscado = "rematador" if estado_filter == "Rematado" else "armador" if estado_filter == "Armado" else None
+        if modo_buscado:
+            codigos_con_estado = db.produccion.distinct("codigo_pieza", {"modo": modo_buscado})
+            filtro["codigo"] = {"$in": codigos_con_estado}
+
+    # Cargar piezas (limitadas por seguridad)
+    limit_safety = 5000
+    piezas = list(db.piezas.find(filtro).limit(limit_safety).sort("_id", -1))
+    
+    # Enriquecer con estado
+    piezas_finales = []
+    if piezas:
+        codigos_en_pantalla = [p.get("codigo") for p in piezas if p.get("codigo")]
+        set_armado = set(db.produccion.distinct("codigo_pieza", {"codigo_pieza": {"$in": codigos_en_pantalla}, "modo": "armador"}))
+        set_remate = set(db.produccion.distinct("codigo_pieza", {"codigo_pieza": {"$in": codigos_en_pantalla}, "modo": "rematador"}))
+        
+        for p in piezas:
+            codigo = p.get("codigo")
+            estado = "Sin producción"
+            if codigo in set_remate:
+                estado = "Rematado"
+            elif codigo in set_armado:
+                estado = "Armado"
+            p["estado_prod"] = estado
+            
+            # Filtro visual "Sin producción"
+            if estado_filter == "Sin producción" and estado != "Sin producción":
+                continue
+            # Filtros estrictos para asegurar consistencia visual
+            if estado_filter == "Armado" and estado != "Armado":
+                continue
+            if estado_filter == "Rematado" and estado != "Rematado":
+                continue
+                
+            piezas_finales.append(p)
+
+    return render_template('soporte_etiquetas.html', 
+                           piezas=piezas_finales, 
+                           search=search_query, 
+                           estado_sel=estado_filter)
 
 @app.route('/soporte/produccion', methods=['GET', 'POST'])
 @login_required('soporte')
@@ -2504,27 +2572,32 @@ def operador_registrar():
     # BLOQUEO DE 5 MINUTOS ENTRE REGISTROS PARA OPERADORES
     # ==============================================================================
     if role == "operador":
-        ultimo_registro = db.produccion.find_one(
-            {"user_id": user_id},
-            sort=[("fecha", -1)]
-        )
-        if ultimo_registro:
-            ultima_fecha = ultimo_registro.get("fecha")
-            if ultima_fecha:
-                # Asegurar timezone UTC para comparación
-                if ultima_fecha.tzinfo is None:
-                    ultima_fecha = ultima_fecha.replace(tzinfo=timezone.utc)
-                
-                ahora_utc = datetime.now(timezone.utc)
-                diferencia = ahora_utc - ultima_fecha
-                
-                # 5 minutos = 300 segundos
-                if diferencia.total_seconds() < 300:
-                    tiempo_restante = int(300 - diferencia.total_seconds())
-                    min_rest = tiempo_restante // 60
-                    seg_rest = tiempo_restante % 60
-                    flash(f"⏳ Debes esperar {min_rest}m {seg_rest}s para registrar otra pieza.", "warning")
-                    return redirect(url_for("operador_home"))
+        # Verificar si el usuario tiene permiso 'sin_restriccion'
+        usuario_db = db.usuarios.find_one({"_id": ObjectId(user_id)})
+        sin_restriccion = usuario_db.get("sin_restriccion", False) if usuario_db else False
+        
+        if not sin_restriccion:
+            ultimo_registro = db.produccion.find_one(
+                {"user_id": user_id},
+                sort=[("fecha", -1)]
+            )
+            if ultimo_registro:
+                ultima_fecha = ultimo_registro.get("fecha")
+                if ultima_fecha:
+                    # Asegurar timezone UTC para comparación
+                    if ultima_fecha.tzinfo is None:
+                        ultima_fecha = ultima_fecha.replace(tzinfo=timezone.utc)
+                    
+                    ahora_utc = datetime.now(timezone.utc)
+                    diferencia = ahora_utc - ultima_fecha
+                    
+                    # 5 minutos = 300 segundos
+                    if diferencia.total_seconds() < 300:
+                        tiempo_restante = int(300 - diferencia.total_seconds())
+                        min_rest = tiempo_restante // 60
+                        seg_rest = tiempo_restante % 60
+                        flash(f"⏳ Debes esperar {min_rest}m {seg_rest}s para registrar otra pieza.", "warning")
+                        return redirect(url_for("operador_home"))
 
     modo = request.form["modo"]                  # armador / rematador
     box = request.form["box"]

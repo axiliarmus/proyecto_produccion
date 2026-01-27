@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% block title %}Generador de Etiquetas{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>🏷️ Generador de Etiquetas (Zebra)</h2>
+    <a href="{{ url_for('soporte_dashboard') }}" class="btn btn-secondary">← Volver al Panel</a>
+</div>
+
+<div class="card bg-dark border-light shadow mb-4">
+    <div class="card-body">
+        <form method="POST" class="row g-3">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="col-md-6">
+                <input type="text" name="search" class="form-control form-control-lg" 
+                       placeholder="Buscar por código, cliente o marco..." 
+                       value="{{ search }}">
+            </div>
+            <div class="col-md-3">
+                <select name="estado" class="form-select form-select-lg">
+                    <option value="todos" {% if estado_sel == 'todos' %}selected{% endif %}>Todos los estados</option>
+                    <option value="Sin producción" {% if estado_sel == 'Sin producción' %}selected{% endif %}>Sin producción</option>
+                    <option value="Armado" {% if estado_sel == 'Armado' %}selected{% endif %}>Armado</option>
+                    <option value="Rematado" {% if estado_sel == 'Rematado' %}selected{% endif %}>Rematado</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-accent w-100 btn-lg">🔍 Buscar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if piezas %}
+<div class="d-flex justify-content-end mb-3">
+    <button class="btn btn-info" onclick="imprimirSeleccionados()">🖨️ Imprimir Seleccionadas</button>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-dark table-hover align-middle">
+        <thead>
+            <tr>
+                <th style="width: 40px;">
+                    <input type="checkbox" class="form-check-input" id="selectAll">
+                </th>
+                <th>Código</th>
+                <th>Cliente</th>
+                <th>Marco</th>
+                <th>Tramo</th>
+                <th>Estado</th>
+                <th>Vista Previa</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in piezas %}
+            <tr>
+                <td>
+                    <input type="checkbox" class="form-check-input item-check" 
+                           data-codigo="{{ p.codigo }}" 
+                           data-cliente="{{ p.empresa }}" 
+                           data-marco="{{ p.marco }}"
+                           data-tramo="{{ p.tramo }}">
+                </td>
+                <td class="fw-bold">{{ p.codigo }}</td>
+                <td>{{ p.empresa }}</td>
+                <td>{{ p.marco }}</td>
+                <td>{{ p.tramo }}</td>
+                <td>
+                    {% if p.estado_prod == 'Rematado' %}
+                        <span class="badge bg-success">Rematado</span>
+                    {% elif p.estado_prod == 'Armado' %}
+                        <span class="badge bg-warning text-dark">Armado</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Sin Prod.</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <svg class="barcode" 
+                         jsbarcode-format="CODE128" 
+                         jsbarcode-value="{{ p.codigo }}" 
+                         jsbarcode-textmargin="0" 
+                         jsbarcode-fontoptions="bold"
+                         jsbarcode-height="30"
+                         jsbarcode-width="1"
+                         jsbarcode-displayValue="true"
+                         jsbarcode-fontSize="12">
+                    </svg>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-secondary text-center">
+    No se encontraron piezas. Intenta realizar una búsqueda.
+</div>
+{% endif %}
+
+<!-- Ventana oculta para imprimir -->
+<div id="printArea" class="d-none"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    JsBarcode(".barcode").init();
+
+    // Selección múltiple
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.item-check');
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(cb => cb.checked = this.checked);
+        });
+    }
+});
+
+function imprimirSeleccionados() {
+    const seleccionados = document.querySelectorAll('.item-check:checked');
+    if (seleccionados.length === 0) {
+        alert("Selecciona al menos una etiqueta para imprimir.");
+        return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    let content = `
+    <html>
+    <head>
+        <title>Imprimir Etiquetas</title>
+        <style>
+            @media print {
+                @page {
+                    size: 100mm 50mm; /* Tamaño típico de etiqueta Zebra (4x2 pulgadas) */
+                    margin: 0;
+                }
+                body {
+                    margin: 0;
+                    padding: 0;
+                }
+                .etiqueta {
+                    width: 95mm;
+                    height: 48mm;
+                    margin: 2mm;
+                    page-break-after: always;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    border: 1px solid #ddd; /* Borde solo para visualizar en pantalla, quitar si molesta */
+                    text-align: center;
+                    font-family: Arial, sans-serif;
+                }
+                .cliente { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
+                .detalle { font-size: 10px; margin-bottom: 5px; }
+                .codigo-texto { font-size: 16px; font-weight: bold; margin-top: 2px; }
+                svg { max-width: 90%; height: auto; }
+            }
+        </style>
+        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"><\/script>
+    </head>
+    <body>
+    `;
+
+    seleccionados.forEach((cb, index) => {
+        const codigo = cb.dataset.codigo;
+
+        content += `
+        <div class="etiqueta">
+            <svg id="barcode-${index}"></svg>
+        </div>
+        <script>
+            JsBarcode("#barcode-${index}", "${codigo}", {
+                format: "CODE128",
+                width: 3,
+                height: 80,
+                displayValue: true,
+                fontSize: 24,
+                margin: 10,
+                textMargin: 5
+            });
+        <\/script>
+        `;
+    });
+
+    content += `
+    <script>
+        window.onload = function() {
+            window.print();
+            window.close();
+        }
+    <\/script>
+    </body>
+    </html>
+    `;
+
+    printWindow.document.write(content);
+    printWindow.document.close();
+}
+</script>
+
+{% endblock %}

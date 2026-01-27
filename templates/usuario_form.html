@@ -28,7 +28,16 @@
           <option value="supervisor" {% if usuario and usuario.tipo=='supervisor' %}selected{% endif %}>Supervisor</option>
           <option value="operador" {% if usuario and usuario.tipo=='operador' %}selected{% endif %}>Operador</option>
           <option value="cliente" {% if usuario and usuario.tipo=='cliente' %}selected{% endif %}>Cliente</option>
+          <option value="soporte" {% if usuario and usuario.tipo=='soporte' %}selected{% endif %}>Soporte</option>
         </select>
+      </div>
+
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="sin_restriccion" id="sinRestriccion" 
+               {% if usuario and usuario.sin_restriccion %}checked{% endif %}>
+        <label class="form-check-label" for="sinRestriccion">
+          ⚡ Sin restricción de tiempo (Ignorar bloqueo de 5 min)
+        </label>
       </div>
 
       <div class="row">
