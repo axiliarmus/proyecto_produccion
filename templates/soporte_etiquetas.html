@@ -187,20 +187,23 @@ function imprimirSeleccionados() {
 
     seleccionados.forEach((cb, index) => {
         const codigo = cb.dataset.codigo;
+        const marco = cb.dataset.marco;
+        const tramo = cb.dataset.tramo;
 
         content += `
         <div class="etiqueta">
+            <div class="detalle"><strong>Marco:</strong> ${marco} | <strong>Tramo:</strong> ${tramo}</div>
             <svg id="barcode-${index}"></svg>
         </div>
         <script>
             JsBarcode("#barcode-${index}", "${codigo}", {
                 format: "CODE128",
                 width: 3,
-                height: 80,
+                height: 70,
                 displayValue: true,
                 fontSize: 24,
-                margin: 10,
-                textMargin: 5
+                margin: 5,
+                textMargin: 2
             });
         <\/script>
         `;
