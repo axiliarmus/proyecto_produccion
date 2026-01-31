@@ -2648,19 +2648,50 @@ def operador_registrar():
         except:
             pass
 
+    # ==============================================================================
+    # LÓGICA DE RESPALDO: BUSCAR EN HISTÓRICO SI NO ESTÁ EN ACTIVO
+    # ==============================================================================
+    es_historico = False
+    corte_id_historico = None
+
+    if not pieza_data:
+        # Buscar la versión más reciente en históricos
+        query_hist = {"codigo": codigo_pieza}
+        pieza_historica = db.piezas_historicas.find_one(query_hist, sort=[("_id", -1)])
+        
+        # Intentar como int si falló string
+        if not pieza_historica and codigo_pieza.isdigit():
+            try:
+                pieza_historica = db.piezas_historicas.find_one({"codigo": int(codigo_pieza)}, sort=[("_id", -1)])
+            except:
+                pass
+        
+        if pieza_historica:
+            pieza_data = pieza_historica
+            es_historico = True
+            corte_id_historico = pieza_historica.get("corte_id")
+
     if not pieza_data:
         flash(f"❌ No existe una pieza con código {codigo_pieza}", "danger")
         return redirect(url_for("operador_home"))
 
     # ------------------- CONTADORES PREVIOS -------------------
 
-    armado_count = db.produccion.count_documents({
-        "codigo_pieza": codigo_pieza,
+    # Seleccionar colección correcta según si es histórico o activo
+    if es_historico:
+        collection_prod = db.produccion_historica
+        filtro_base = {"codigo_pieza": codigo_pieza, "corte_id": corte_id_historico}
+    else:
+        collection_prod = db.produccion
+        filtro_base = {"codigo_pieza": codigo_pieza}
+
+    armado_count = collection_prod.count_documents({
+        **filtro_base,
         "modo": "armador"
     })
 
-    remate_count = db.produccion.count_documents({
-        "codigo_pieza": codigo_pieza,
+    remate_count = collection_prod.count_documents({
+        **filtro_base,
         "modo": "rematador"
     })
 
@@ -2745,9 +2776,14 @@ def operador_registrar():
         "calidad_status": "pendiente"
     }
 
-    db.produccion.insert_one(registro)
+    if es_historico:
+        registro["corte_id"] = corte_id_historico
+        db.produccion_historica.insert_one(registro)
+        flash(f"✔ Pieza {codigo_pieza} registrada en ARCHIVO HISTÓRICO como {modo} (Corte cerrado)", "warning")
+    else:
+        db.produccion.insert_one(registro)
+        flash(f"✔ Pieza {codigo_pieza} registrada correctamente como {modo}", "success")
 
-    flash(f"✔ Pieza {codigo_pieza} registrada correctamente como {modo}", "success")
     return redirect(url_for("operador_home"))
 
 
