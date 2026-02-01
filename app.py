@@ -1523,6 +1523,109 @@ def admin_produccion_archivada():
                            archived_view=True,
                            corte_nombre=corte_nombre)
 
+
+@app.route('/admin/piezas/archivadas')
+@login_required(['administrador', 'soporte', 'supervisor'])
+def admin_piezas_archivadas():
+    corte_nombre = request.args.get('corte_nombre')
+    if not corte_nombre:
+        flash("Debes seleccionar un corte para ver sus piezas.", "warning")
+        return redirect(url_for('admin_produccion_archivada'))
+
+    corte = db.cortes.find_one({'nombre': corte_nombre})
+    if not corte:
+        flash("Corte no encontrado.", "danger")
+        return redirect(url_for('admin_produccion_archivada'))
+
+    corte_id = corte.get('_id')
+    filtro = {"corte_id": corte_id}
+
+    # --- Lógica de Filtros (Igual que soporte_etiquetas pero con colección histórica) ---
+    cliente_sel = request.args.get('cliente', "")
+    marco_sel = request.args.get('marco', "")
+    tramo_sel = request.args.get('tramo', "")
+    estado_filter = request.args.get('estado', "todos")
+
+    # POST -> GET
+    if request.method == 'POST':
+        cliente_sel = request.form.get('cliente') or ""
+        marco_sel = request.form.get('marco') or ""
+        tramo_sel = request.form.get('tramo') or ""
+        estado_filter = request.form.get('estado') or "todos"
+        return redirect(url_for('admin_piezas_archivadas', 
+                                corte_nombre=corte_nombre,
+                                cliente=cliente_sel, 
+                                marco=marco_sel, 
+                                tramo=tramo_sel, 
+                                estado=estado_filter))
+
+    if cliente_sel and cliente_sel != "todos":
+        filtro["empresa"] = cliente_sel
+    if marco_sel and marco_sel != "todos":
+        filtro["marco"] = marco_sel
+    if tramo_sel and tramo_sel != "todos":
+        filtro["tramo"] = tramo_sel
+
+    # Filtro por estado en histórico
+    if estado_filter != "todos":
+        modo_buscado = "rematador" if estado_filter == "Rematado" else "armador" if estado_filter == "Armado" else None
+        if modo_buscado:
+            # Buscar en PRODUCCION HISTORICA de este corte
+            codigos_con_estado = db.produccion_historica.distinct("codigo_pieza", {"modo": modo_buscado, "corte_id": corte_id})
+            filtro["codigo"] = {"$in": codigos_con_estado}
+
+    # Obtener piezas del corte
+    piezas = list(db.piezas_historicas.find(filtro).sort("_id", -1))
+
+    # Dropdowns dinámicos basados en ESTE corte
+    try:
+        # Usamos set comprehension para sacar unicos de las piezas del corte
+        # (Mejor que distinct global que barrería toda la colección histórica)
+        all_piezas_corte = list(db.piezas_historicas.find({"corte_id": corte_id}, {"empresa": 1, "marco": 1, "tramo": 1}))
+        clientes = sorted(list(set(p.get("empresa", "") for p in all_piezas_corte if p.get("empresa"))))
+        marcos = sorted(list(set(p.get("marco", "") for p in all_piezas_corte if p.get("marco"))))
+        tramos = sorted(list(set(p.get("tramo", "") for p in all_piezas_corte if p.get("tramo"))))
+    except Exception as e:
+        clientes, marcos, tramos = [], [], []
+
+    # Enriquecer estado (Armado/Rematado/Sin Prod) usando producción histórica
+    piezas_finales = []
+    if piezas:
+        codigos_en_pantalla = [p.get("codigo") for p in piezas if p.get("codigo")]
+        # Consultar estado en el mismo corte
+        set_armado = set(db.produccion_historica.distinct("codigo_pieza", {"codigo_pieza": {"$in": codigos_en_pantalla}, "modo": "armador", "corte_id": corte_id}))
+        set_remate = set(db.produccion_historica.distinct("codigo_pieza", {"codigo_pieza": {"$in": codigos_en_pantalla}, "modo": "rematador", "corte_id": corte_id}))
+        
+        for p in piezas:
+            codigo = p.get("codigo")
+            estado = "Sin producción"
+            if codigo in set_remate:
+                estado = "Rematado"
+            elif codigo in set_armado:
+                estado = "Armado"
+            p["estado_prod"] = estado
+            
+            # Filtro visual "Sin producción"
+            if estado_filter == "Sin producción" and estado != "Sin producción":
+                continue
+            if estado_filter == "Armado" and estado != "Armado":
+                continue
+            if estado_filter == "Rematado" and estado != "Rematado":
+                continue
+                
+            piezas_finales.append(p)
+
+    return render_template('admin_piezas_archivadas.html',
+                           piezas=piezas_finales,
+                           corte_nombre=corte_nombre,
+                           clientes=clientes,
+                           marcos=marcos,
+                           tramos=tramos,
+                           cliente_sel=cliente_sel,
+                           marco_sel=marco_sel,
+                           tramo_sel=tramo_sel,
+                           estado_sel=estado_filter)
+
 @app.route('/admin/produccion/archivada/export', methods=['POST'])
 @login_required(['administrador', 'soporte'])
 def exportar_produccion_archivada_excel():

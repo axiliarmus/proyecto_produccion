@@ -60,6 +60,12 @@
             <button class="btn btn-success w-100">📥 Exportar a Excel</button>
         </form>
       </div>
+
+      {% if archived_view and corte_nombre %}
+      <div class="col-md-6">
+          <a href="{{ url_for('admin_piezas_archivadas', corte_nombre=corte_nombre) }}" class="btn btn-info w-100">🏷️ Ver Piezas y Etiquetas (Corte)</a>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>
