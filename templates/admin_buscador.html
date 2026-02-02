@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% block title %}Buscador Universal de Piezas{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2>🔍 Buscador Universal</h2>
+        <h4 class="text-secondary">Rastreo de historial completo (Activo + Archivo)</h4>
+    </div>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">← Volver al Panel</a>
+</div>
+
+<div class="card bg-dark border-light shadow mb-4">
+    <div class="card-body">
+        <form method="POST" class="row g-3 align-items-end">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="col-md-9">
+                <label class="form-label text-light">Código de Pieza</label>
+                <input type="text" name="codigo" class="form-control form-control-lg" 
+                       placeholder="Ingresa el código exacto..." value="{{ codigo or '' }}" required>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-warning w-100 btn-lg">🔍 Buscar Historial</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if codigo and not pieza_activa and not piezas_historicas %}
+<div class="alert alert-danger text-center">
+    No se encontró ninguna información para el código <strong>{{ codigo }}</strong> ni en el sistema activo ni en los archivos históricos.
+</div>
+{% endif %}
+
+<!-- SECCIÓN: PIEZA ACTIVA (SISTEMA ACTUAL) -->
+{% if pieza_activa %}
+<div class="card bg-dark border-success shadow mb-5">
+    <div class="card-header bg-success text-white">
+        <h4 class="mb-0">✅ En Sistema Activo (Ciclo Actual)</h4>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <h5 class="text-accent">Detalles de la Pieza</h5>
+                <ul class="list-group list-group-flush bg-transparent">
+                    <li class="list-group-item bg-transparent text-light"><strong>Cliente:</strong> {{ pieza_activa.data.empresa }}</li>
+                    <li class="list-group-item bg-transparent text-light"><strong>Marco:</strong> {{ pieza_activa.data.marco }}</li>
+                    <li class="list-group-item bg-transparent text-light"><strong>Tramo:</strong> {{ pieza_activa.data.tramo }}</li>
+                    <li class="list-group-item bg-transparent text-light"><strong>Estado Actual:</strong> 
+                        <span class="badge bg-light text-dark">{{ pieza_activa.estado_actual }}</span>
+                    </li>
+                </ul>
+            </div>
+            <div class="col-md-8">
+                <h5 class="text-accent">Historial de Producción (Actual)</h5>
+                {% if pieza_activa.produccion %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-dark table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Operador</th>
+                                <th>Acción</th>
+                                <th>Box</th>
+                                <th>Calidad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prod in pieza_activa.produccion %}
+                            <tr>
+                                <td>{{ prod.fecha.strftime('%d-%m-%Y %H:%M') }}</td>
+                                <td>{{ prod.usuario }}</td>
+                                <td>
+                                    {% if prod.modo == 'armador' %}
+                                        <span class="badge bg-warning text-dark">Armado</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Remate</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ prod.box }}</td>
+                                <td>{{ prod.calidad_status }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-secondary">Esta pieza está cargada en el sistema pero <strong>nadie la ha trabajado aún</strong>.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- SECCIÓN: ARCHIVO HISTÓRICO -->
+{% if piezas_historicas %}
+<h3 class="text-light mb-3">📂 Historial de Archivos (Cortes Anteriores)</h3>
+{% for ph in piezas_historicas %}
+<div class="card bg-dark border-secondary shadow mb-4">
+    <div class="card-header bg-secondary text-white d-flex justify-content-between">
+        <h5 class="mb-0">📅 Corte: {{ ph.corte_nombre }}</h5>
+        <span class="badge bg-dark">Estado al cierre: {{ ph.estado_cierre }}</span>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <h6 class="text-info">Datos en ese momento</h6>
+                <p class="mb-1 text-secondary"><small>Cliente: {{ ph.data.empresa }}</small></p>
+                <p class="mb-1 text-secondary"><small>Marco: {{ ph.data.marco }}</small></p>
+                <p class="mb-1 text-secondary"><small>Tramo: {{ ph.data.tramo }}</small></p>
+            </div>
+            <div class="col-md-8">
+                <h6 class="text-info">Registro de Producción en este Corte</h6>
+                {% if ph.produccion %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-dark table-striped">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Operador</th>
+                                <th>Acción</th>
+                                <th>Calidad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prod in ph.produccion %}
+                            <tr>
+                                <td>{{ prod.fecha.strftime('%d-%m-%Y %H:%M') }}</td>
+                                <td>{{ prod.usuario }}</td>
+                                <td>{{ prod.modo|capitalize }}</td>
+                                <td>{{ prod.calidad_status }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">En este corte, la pieza existía pero <strong>no registró producción</strong>.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% endblock %}

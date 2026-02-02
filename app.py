@@ -2686,6 +2686,94 @@ def operador_salida():
     return redirect(url_for("operador_home"))
 
 
+@app.route('/admin/buscador', methods=['GET', 'POST'])
+@login_required(['administrador', 'soporte', 'supervisor'])
+def admin_buscador_piezas():
+    codigo = None
+    pieza_activa = None
+    piezas_historicas = []
+    
+    if request.method == 'POST':
+        codigo = (request.form.get('codigo') or '').strip()
+        
+        if codigo:
+            # 1. Buscar en Piezas Activas
+            # Intentar como string y luego como int
+            query_str = {"codigo": codigo}
+            query_int = {"codigo": int(codigo)} if codigo.isdigit() else None
+            
+            p_activa = db.piezas.find_one(query_str)
+            if not p_activa and query_int:
+                p_activa = db.piezas.find_one(query_int)
+            
+            if p_activa:
+                # Buscar producción asociada
+                prod_recs = list(db.produccion.find({"codigo_pieza": str(p_activa.get("codigo"))}).sort("fecha", -1))
+                # Formatear fechas
+                for r in prod_recs:
+                    if r.get("fecha"):
+                        r["fecha"] = to_cl(r.get("fecha"))
+                
+                pieza_activa = {
+                    "data": p_activa,
+                    "produccion": prod_recs,
+                    "estado_actual": "En Proceso" if prod_recs else "Sin Producción"
+                }
+                
+                # Determinar estado más preciso
+                has_armado = any(r["modo"] == "armador" for r in prod_recs)
+                has_remate = any(r["modo"] == "rematador" for r in prod_recs)
+                
+                if has_remate:
+                    pieza_activa["estado_actual"] = "Rematado (Finalizado)"
+                elif has_armado:
+                    pieza_activa["estado_actual"] = "Armado (Pendiente Remate)"
+
+            # 2. Buscar en Piezas Históricas
+            # Pueden haber múltiples versiones de la misma pieza en diferentes cortes
+            hist_cursor = db.piezas_historicas.find({"$or": [
+                {"codigo": codigo},
+                {"codigo": int(codigo) if codigo.isdigit() else "###"}
+            ]}).sort("_id", -1)
+            
+            for p_hist in hist_cursor:
+                corte_id = p_hist.get("corte_id")
+                corte_info = db.cortes.find_one({"_id": corte_id})
+                corte_nombre = corte_info.get("nombre") if corte_info else "Desconocido"
+                
+                # Buscar producción histórica asociada a este corte y pieza
+                # Usamos el código de la pieza histórica y el corte_id para filtrar
+                prod_hist_recs = list(db.produccion_historica.find({
+                    "codigo_pieza": str(p_hist.get("codigo")),
+                    "corte_id": corte_id
+                }).sort("fecha", -1))
+                
+                for r in prod_hist_recs:
+                    if r.get("fecha"):
+                        r["fecha"] = to_cl(r.get("fecha"))
+
+                estado_hist = "Sin Producción"
+                has_armado_h = any(r["modo"] == "armador" for r in prod_hist_recs)
+                has_remate_h = any(r["modo"] == "rematador" for r in prod_hist_recs)
+                
+                if has_remate_h:
+                    estado_hist = "Rematado"
+                elif has_armado_h:
+                    estado_hist = "Armado"
+                
+                piezas_historicas.append({
+                    "data": p_hist,
+                    "produccion": prod_hist_recs,
+                    "corte_nombre": corte_nombre,
+                    "estado_cierre": estado_hist
+                })
+
+    return render_template('admin_buscador.html', 
+                           codigo=codigo, 
+                           pieza_activa=pieza_activa, 
+                           piezas_historicas=piezas_historicas)
+
+
 # ============================================================
 #              NUEVO REGISTRO DE PRODUCCIÓN (FINAL)
 # ============================================================
