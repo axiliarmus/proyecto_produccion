@@ -1524,7 +1524,7 @@ def admin_produccion_archivada():
                            corte_nombre=corte_nombre)
 
 
-@app.route('/admin/piezas/archivadas')
+@app.route('/admin/piezas/archivadas', methods=['GET', 'POST'])
 @login_required(['administrador', 'soporte', 'supervisor'])
 def admin_piezas_archivadas():
     corte_nombre = request.args.get('corte_nombre')
