@@ -54,6 +54,16 @@
                 <button class="btn btn-accent w-100 btn-lg">🔍 Filtrar Piezas</button>
             </div>
         </form>
+        
+        <form method="POST" action="{{ url_for('exportar_piezas_archivadas_excel') }}" class="mt-3">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="corte_nombre" value="{{ corte_nombre }}">
+            <input type="hidden" name="cliente" value="{{ cliente_sel }}">
+            <input type="hidden" name="marco" value="{{ marco_sel }}">
+            <input type="hidden" name="tramo" value="{{ tramo_sel }}">
+            <input type="hidden" name="estado" value="{{ estado_sel }}">
+            <button class="btn btn-success w-100 btn-lg">📥 Exportar a Excel</button>
+        </form>
     </div>
 </div>
 
