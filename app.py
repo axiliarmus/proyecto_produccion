@@ -86,9 +86,12 @@ def _get_csrf_token():
     return token
 
 @app.context_processor
-def inject_csrf():
-    """Inyecta el token CSRF en todas las plantillas HTML automáticamente."""
-    return {'csrf_token': session.get('_csrf_token') or _get_csrf_token()}
+def inject_globals():
+    """Inyecta variables globales en todas las plantillas."""
+    return {
+        'csrf_token': session.get('_csrf_token') or _get_csrf_token(),
+        'tunnel_url': tunnel_url
+    }
 
 @app.before_request
 def csrf_protect():

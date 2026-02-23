@@ -86,10 +86,12 @@ const lastScannedCard = document.getElementById('lastScannedCard');
 const lastCodeSpan = document.getElementById('lastCode');
 const lastStatusSpan = document.getElementById('lastStatus');
 const lastInfoSpan = document.getElementById('lastInfo');
+const tunnelUrl = "{{ tunnel_url if tunnel_url else '' }}";
 
 // Inicializar UI con datos del servidor
 document.addEventListener('DOMContentLoaded', () => {
     updateUI();
+    checkSecureConnection();
 });
 
 // AUDIO
@@ -101,7 +103,7 @@ const playSound = (type) => {
     }
 };
 
-// LÓGICA DE ESCANEO
+// LÓGICA DE NEGOCIO (Picking)
 async function processCode(code) {
     code = code.trim().toUpperCase();
     if (!code) return;
@@ -145,7 +147,6 @@ async function processCode(code) {
     }
 }
 
-// GESTIÓN DE DATOS
 function addToData(pieza, estado) {
     const { empresa, marco, tramo } = pieza;
     
@@ -177,12 +178,10 @@ function updateUI() {
 
     let html = '';
     
-    // Iterar Clientes
     for (const [cliente, marcos] of Object.entries(state.data)) {
         html += `<h5 class="text-accent mt-4 mb-3"><i class='bx bxs-business'></i> ${cliente}</h5>`;
         html += `<div class="row row-cols-1 row-cols-md-2 g-3">`;
         
-        // Iterar Marcos
         for (const [marco, tramos] of Object.entries(marcos)) {
             html += `
             <div class="col">
@@ -200,7 +199,6 @@ function updateUI() {
                         </thead>
                         <tbody>`;
             
-            // Iterar Tramos
             for (const [tramo, counts] of Object.entries(tramos)) {
                 html += `
                 <tr>
@@ -265,31 +263,88 @@ manualInput.addEventListener('keypress', (e) => {
     }
 });
 
-// ESCÁNER CÁMARA
-const html5QrCode = new Html5Qrcode("reader");
+// ============================================================
+// LÓGICA DE ESCÁNER ROBUSTA (CÁMARA TRASERA + HTTPS)
+// ============================================================
+
+let configHtml5QrCode = {};
+if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+    configHtml5QrCode = { 
+        formatsToSupport: [ 
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.UPC_A
+        ]
+    };
+}
+
+const html5QrCode = new Html5Qrcode("reader", configHtml5QrCode);
 let isScanning = false;
+
+function checkSecureConnection() {
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && tunnelUrl) {
+        const banner = document.createElement('div');
+        banner.className = 'alert alert-warning fixed-top text-center m-0 shadow-lg';
+        banner.style.zIndex = '9999';
+        banner.innerHTML = `
+           <div class="d-flex flex-column align-items-center gap-2">
+               <strong>⚠️ MODO INSEGURO DETECTADO</strong>
+               <span>La cámara no funcionará en esta dirección.</span>
+               <a href="${tunnelUrl}/admin/picking" class="btn btn-success fw-bold pulse-button">
+                   🔒 CAMBIAR A VERSIÓN SEGURA
+               </a>
+           </div>
+        `;
+        document.body.prepend(banner);
+        
+        const style = document.createElement('style');
+        style.textContent = `
+            .pulse-button { animation: pulse 1.5s infinite; }
+            @keyframes pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+                100% { transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
 
 document.getElementById('btn-scan-qr').addEventListener('click', () => {
     const readerDiv = document.getElementById('reader');
     
     if (isScanning) {
-        html5QrCode.stop().then(() => {
-            isScanning = false;
-            readerDiv.style.display = 'none';
-            document.getElementById('btn-scan-qr').innerHTML = "<i class='bx bx-camera fs-4'></i> Activar Cámara";
-            document.getElementById('btn-scan-qr').classList.replace('btn-danger', 'btn-accent');
-        });
+        stopScanning();
         return;
     }
 
+    // Verificación de seguridad antes de iniciar
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        if (tunnelUrl) {
+            const userWantsSecure = confirm(
+                "⚠️ Estás en modo inseguro (HTTP) y la cámara fallará.\n\n" +
+                "✅ ¡Hay una conexión segura lista!\n\n" +
+                "¿Quieres cambiar a la versión segura ahora?"
+            );
+            if (userWantsSecure) {
+                location.href = tunnelUrl + location.pathname;
+                return;
+            }
+        }
+    }
+
     readerDiv.style.display = 'block';
-    
+    startScanning(readerDiv);
+});
+
+function startScanning(readerDiv) {
     Html5Qrcode.getCameras().then(devices => {
         if (devices && devices.length) {
             let cameraId = devices[0].id;
             // Preferir cámara trasera
             for (const device of devices) {
-                if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('trasera')) {
+                if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('trasera') || device.label.toLowerCase().includes('environment')) {
                     cameraId = device.id;
                     break;
                 }
@@ -304,18 +359,66 @@ document.getElementById('btn-scan-qr').addEventListener('click', () => {
                     processCode(decodedText).then(() => {
                          setTimeout(() => html5QrCode.resume(), 1500);
                     });
+                },
+                (errorMessage) => {
+                    // Ignorar errores de frame vacío
                 }
             ).then(() => {
                 isScanning = true;
                 document.getElementById('btn-scan-qr').innerHTML = "<i class='bx bx-stop-circle fs-4'></i> Detener Cámara";
                 document.getElementById('btn-scan-qr').classList.replace('btn-accent', 'btn-danger');
+            }).catch(err => {
+                isScanning = false;
+                mostrarErrorUI(readerDiv, err);
             });
         } else {
             alert('No se encontraron cámaras.');
         }
     }).catch(err => {
-        alert('Error al iniciar cámara: ' + err);
+        mostrarErrorUI(readerDiv, err);
     });
-});
+}
+
+function stopScanning() {
+    const readerDiv = document.getElementById('reader');
+    html5QrCode.stop().then(() => {
+        isScanning = false;
+        readerDiv.style.display = 'none';
+        document.getElementById('btn-scan-qr').innerHTML = "<i class='bx bx-camera fs-4'></i> Activar Cámara";
+        document.getElementById('btn-scan-qr').classList.replace('btn-danger', 'btn-accent');
+        html5QrCode.clear();
+    }).catch(err => {
+        console.error("Error al detener cámara", err);
+    });
+}
+
+function mostrarErrorUI(container, err) {
+    const esHttp = location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
+    let msgExtra = "";
+    
+    if (esHttp) {
+        msgExtra = `
+        <div class="mt-3 text-start small border p-2 bg-dark text-white">
+            <strong>Solución para HTTP (Chrome/Android):</strong><br>
+            1. Ve a <code>chrome://flags</code><br>
+            2. Busca <code>unsafely-treat-insecure-origin-as-secure</code><br>
+            3. Actívalo y agrega: <code>http://${location.host}</code><br>
+            4. Reinicia Chrome.
+        </div>`;
+    }
+
+    container.innerHTML = `
+        <div class="alert alert-danger">
+            <strong>No se pudo iniciar la cámara.</strong><br>
+            <small>${err}</small><br><br>
+            Posibles causas:<br>
+            1. No diste permiso a la cámara.<br>
+            2. Estás usando HTTP sin configurar excepciones.<br>
+            3. Otra aplicación está usando la cámara.
+        </div>
+        ${msgExtra}
+        <button class="btn btn-outline-light btn-sm mt-2" onclick="location.reload()">Recargar página</button>
+    `;
+}
 </script>
 {% endblock %}
