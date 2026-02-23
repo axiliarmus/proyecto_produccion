@@ -1,40 +1,34 @@
-{% extends 'base.html' %}
-{% block title %}Supervisor{% endblock %}
+{% extends 'admin_layout.html' %}
+
+{% block title %}Panel Supervisor{% endblock %}
+{% block header_title %}Supervisión de Calidad{% endblock %}
+{% block header_subtitle %}Validación y revisión de piezas rematadas{% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">Supervisor – Piezas Rematadas</h2>
-
-<!-- ============= BOTÓN PARA IR A INFORMES ================= -->
-<div class="mb-3 text-end">
-  <a href="{{ url_for('supervisor_informes') }}" class="btn btn-accent">
-    📊 Ver Informes
-  </a>
-</div>
-
 <!-- ================= FILTROS ================= -->
-<div class="card mb-4">
+<div class="admin-card mb-4">
   <div class="card-body">
-    <form method="POST" class="row g-3">
+    <form method="POST" class="row g-3 align-items-end">
 
       <div class="col-md-3">
-        <label class="form-label text-light">Fecha inicio</label>
-        <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control">
+        <label class="form-label text-secondary small">Fecha inicio</label>
+        <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control bg-dark text-light border-secondary">
       </div>
 
       <div class="col-md-3">
-        <label class="form-label text-light">Fecha fin</label>
-        <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-control">
+        <label class="form-label text-secondary small">Fecha fin</label>
+        <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-control bg-dark text-light border-secondary">
       </div>
 
       <div class="col-md-3">
-        <label class="form-label text-light">Código pieza</label>
-        <input type="text" name="codigo" value="{{ codigo or '' }}" class="form-control" placeholder="Ej: 1001 (vacío = todas)">
+        <label class="form-label text-secondary small">Código pieza</label>
+        <input type="text" name="codigo" value="{{ codigo or '' }}" class="form-control bg-dark text-light border-secondary" placeholder="Ej: 1001...">
       </div>
 
       <div class="col-md-3">
-        <label class="form-label text-light">Estado</label>
-        <select name="estado" class="form-select">
+        <label class="form-label text-secondary small">Estado</label>
+        <select name="estado" class="form-select bg-dark text-light border-secondary">
           <option value="todos" {% if estado_sel=='todos' or not estado_sel %}selected{% endif %}>Todos</option>
           <option value="pendiente" {% if estado_sel=='pendiente' %}selected{% endif %}>Pendiente</option>
           <option value="aprobado" {% if estado_sel=='aprobado' %}selected{% endif %}>Aprobado</option>
@@ -42,8 +36,10 @@
         </select>
       </div>
 
-      <div class="col-md-12">
-        <button class="btn btn-accent w-100">Aplicar filtros</button>
+      <div class="col-md-12 text-end mt-3">
+        <button class="btn btn-accent px-4 fw-bold">
+            <i class='bx bx-filter-alt'></i> Aplicar filtros
+        </button>
       </div>
 
     </form>
@@ -53,94 +49,98 @@
 <!-- ================= TABLA ================= -->
 
 {% if piezas %}
-  <div class="table-responsive">
-    <table class="table table-dark table-striped align-middle">
-      <thead>
-        <tr>
-          <th>Fecha</th>
-          <th>Operador</th>
-          <th>Código</th>
-          <th>Box</th>
-          <th>Cliente</th>
-          <th>Marco</th>
-          <th>Tramo</th>
-          <th>Estado</th>
-          <th style="width: 380px;">Supervisión</th>
-        </tr>
-      </thead>
-      <tbody>
-      {% for p in piezas %}
-        <tr>
-          <td>{{ p.fecha.strftime('%d-%m-%Y %H:%M') }}</td>
-          <td>{{ p.usuario }}</td>
-          <td>{{ p.codigo_pieza }}</td>
-          <td>{{ p.box }}</td>
-          <td>{{ p.empresa }}</td>
-          <td>{{ p.marco }}</td>
-          <td>{{ p.tramo }}</td>
+  <div class="admin-card">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0" style="background: transparent;">
+        <thead>
+            <tr class="text-secondary small border-bottom border-secondary">
+            <th>Fecha</th>
+            <th>Operador</th>
+            <th>Código</th>
+            <th>Box</th>
+            <th>Cliente</th>
+            <th>Marco</th>
+            <th>Tramo</th>
+            <th>Estado</th>
+            <th style="width: 380px;">Supervisión</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for p in piezas %}
+            <tr>
+            <td class="text-white">{{ p.fecha.strftime('%d-%m %H:%M') }}</td>
+            <td class="fw-bold text-accent">{{ p.usuario }}</td>
+            <td><span class="badge bg-dark border border-secondary">{{ p.codigo_pieza }}</span></td>
+            <td>{{ p.box }}</td>
+            <td>{{ p.empresa }}</td>
+            <td>{{ p.marco }}</td>
+            <td>{{ p.tramo }}</td>
 
-          <td>
-            {% if p.calidad_status == 'aprobado' %}
-              <span class="badge bg-success">Aprobado</span>
-            {% elif p.calidad_status == 'rechazado' %}
-              <span class="badge bg-danger">Rechazado</span>
-            {% else %}
-              <span class="badge bg-secondary">Pendiente</span>
-            {% endif %}
-          </td>
+            <td>
+                {% if p.calidad_status == 'aprobado' %}
+                <span class="badge bg-success bg-opacity-25 text-success border border-success">Aprobado</span>
+                {% elif p.calidad_status == 'rechazado' %}
+                <span class="badge bg-danger bg-opacity-25 text-danger border border-danger">Rechazado</span>
+                {% else %}
+                <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary">Pendiente</span>
+                {% endif %}
+            </td>
 
-          <td>
-            <form method="POST" action="{{ url_for('supervisor_validar_pieza', id=p._id) }}" class="row g-2">
+            <td>
+                <form method="POST" action="{{ url_for('supervisor_validar_pieza', id=p._id) }}" class="row g-2">
 
-              <div class="col-md-6">
-                <input 
-                  class="form-control" 
-                  type="number" 
-                  step="0.01" 
-                  name="cuerda_interna" 
-                  placeholder="Cuerda interna"
-                  value="{{ p.cuerda_interna or '' }}">
-              </div>
+                <div class="col-md-6">
+                    <input 
+                    class="form-control form-control-sm bg-dark text-light border-secondary" 
+                    type="number" 
+                    step="0.01" 
+                    name="cuerda_interna" 
+                    placeholder="C. Interna"
+                    value="{{ p.cuerda_interna or '' }}">
+                </div>
 
-              <div class="col-md-6">
-                <input 
-                  class="form-control" 
-                  type="number" 
-                  step="0.01" 
-                  name="cuerda_externa" 
-                  placeholder="Cuerda externa"
-                  value="{{ p.cuerda_externa or '' }}">
-              </div>
+                <div class="col-md-6">
+                    <input 
+                    class="form-control form-control-sm bg-dark text-light border-secondary" 
+                    type="number" 
+                    step="0.01" 
+                    name="cuerda_externa" 
+                    placeholder="C. Externa"
+                    value="{{ p.cuerda_externa or '' }}">
+                </div>
 
-              <div class="col-12 mt-2">
-                <textarea 
-                  class="form-control" 
-                  name="comentario" 
-                  placeholder="Comentario (motivo si se rechaza)">{{ p.comentario_supervisor or '' }}</textarea>
-              </div>
+                <div class="col-12">
+                    <textarea 
+                    class="form-control form-control-sm bg-dark text-light border-secondary" 
+                    name="comentario" 
+                    rows="1"
+                    placeholder="Comentario...">{{ p.comentario_supervisor or '' }}</textarea>
+                </div>
 
-              <div class="col-md-6 mt-2">
-                <button name="decision" value="aprobado" class="btn btn-success w-100">
-                  ✔ Aprobar / Actualizar
-                </button>
-              </div>
+                <div class="col-md-6">
+                    <button name="decision" value="aprobado" class="btn btn-sm btn-success w-100 d-flex align-items-center justify-content-center gap-1">
+                    <i class='bx bx-check'></i> Aprobar
+                    </button>
+                </div>
 
-              <div class="col-md-6 mt-2">
-                <button name="decision" value="rechazado" class="btn btn-danger w-100">
-                  ✖ Rechazar / Actualizar
-                </button>
-              </div>
+                <div class="col-md-6">
+                    <button name="decision" value="rechazado" class="btn btn-sm btn-danger w-100 d-flex align-items-center justify-content-center gap-1">
+                    <i class='bx bx-x'></i> Rechazar
+                    </button>
+                </div>
 
-            </form>
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+                </form>
+            </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        </table>
+    </div>
   </div>
 {% else %}
-  <div class="alert alert-secondary text-center">
-    No se encontraron piezas rematadas con los filtros seleccionados.
+  <div class="alert alert-secondary text-center py-5">
+    <i class='bx bx-search fs-1 mb-3 text-muted'></i>
+    <p class="mb-0 text-muted">No se encontraron piezas rematadas con los filtros seleccionados.</p>
   </div>
 {% endif %}
 

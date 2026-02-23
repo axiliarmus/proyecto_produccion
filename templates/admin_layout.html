@@ -65,7 +65,7 @@
             </li>
             {% endif %}
 
-            {% if session.get('role') in ['administrador', 'soporte', 'supervisor'] %}
+            {% if session.get('role') in ['administrador', 'soporte'] %}
             <li>
                 <a href="{{ url_for('admin_archivados_menu') }}" class="nav-link {% if 'archivada' in request.endpoint or 'archivados' in request.endpoint %}active{% endif %}">
                     <i class='bx bxs-archive-in'></i> Archivados
