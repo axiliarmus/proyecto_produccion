@@ -1,10 +1,12 @@
-{% extends 'base.html' %}
+{% extends 'admin_layout.html' %}
+
 {% block title %}Valor por Operador (Archivado){% endblock %}
+{% block header_title %}Valor por Operador (Archivado){% endblock %}
+{% block header_subtitle %}Informe histórico de costos por operador{% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4 text-warning">🗄️ Informe Archivado – Valor por Operador</h2>
-<p class="text-secondary">Viendo datos históricos del corte: <strong>{{ corte_nombre or 'Sin corte seleccionado' }}</strong></p>
+<p class="text-secondary mb-4">Viendo datos históricos del corte: <strong class="text-warning">{{ corte_nombre or 'Sin corte seleccionado' }}</strong></p>
 
 <div class="card bg-dark border-light shadow mb-4">
   <div class="card-body">
@@ -17,7 +19,7 @@
 
       <div class="col-md-4">
         <label class="form-label text-light">Operador</label>
-        <select name="operador" class="form-select">
+        <select name="operador" class="form-select bg-dark text-light border-secondary">
           <option value="todos">Todos</option>
           {% for op in operadores %}
             <option value="{{ op }}" {% if operador_sel == op %}selected{% endif %}>
@@ -29,12 +31,12 @@
 
       <div class="col-md-3">
         <label class="form-label text-light">Fecha inicio</label>
-        <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control">
+        <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control bg-dark text-light border-secondary">
       </div>
 
       <div class="col-md-3">
         <label class="form-label text-light">Fecha fin</label>
-        <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-control">
+        <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-control bg-dark text-light border-secondary">
       </div>
 
       <div class="col-md-12">

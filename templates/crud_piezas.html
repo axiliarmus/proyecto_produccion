@@ -1,87 +1,89 @@
-{% extends 'base.html' %}
+{% extends 'admin_layout.html' %}
+
 {% block title %}Piezas{% endblock %}
+{% block header_title %}Gestión de Piezas{% endblock %}
+{% block header_subtitle %}Catálogo de piezas, marcos y tramos{% endblock %}
 
 {% block content %}
 
-<h2 class="mb-3">Gestión de Piezas</h2>
-
-<div class="d-flex justify-content-between mb-3">
-
-  <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
-    ← Volver al Panel
-  </a>
-
-  <div class="d-flex gap-2">
-    <!-- 🔧 BOTÓN NUEVO -->
-    <a href="{{ url_for('piezas_nuevo_form') }}" class="btn btn-accent">
-      ➕ Nueva Pieza
-    </a>
-
-    <!-- 🛠 BOTÓN EDICIÓN MASIVA -->
-    <a href="{{ url_for('piezas_masivo') }}" class="btn btn-warning">
-      🛠 Edición Masiva
-    </a>
+<!-- BARRA DE ACCIONES Y FILTRO -->
+<div class="card bg-dark border-light shadow mb-4">
+  <div class="card-body">
+    <div class="row g-3 align-items-center">
+      <!-- Filtro -->
+      <div class="col-md-6">
+        <form method="GET" class="d-flex gap-2">
+          <input type="text" name="codigo" class="form-control bg-dark text-light border-secondary" 
+                 placeholder="🔍 Filtrar por código..." value="{{ codigo_sel or '' }}">
+          <button type="submit" class="btn btn-accent px-4 fw-bold">
+            <i class='bx bx-search'></i> Buscar
+          </button>
+        </form>
+      </div>
+      
+      <!-- Botones de Acción -->
+      <div class="col-md-6 text-end">
+        <a href="{{ url_for('piezas_masivo') }}" class="btn btn-outline-warning d-inline-flex align-items-center gap-2 me-2">
+          <i class='bx bx-wrench'></i> Edición Masiva
+        </a>
+        <a href="{{ url_for('piezas_nuevo_form') }}" class="btn btn-success d-inline-flex align-items-center gap-2">
+          <i class='bx bx-plus-circle'></i> Nueva Pieza
+        </a>
+      </div>
+    </div>
   </div>
-
 </div>
 
-<div class="table-responsive">
-  <table class="table table-dark table-striped align-middle">
-    <thead>
-      <tr>
-        <th>Código</th>
-        <th>Cliente</th>
-        <th>Marco</th>
-        <th>Tramo</th>
-        <th>Tipo</th>
-        <th>Peso (Kg)</th>
-        <th>C. Interna</th>
-        <th>C. Externa</th>
-        <th class="text-end">Acciones</th>
-      </tr>
-    </thead>
+<div class="admin-card">
+  <div class="table-responsive">
+    <table class="table table-dark table-hover align-middle mb-0" style="background: transparent;">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Cliente</th>
+          <th>Marco</th>
+          <th>Tramo</th>
+          <th>Peso (Kg)</th>
+          <th>C. Interna</th>
+          <th>C. Externa</th>
+          <th class="text-end">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in piezas %}
+        <tr>
+          <td class="fw-bold text-white">{{ p.codigo }}</td>
+          <td>{{ p.get('empresa','—') }}</td>
+          <td>{{ p.get('marco','—') }}</td>
+          <td>{{ p.get('tramo','—') }}</td>
+          
+          <td>
+            {% set peso_raw = p.get('kilo_pieza', 0) %}
+            {% set peso = peso_raw | float %}
+            {{ "%.2f"|format(peso) }}
+          </td>
 
-    <tbody>
-      {% for p in piezas %}
-      <tr>
-        <td>{{ p.codigo }}</td>
-        <td>{{ p.get('empresa','—') }}</td>
-        <td>{{ p.get('marco','—') }}</td>
-        <td>{{ p.get('tramo','—') }}</td>
+          <td>{{ p.get('cuerda_interna', '—') }}</td>
+          <td>{{ p.get('cuerda_externa', '—') }}</td>
 
-        <!-- ✔ Peso corregido -->
-        <td>
-          {% set peso_raw = p.get('kilo_pieza', 0) %}
-          {% set peso = peso_raw | float %}
-          {{ "%.2f"|format(peso) }}
-        </td>
-
-        <!-- Cuerdas -->
-        <td>{{ p.get('cuerda_interna', '—') }}</td>
-        <td>{{ p.get('cuerda_externa', '—') }}</td>
-
-        <!-- Acciones -->
-        <td class="text-end">
-          <a href="{{ url_for('piezas_editar_form', id=p._id) }}" class="btn btn-sm btn-warning">
-            Editar
-          </a>
-
-          <form action="{{ url_for('piezas_delete', id=p._id) }}" method="post" class="d-inline">
-            <button class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar esta pieza?')">
-              Eliminar
-            </button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-{% if piezas|length == 0 %}
-  <div class="alert alert-secondary text-center mt-3">
-    No hay piezas registradas aún.
+          <td class="text-end">
+            <a href="{{ url_for('piezas_editar_form', id=p._id) }}" class="btn btn-ghost-warning d-inline-flex align-items-center gap-1">
+              <i class='bx bx-edit-alt'></i> Editar
+            </a>
+            <form action="{{ url_for('piezas_delete', id=p._id) }}" method="post" class="d-inline">
+              <button class="btn btn-ghost-danger d-inline-flex align-items-center gap-1" onclick="return confirm('¿Eliminar esta pieza?')">
+                <i class='bx bx-trash'></i> Eliminar
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
-{% endif %}
+  {% if piezas|length == 0 %}
+    <div class="p-4 text-center text-secondary">No hay piezas registradas aún.</div>
+  {% endif %}
+</div>
 
 {% endblock %}

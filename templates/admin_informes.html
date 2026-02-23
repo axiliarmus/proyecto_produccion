@@ -1,159 +1,145 @@
-{% extends 'base.html' %}
-{% block title %}Informes del Sistema{% endblock %}
+{% extends 'admin_layout.html' %}
+
+{% block title %}Informes{% endblock %}
+{% block header_title %}Centro de Informes{% endblock %}
+{% block header_subtitle %}Reportes de asistencia, producción y desempeño{% endblock %}
+
 {% block content %}
 
-<h2 class="mb-4 text-center">📊 Centro de Informes</h2>
-
-<p class="text-center text-secondary mb-5">
-  Consulta los reportes generales de asistencia, producción y desempeño de tus operadores.
-</p>
-
-<!-- Tarjetas de informes -->
-<div class="row g-4 justify-content-center">
+<div class="row g-4">
   
   <!-- Informe Resumen Producción -->
-  {% if role in ['administrador', 'cliente', 'soporte'] %}
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <h5 class="card-title text-light">📈 Resumen Kilos</h5>
-          <p class="text-secondary">
-            Kilos diarios, mensuales y evolución de los últimos 6 meses.
-          </p>
+  {% if session.get('role') in ['administrador', 'cliente', 'soporte'] %}
+  <div class="col-md-4 col-xl-3">
+    <div class="admin-card h-100 text-center">
+      <div class="d-flex justify-content-center mb-3">
+        <div class="stat-icon bg-gradient-1 text-white position-relative">
+          <i class='bx bxs-bar-chart-alt-2'></i>
         </div>
-        <a href="{{ url_for('informe_resumen_produccion') }}" class="btn btn-accent w-100 mt-3">Ver Informe</a>
       </div>
+      <h5 class="text-white">Resumen Kilos</h5>
+      <p class="text-secondary small mb-4">
+        Kilos diarios, mensuales y evolución de los últimos 6 meses.
+      </p>
+      <a href="{{ url_for('informe_resumen_produccion') }}" class="btn btn-outline-light w-100 stretched-link">Ver Informe</a>
     </div>
   </div>
   {% endif %}
 
   <!-- Informe de horarios -->
-  {% if role in ['administrador', 'soporte'] %}
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <h5 class="card-title text-light">⏰ Horarios</h5>
-          <p class="text-secondary">
-            Visualiza los registros de ingreso y salida de los operadores durante la jornada.
-          </p>
+  {% if session.get('role') in ['administrador', 'soporte'] %}
+  <div class="col-md-4 col-xl-3">
+    <div class="admin-card h-100 text-center">
+      <div class="d-flex justify-content-center mb-3">
+        <div class="stat-icon bg-gradient-2 text-white position-relative">
+          <i class='bx bxs-time'></i>
         </div>
-        <a href="{{ url_for('informe_horarios') }}" class="btn btn-accent w-100 mt-3">Ver Informe</a>
       </div>
+      <h5 class="text-white">Horarios</h5>
+      <p class="text-secondary small mb-4">
+        Registros de ingreso y salida de operadores.
+      </p>
+      <a href="{{ url_for('informe_horarios') }}" class="btn btn-outline-light w-100 stretched-link">Ver Informe</a>
     </div>
   </div>
 
   <!-- Informe por operador -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <h5 class="card-title text-light">👷 Producción por Operador</h5>
-          <p class="text-secondary">
-            Consulta cuántas piezas ha producido cada operador en el sistema.
-          </p>
+  <div class="col-md-4 col-xl-3">
+    <div class="admin-card h-100 text-center">
+      <div class="d-flex justify-content-center mb-3">
+        <div class="stat-icon bg-gradient-3 text-white position-relative">
+          <i class='bx bxs-user-detail'></i>
         </div>
-        <a href="{{ url_for('informe_operadores') }}" class="btn btn-accent w-100 mt-3">Ver Informe</a>
       </div>
+      <h5 class="text-white">Producción por Operador</h5>
+      <p class="text-secondary small mb-4">
+        Desempeño individual y piezas producidas.
+      </p>
+      <a href="{{ url_for('informe_operadores') }}" class="btn btn-outline-light w-100 stretched-link">Ver Informe</a>
     </div>
   </div>
   {% endif %}
 
-</div>
-
-<!-- Segunda fila de informes específicos de piezas -->
-<div class="row g-4 justify-content-center mt-3">
-
-
-
   <!-- Informe de estado de piezas -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <h5 class="card-title text-light">📋 Estado de Piezas</h5>
-          <p class="text-secondary">
-            Ver si cada pieza está sin producir, en armado o rematada.
-          </p>
+  <div class="col-md-4 col-xl-3">
+    <div class="admin-card h-100 text-center">
+      <div class="d-flex justify-content-center mb-3">
+        <div class="stat-icon bg-info text-white position-relative">
+          <i class='bx bxs-playlist'></i>
         </div>
-        <a href="{{ url_for('informe_estado_piezas') }}" class="btn btn-accent w-100 mt-3">
-          Ver Informe
-        </a>
       </div>
+      <h5 class="text-white">Estado de Piezas</h5>
+      <p class="text-secondary small mb-4">
+        Monitoreo de piezas sin producir, en armado o rematadas.
+      </p>
+      <a href="{{ url_for('informe_estado_piezas') }}" class="btn btn-outline-light w-100 stretched-link">Ver Informe</a>
     </div>
   </div>
 
-  <!-- Informe de tarjetas por cliente/marco/tramo -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <h5 class="card-title text-light">📦 Piezas por Cliente (Tarjetas)</h5>
-          <p class="text-secondary">
-            Tarjetas por cliente con marco y tramos: N - M = pendientes.
-          </p>
+  <!-- Informe de tarjetas -->
+  <div class="col-md-4 col-xl-3">
+    <div class="admin-card h-100 text-center">
+      <div class="d-flex justify-content-center mb-3">
+        <div class="stat-icon bg-warning text-white position-relative">
+          <i class='bx bxs-collection'></i>
         </div>
-        <a href="{{ url_for('informe_piezas_tarjetas') }}" class="btn btn-accent w-100 mt-3">
-          Ver Informe
-        </a>
       </div>
+      <h5 class="text-white">Piezas por Cliente</h5>
+      <p class="text-secondary small mb-4">
+        Tarjetas agrupadas por cliente, marco y tramo.
+      </p>
+      <a href="{{ url_for('informe_piezas_tarjetas') }}" class="btn btn-outline-light w-100 stretched-link">Ver Informe</a>
     </div>
   </div>
 
-  <!-- Informe produccion -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <h5 class="card-title text-light">📄 Registros de Producción</h5>
-          <p class="text-secondary">
-            Listado general de registros de producción (solo lectura).
-          </p>
+  <!-- Registros de Producción -->
+  <div class="col-md-4 col-xl-3">
+    <div class="admin-card h-100 text-center">
+      <div class="d-flex justify-content-center mb-3">
+        <div class="stat-icon bg-success text-white position-relative">
+          <i class='bx bxs-file-find'></i>
         </div>
-        <a href="{{ url_for('admin_produccion_list') }}" class="btn btn-accent w-100 mt-3">
-          Ver Registros
-        </a>
       </div>
+      <h5 class="text-white">Registros de Producción</h5>
+      <p class="text-secondary small mb-4">
+        Listado completo de todos los registros (solo lectura).
+      </p>
+      <a href="{{ url_for('admin_produccion_list') }}" class="btn btn-outline-light w-100 stretched-link">Ver Registros</a>
     </div>
   </div>
 
-  <!-- Generador de Etiquetas (Zebra) -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <h5 class="card-title text-light">🏷️ Etiquetas Zebra</h5>
-          <p class="text-secondary">
-            Generar códigos de barra para impresión en formato Zebra.
-          </p>
+  <!-- Etiquetas Zebra -->
+  <div class="col-md-4 col-xl-3">
+    <div class="admin-card h-100 text-center">
+      <div class="d-flex justify-content-center mb-3">
+        <div class="stat-icon bg-secondary text-white position-relative">
+          <i class='bx bxs-barcode'></i>
         </div>
-        <a href="{{ url_for('soporte_etiquetas') }}" class="btn btn-info w-100 mt-3">
-          Generar Etiquetas
-        </a>
       </div>
+      <h5 class="text-white">Etiquetas Zebra</h5>
+      <p class="text-secondary small mb-4">
+        Generador de códigos de barra para impresión térmica.
+      </p>
+      <a href="{{ url_for('soporte_etiquetas') }}" class="btn btn-outline-light w-100 stretched-link">Generar</a>
     </div>
   </div>
 
-  <!-- Buscador Universal de Piezas -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <h5 class="card-title text-light">🔍 Buscador Universal</h5>
-          <p class="text-secondary">
-            Rastrea el historial completo de una pieza (Activa y Archivada).
-          </p>
+  <!-- Buscador Universal -->
+  <div class="col-md-4 col-xl-3">
+    <div class="admin-card h-100 text-center">
+      <div class="d-flex justify-content-center mb-3">
+        <div class="stat-icon bg-primary text-white position-relative">
+          <i class='bx bx-search-alt'></i>
         </div>
-        <a href="{{ url_for('admin_buscador_piezas') }}" class="btn btn-warning w-100 mt-3">
-          Buscar Pieza
-        </a>
       </div>
+      <h5 class="text-white">Buscador Universal</h5>
+      <p class="text-secondary small mb-4">
+        Rastreo histórico completo de piezas activas y archivadas.
+      </p>
+      <a href="{{ url_for('admin_buscador_piezas') }}" class="btn btn-outline-light w-100 stretched-link">Buscar</a>
     </div>
   </div>
 
 </div>
-
-<!-- Navegación simplificada: sin botones de volver -->
 
 {% endblock %}

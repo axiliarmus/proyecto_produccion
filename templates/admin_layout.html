@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Panel Admin{% endblock %}</title>
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Boxicons -->
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <!-- Custom Admin Theme -->
+    <link href="{{ url_for('static', filename='css/admin_theme.css') }}" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <nav class="admin-sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <i class='bx bxs-component text-gradient' style="font-size: 2rem;"></i>
+            <span>Producción</span>
+            <!-- Close button for mobile -->
+            <button class="btn btn-link text-secondary d-md-none ms-auto" id="sidebarClose">
+                <i class='bx bx-x fs-1'></i>
+            </button>
+        </div>
+
+        <ul class="sidebar-menu">
+            {% if session.get('role') in ['administrador', 'soporte'] %}
+            <li>
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
+                    <i class='bx bxs-dashboard'></i> Dashboard
+                </a>
+            </li>
+            {% endif %}
+
+            {% if session.get('role') in ['administrador', 'soporte'] %}
+            <li>
+                <a href="{{ url_for('usuarios_list') }}" class="nav-link {% if 'usuarios' in request.endpoint %}active{% endif %}">
+                    <i class='bx bxs-user-group'></i> Usuarios
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('boxes_list') }}" class="nav-link {% if 'boxes' in request.endpoint %}active{% endif %}">
+                    <i class='bx bxs-package'></i> Boxes
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('piezas_list') }}" class="nav-link {% if 'piezas' in request.endpoint and 'archivada' not in request.endpoint %}active{% endif %}">
+                    <i class='bx bxs-extension'></i> Piezas
+                </a>
+            </li>
+            {% endif %}
+
+            <li>
+                <a href="{{ url_for('admin_informes') }}" class="nav-link {% if 'informe' in request.endpoint %}active{% endif %}">
+                    <i class='bx bxs-report'></i> Informes
+                </a>
+            </li>
+
+            {% if session.get('role') in ['administrador', 'soporte', 'supervisor'] %}
+            <li>
+                <a href="{{ url_for('admin_picking') }}" class="nav-link {% if 'picking' in request.endpoint %}active{% endif %}">
+                    <i class='bx bx-barcode-reader'></i> Picking
+                </a>
+            </li>
+            {% endif %}
+
+            {% if session.get('role') in ['administrador', 'soporte', 'supervisor'] %}
+            <li>
+                <a href="{{ url_for('admin_archivados_menu') }}" class="nav-link {% if 'archivada' in request.endpoint or 'archivados' in request.endpoint %}active{% endif %}">
+                    <i class='bx bxs-archive-in'></i> Archivados
+                </a>
+            </li>
+            {% endif %}
+            
+            {% if session.get('role') == 'supervisor' %}
+            <li>
+                 <a href="{{ url_for('supervisor_home') }}" class="nav-link {% if 'supervisor' in request.endpoint %}active{% endif %}">
+                    <i class='bx bxs-user-check'></i> Mi Panel
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}" class="nav-link text-danger">
+                <i class='bx bx-log-out'></i> Cerrar Sesión
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+        <!-- Overlay for mobile sidebar -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <!-- Header -->
+        <header class="admin-header">
+            <div class="d-flex align-items-center gap-3">
+                <button class="btn d-md-none p-0 rounded-circle shadow-lg position-relative overflow-hidden d-flex align-items-center justify-content-center" 
+                        id="sidebarToggle" 
+                        style="width: 50px; height: 50px; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); border: 2px solid rgba(255,255,255,0.1); transition: transform 0.2s;">
+                    <div class="position-absolute w-100 h-100" style="background: radial-gradient(circle at center, rgba(255,255,255,0.2) 0%, transparent 70%);"></div>
+                    <i class='bx bx-menu fs-1 text-white position-relative' style="z-index: 2;"></i>
+                </button>
+                <div class="header-title">
+                    <h1>{% block header_title %}Dashboard{% endblock %}</h1>
+                    <span>{% block header_subtitle %}Bienvenido al panel de control{% endblock %}</span>
+                </div>
+            </div>
+            
+            <div class="user-profile">
+                <div class="user-info text-end me-2">
+                    <small class="d-block text-secondary">{{ session.get('role', 'Usuario')|capitalize }}</small>
+                    <span class="fw-bold">{{ session.get('nombre', 'Usuario') }}</span>
+                </div>
+                <div class="user-avatar">
+                    {{ session.get('nombre', 'A')[0]|upper }}
+                </div>
+            </div>
+        </header>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="mb-4">
+              {% for category, msg in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                  {{ msg }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <!-- Content Block -->
+        <div class="admin-content">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // CSRF Token Auto-inject
+        (function() {
+          const token = "{{ csrf_token }}";
+          document.querySelectorAll('form').forEach(function(form) {
+            const method = (form.getAttribute('method') || 'GET').toUpperCase();
+            if (method === 'POST') {
+              form.addEventListener('submit', function() {
+                if (!form.querySelector('input[name="_csrf_token"]')) {
+                  const input = document.createElement('input');
+                  input.type = 'hidden';
+                  input.name = '_csrf_token';
+                  input.value = token;
+                  form.appendChild(input);
+                }
+              });
+            }
+          });
+        })();
+
+        // Mobile Sidebar Logic
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const sidebarClose = document.getElementById('sidebarClose');
+            const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+            function closeSidebar() {
+                sidebar.classList.remove('show');
+                sidebarOverlay.classList.remove('show');
+            }
+
+            function openSidebar() {
+                sidebar.classList.add('show');
+                sidebarOverlay.classList.add('show');
+            }
+
+            if (sidebarToggle) {
+                sidebarToggle.addEventListener('click', openSidebar);
+            }
+
+            if (sidebarClose) {
+                sidebarClose.addEventListener('click', closeSidebar);
+            }
+
+            if (sidebarOverlay) {
+                sidebarOverlay.addEventListener('click', closeSidebar);
+            }
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,13 +1,10 @@
-{% extends 'base.html' %}
+{% extends 'admin_layout.html' %}
+
 {% block title %}Informe Estado de Piezas{% endblock %}
+{% block header_title %}Estado de Piezas{% endblock %}
+{% block header_subtitle %}Monitoreo de piezas (Sin prod / Armado / Rematado){% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Informe – Estado de Piezas</h2>
-
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <p class="text-secondary mb-0">Ver si cada pieza está sin producir, en armado o rematada.</p>
-  
-  </div>
 
 <!-- ================= GRÁFICO DE ESTADO ================= -->
 <div class="row mb-4">
@@ -57,7 +54,7 @@
       <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <div class="col-md-3">
         <label class="form-label text-light">Cliente</label>
-        <select name="empresa" id="empresa" class="form-select">
+        <select name="empresa" id="empresa" class="form-select bg-dark text-light border-secondary">
           <option value="todos" {% if not empresa_sel or empresa_sel=='todos' %}selected{% endif %}>Todos</option>
           {% for e in empresas %}
             <option value="{{ e }}" {% if empresa_sel==e %}selected{% endif %}>{{ e }}</option>
@@ -67,7 +64,7 @@
 
       <div class="col-md-3">
         <label class="form-label text-light">Marco</label>
-        <select name="marco" id="marco" class="form-select">
+        <select name="marco" id="marco" class="form-select bg-dark text-light border-secondary">
           <option value="todos" {% if not marco_sel or marco_sel=='todos' %}selected{% endif %}>Todos</option>
           {% for m in marcos %}
             <option value="{{ m }}" {% if marco_sel==m %}selected{% endif %}>{{ m }}</option>
@@ -77,7 +74,7 @@
 
       <div class="col-md-3">
         <label class="form-label text-light">Tramo</label>
-        <select name="tramo" id="tramo" class="form-select">
+        <select name="tramo" id="tramo" class="form-select bg-dark text-light border-secondary">
           <option value="todos" {% if not tramo_sel or tramo_sel=='todos' %}selected{% endif %}>Todos</option>
           {% for t in tramos %}
             <option value="{{ t }}" {% if tramo_sel==t %}selected{% endif %}>{{ t }}</option>
@@ -87,12 +84,12 @@
 
       <div class="col-md-3">
         <label class="form-label text-light">Código pieza</label>
-        <input type="text" name="codigo_pieza" value="{{ codigo_sel or '' }}" class="form-control" placeholder="Ej: 1001 (vacío = todas)">
+        <input type="text" name="codigo_pieza" value="{{ codigo_sel or '' }}" class="form-control bg-dark text-light border-secondary" placeholder="Ej: 1001 (vacío = todas)">
       </div>
 
       <div class="col-md-3">
         <label class="form-label text-light">Estado</label>
-        <select name="estado" class="form-select">
+        <select name="estado" class="form-select bg-dark text-light border-secondary">
             <option value="todos" {% if not estado_sel or estado_sel == 'todos' %}selected{% endif %}>Todos</option>
             <option value="Sin producción" {% if estado_sel == 'Sin producción' %}selected{% endif %}>Sin producción</option>
             <option value="Armado" {% if estado_sel == 'Armado' %}selected{% endif %}>Armado</option>
@@ -135,7 +132,7 @@
     <tbody>
       {% for p in piezas %}
       <tr>
-        <td>{{ p.codigo }}</td>
+        <td class="fw-bold">{{ p.codigo }}</td>
         <td>{{ p.cliente }}</td>
         <td>{{ p.marco }}</td>
         <td>{{ p.tramo }}</td>

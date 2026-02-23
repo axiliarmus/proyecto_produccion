@@ -1,31 +1,34 @@
-{% extends 'base.html' %}
+{% extends 'admin_layout.html' %}
+
 {% block title %}Gestión Masiva de Piezas{% endblock %}
+{% block header_title %}Gestión Masiva de Piezas{% endblock %}
+{% block header_subtitle %}Eliminación y consulta de piezas en bloque{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>🗑️ Gestión Masiva de Piezas</h2>
-    <a href="{{ url_for('soporte_dashboard') }}" class="btn btn-secondary">← Volver al Panel</a>
-</div>
 
 <div class="card bg-dark border-light shadow mb-4">
     <div class="card-body">
         <form method="POST" class="row g-3">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
             <div class="col-md-6">
-                <input type="text" name="search" class="form-control form-control-lg" 
-                       placeholder="Buscar por código, cliente o marco..." 
+                <label class="form-label text-secondary small">Buscar</label>
+                <input type="text" name="search" class="form-control bg-dark text-light border-secondary" 
+                       placeholder="Código, cliente o marco..." 
                        value="{{ search }}">
             </div>
             <div class="col-md-3">
-                <select name="estado" class="form-select form-select-lg">
+                <label class="form-label text-secondary small">Estado</label>
+                <select name="estado" class="form-select bg-dark text-light border-secondary">
                     <option value="todos" {% if estado_sel == 'todos' %}selected{% endif %}>Todos los estados</option>
                     <option value="Sin producción" {% if estado_sel == 'Sin producción' %}selected{% endif %}>Sin producción</option>
                     <option value="Armado" {% if estado_sel == 'Armado' %}selected{% endif %}>Armado</option>
                     <option value="Rematado" {% if estado_sel == 'Rematado' %}selected{% endif %}>Rematado</option>
                 </select>
             </div>
-            <div class="col-md-3">
-                <button class="btn btn-accent w-100 btn-lg">🔍 Buscar</button>
+            <div class="col-md-3 d-flex align-items-end">
+                <button class="btn btn-accent w-100">
+                    <i class='bx bx-search'></i> Buscar
+                </button>
             </div>
         </form>
     </div>
@@ -35,62 +38,65 @@
     <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
     
     {% if piezas %}
-    <div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-dark border border-secondary rounded">
         <div class="text-light">
-            <span id="selectedCount">0</span> piezas seleccionadas
+            <i class='bx bx-check-square text-accent'></i>
+            <span id="selectedCount" class="fw-bold mx-1">0</span> piezas seleccionadas
         </div>
         <button type="submit" class="btn btn-danger" id="btnDelete" disabled onclick="return confirm('¿Estás SEGURO de eliminar las piezas seleccionadas? Esta acción NO se puede deshacer.')">
-            🗑️ Eliminar Seleccionadas
+            <i class='bx bx-trash'></i> Eliminar Seleccionadas
         </button>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-dark table-hover align-middle">
-            <thead>
-                <tr>
-                    <th style="width: 40px;">
-                        <input type="checkbox" class="form-check-input" id="selectAll">
-                    </th>
-                    <th>Código</th>
-                    <th>Cliente</th>
-                    <th>Marco</th>
-                    <th>Tramo</th>
-                    <th>Estado</th>
-                    <th>Tipo</th>
-                    <th>Peso</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for p in piezas %}
-                <tr>
-                    <td>
-                        <input type="checkbox" name="ids[]" value="{{ p._id }}" class="form-check-input item-check">
-                    </td>
-                    <td class="fw-bold">{{ p.codigo }}</td>
-                    <td>{{ p.empresa }}</td>
-                    <td>{{ p.marco }}</td>
-                    <td>{{ p.tramo }}</td>
-                    <td>
-                        {% if p.estado_prod == 'Rematado' %}
-                            <span class="badge bg-success">Rematado</span>
-                        {% elif p.estado_prod == 'Armado' %}
-                            <span class="badge bg-warning text-dark">Armado</span>
-                        {% else %}
-                            <span class="badge bg-secondary">Sin Prod.</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if p.tipo_precio == 'avo' %}
-                        <span class="badge bg-success">Avo</span>
-                        {% else %}
-                        <span class="badge bg-info text-dark">Metro</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ p.kilo_pieza }} kg</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="admin-card">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0" style="background: transparent;">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">
+                            <input type="checkbox" class="form-check-input" id="selectAll">
+                        </th>
+                        <th>Código</th>
+                        <th>Cliente</th>
+                        <th>Marco</th>
+                        <th>Tramo</th>
+                        <th>Estado</th>
+                        <th>Tipo</th>
+                        <th>Peso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in piezas %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="ids[]" value="{{ p._id }}" class="form-check-input item-check">
+                        </td>
+                        <td class="fw-bold text-white">{{ p.codigo }}</td>
+                        <td>{{ p.empresa }}</td>
+                        <td>{{ p.marco }}</td>
+                        <td>{{ p.tramo }}</td>
+                        <td>
+                            {% if p.estado_prod == 'Rematado' %}
+                                <span class="badge badge-soft text-success">Rematado</span>
+                            {% elif p.estado_prod == 'Armado' %}
+                                <span class="badge badge-soft text-warning">Armado</span>
+                            {% else %}
+                                <span class="badge badge-soft text-secondary">Sin Prod.</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if p.tipo_precio == 'avo' %}
+                            <span class="badge bg-success">Avo</span>
+                            {% else %}
+                            <span class="badge bg-info text-dark">Metro</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.kilo_pieza }} kg</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
     {% else %}
     <div class="alert alert-secondary text-center">

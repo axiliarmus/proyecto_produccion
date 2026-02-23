@@ -1,0 +1,321 @@
+{% extends 'admin_layout.html' %}
+
+{% block title %}Picking de Piezas{% endblock %}
+{% block header_title %}Picking y Conteo{% endblock %}
+{% block header_subtitle %}Escaneo y verificación de piezas en planta{% endblock %}
+
+{% block content %}
+
+<div class="row g-4">
+    <!-- SECCIÓN DE ESCANEO -->
+    <div class="col-lg-4">
+        <div class="admin-card mb-4 sticky-top" style="top: 20px; z-index: 100;">
+            <h5 class="text-white mb-3">📸 Escáner</h5>
+            
+            <!-- Visor de Cámara -->
+            <div id="reader" class="mb-3 border border-secondary rounded overflow-hidden bg-black" style="min-height: 250px; display: none;"></div>
+            
+            <button class="btn btn-accent w-100 mb-3 d-flex align-items-center justify-content-center gap-2" id="btn-scan-qr">
+                <i class='bx bx-camera fs-4'></i> Activar Cámara
+            </button>
+            
+            <hr class="border-secondary my-4">
+            
+            <h5 class="text-white mb-3">⌨️ Ingreso Manual</h5>
+            <div class="input-group mb-3">
+                <input type="text" id="manualInput" class="form-control bg-dark text-light border-secondary" placeholder="Código de pieza..." autocomplete="off">
+                <button class="btn btn-secondary" type="button" id="manualBtn"><i class='bx bx-plus'></i></button>
+            </div>
+
+            <!-- Última pieza escaneada -->
+            <div id="lastScannedCard" class="alert alert-secondary d-none">
+                <div class="d-flex justify-content-between">
+                    <strong id="lastCode"></strong>
+                    <span id="lastStatus" class="badge bg-dark"></span>
+                </div>
+                <small id="lastInfo" class="d-block mt-1 text-muted"></small>
+            </div>
+            
+            <div class="d-grid gap-2 mt-4">
+                 <button class="btn btn-outline-danger btn-sm" onclick="resetPicking()">
+                    <i class='bx bx-trash'></i> Reiniciar Conteo
+                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN DE RESULTADOS -->
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="text-white mb-0">📦 Resumen del Picking</h5>
+            <span class="badge bg-primary fs-6" id="totalCount">0 Piezas</span>
+        </div>
+
+        <!-- Contenedor de Tarjetas -->
+        <div id="resultsContainer">
+            <div class="text-center py-5 text-secondary">
+                <i class='bx bx-barcode-reader fs-1 mb-3'></i>
+                <p>Escanea piezas para comenzar el conteo.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SONIDOS -->
+<audio id="soundSuccess" src="https://cdn.freesound.org/previews/341/341695_5858296-lq.mp3"></audio>
+<audio id="soundError" src="https://cdn.freesound.org/previews/142/142608_1840739-lq.mp3"></audio>
+<audio id="soundDuplicate" src="https://cdn.freesound.org/previews/350/350861_6436536-lq.mp3"></audio>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script>
+// ESTADO DE LA APLICACIÓN
+const state = {
+    scannedCodes: new Set({{ scanned_codes|tojson }}),
+    data: {{ initial_data|tojson }}
+};
+
+// ELEMENTOS DOM
+const manualInput = document.getElementById('manualInput');
+const manualBtn = document.getElementById('manualBtn');
+const resultsContainer = document.getElementById('resultsContainer');
+const totalCountBadge = document.getElementById('totalCount');
+const lastScannedCard = document.getElementById('lastScannedCard');
+const lastCodeSpan = document.getElementById('lastCode');
+const lastStatusSpan = document.getElementById('lastStatus');
+const lastInfoSpan = document.getElementById('lastInfo');
+
+// Inicializar UI con datos del servidor
+document.addEventListener('DOMContentLoaded', () => {
+    updateUI();
+});
+
+// AUDIO
+const playSound = (type) => {
+    const audio = document.getElementById(type === 'success' ? 'soundSuccess' : (type === 'duplicate' ? 'soundDuplicate' : 'soundError'));
+    if(audio) {
+        audio.currentTime = 0;
+        audio.play().catch(e => console.log("Audio play error", e));
+    }
+};
+
+// LÓGICA DE ESCANEO
+async function processCode(code) {
+    code = code.trim().toUpperCase();
+    if (!code) return;
+
+    // 1. Verificar duplicado
+    if (state.scannedCodes.has(code)) {
+        playSound('duplicate');
+        alert(`⚠️ ¡La pieza ${code} YA FUE ESCANEADA!`);
+        return;
+    }
+
+    // 2. Consultar API
+    try {
+        const res = await fetch('/api/picking/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ codigo: code })
+        });
+        
+        const data = await res.json();
+
+        if (!data.success) {
+            playSound('error');
+            alert(`❌ Error: ${data.message}`);
+            return;
+        }
+
+        // 3. Agregar a estado
+        state.scannedCodes.add(code);
+        addToData(data.pieza, data.estado);
+        
+        // 4. Actualizar UI
+        updateUI();
+        showLastScanned(data.pieza, data.estado);
+        playSound('success');
+
+    } catch (e) {
+        console.error(e);
+        playSound('error');
+        alert("Error de conexión con el servidor.");
+    }
+}
+
+// GESTIÓN DE DATOS
+function addToData(pieza, estado) {
+    const { empresa, marco, tramo } = pieza;
+    
+    if (!state.data[empresa]) state.data[empresa] = {};
+    if (!state.data[empresa][marco]) state.data[empresa][marco] = {};
+    if (!state.data[empresa][marco][tramo]) {
+        state.data[empresa][marco][tramo] = { armado: 0, rematado: 0, sin_prod: 0, total: 0 };
+    }
+
+    const counter = state.data[empresa][marco][tramo];
+    counter.total++;
+    
+    if (estado === 'Armado') counter.armado++;
+    else if (estado === 'Rematado') counter.rematado++;
+    else counter.sin_prod++;
+}
+
+function updateUI() {
+    totalCountBadge.textContent = `${state.scannedCodes.size} Piezas`;
+    
+    if (state.scannedCodes.size === 0) {
+        resultsContainer.innerHTML = `
+            <div class="text-center py-5 text-secondary">
+                <i class='bx bx-barcode-reader fs-1 mb-3'></i>
+                <p>Escanea piezas para comenzar el conteo.</p>
+            </div>`;
+        return;
+    }
+
+    let html = '';
+    
+    // Iterar Clientes
+    for (const [cliente, marcos] of Object.entries(state.data)) {
+        html += `<h5 class="text-accent mt-4 mb-3"><i class='bx bxs-business'></i> ${cliente}</h5>`;
+        html += `<div class="row row-cols-1 row-cols-md-2 g-3">`;
+        
+        // Iterar Marcos
+        for (const [marco, tramos] of Object.entries(marcos)) {
+            html += `
+            <div class="col">
+                <div class="admin-card h-100 p-3">
+                    <h6 class="text-white border-bottom border-secondary pb-2 mb-3">${marco}</h6>
+                    <table class="table table-dark table-sm mb-0">
+                        <thead>
+                            <tr class="text-secondary small">
+                                <th>Tramo</th>
+                                <th class="text-center text-warning">Arm</th>
+                                <th class="text-center text-success">Rem</th>
+                                <th class="text-center text-secondary">Sin</th>
+                                <th class="text-end text-white">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+            
+            // Iterar Tramos
+            for (const [tramo, counts] of Object.entries(tramos)) {
+                html += `
+                <tr>
+                    <td>${tramo}</td>
+                    <td class="text-center text-warning">${counts.armado || '-'}</td>
+                    <td class="text-center text-success">${counts.rematado || '-'}</td>
+                    <td class="text-center text-secondary">${counts.sin_prod || '-'}</td>
+                    <td class="text-end fw-bold text-white">${counts.total}</td>
+                </tr>`;
+            }
+            
+            html += `</tbody></table></div></div>`;
+        }
+        html += `</div>`;
+    }
+    
+    resultsContainer.innerHTML = html;
+}
+
+function showLastScanned(pieza, estado) {
+    lastScannedCard.classList.remove('d-none');
+    lastScannedCard.className = `alert mt-3 ${estado === 'Rematado' ? 'alert-success' : (estado === 'Armado' ? 'alert-warning' : 'alert-secondary')}`;
+    
+    lastCodeSpan.textContent = pieza.codigo;
+    lastStatusSpan.textContent = estado;
+    lastStatusSpan.className = `badge ${estado === 'Rematado' ? 'bg-success' : (estado === 'Armado' ? 'bg-warning text-dark' : 'bg-secondary')}`;
+    
+    lastInfoSpan.textContent = `${pieza.empresa} - ${pieza.marco} - ${pieza.tramo}`;
+}
+
+function resetPicking() {
+    if(confirm("¿Estás seguro de borrar todo el conteo actual?")) {
+        fetch('/api/picking/reset', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                state.scannedCodes.clear();
+                state.data = {};
+                updateUI();
+                lastScannedCard.classList.add('d-none');
+            } else {
+                alert("Error al reiniciar: " + data.message);
+            }
+        });
+    }
+}
+
+// EVENTOS MANUALES
+manualBtn.addEventListener('click', () => {
+    processCode(manualInput.value);
+    manualInput.value = '';
+    manualInput.focus();
+});
+
+manualInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        processCode(manualInput.value);
+        manualInput.value = '';
+    }
+});
+
+// ESCÁNER CÁMARA
+const html5QrCode = new Html5Qrcode("reader");
+let isScanning = false;
+
+document.getElementById('btn-scan-qr').addEventListener('click', () => {
+    const readerDiv = document.getElementById('reader');
+    
+    if (isScanning) {
+        html5QrCode.stop().then(() => {
+            isScanning = false;
+            readerDiv.style.display = 'none';
+            document.getElementById('btn-scan-qr').innerHTML = "<i class='bx bx-camera fs-4'></i> Activar Cámara";
+            document.getElementById('btn-scan-qr').classList.replace('btn-danger', 'btn-accent');
+        });
+        return;
+    }
+
+    readerDiv.style.display = 'block';
+    
+    Html5Qrcode.getCameras().then(devices => {
+        if (devices && devices.length) {
+            let cameraId = devices[0].id;
+            // Preferir cámara trasera
+            for (const device of devices) {
+                if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('trasera')) {
+                    cameraId = device.id;
+                    break;
+                }
+            }
+            
+            html5QrCode.start(
+                cameraId, 
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                (decodedText) => {
+                    // Pausa breve para evitar lecturas múltiples muy rápidas
+                    html5QrCode.pause();
+                    processCode(decodedText).then(() => {
+                         setTimeout(() => html5QrCode.resume(), 1500);
+                    });
+                }
+            ).then(() => {
+                isScanning = true;
+                document.getElementById('btn-scan-qr').innerHTML = "<i class='bx bx-stop-circle fs-4'></i> Detener Cámara";
+                document.getElementById('btn-scan-qr').classList.replace('btn-accent', 'btn-danger');
+            });
+        } else {
+            alert('No se encontraron cámaras.');
+        }
+    }).catch(err => {
+        alert('Error al iniciar cámara: ' + err);
+    });
+});
+</script>
+{% endblock %}

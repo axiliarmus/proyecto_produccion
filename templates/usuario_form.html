@@ -1,77 +1,86 @@
-{% extends 'base.html' %}
+{% extends 'admin_layout.html' %}
+
 {% block title %}{{ 'Nuevo Usuario' if modo == 'nuevo' else 'Editar Usuario' }}{% endblock %}
+{% block header_title %}{{ 'Nuevo Usuario' if modo == 'nuevo' else 'Editar Usuario' }}{% endblock %}
+{% block header_subtitle %}Configura los datos de acceso y roles{% endblock %}
+
 {% block content %}
 
-<div class="card bg-dark text-light shadow-lg mx-auto" style="max-width: 600px;">
-  <div class="card-body">
-    <h3 class="card-title text-center mb-4">
-      {{ 'Crear Nuevo Usuario' if modo == 'nuevo' else 'Editar Usuario' }}
-    </h3>
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="admin-card">
+      <form method="post" action="">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        
+        <h5 class="text-accent mb-4">Información de la Cuenta</h5>
+        
+        <div class="row g-3 mb-4">
+          {% if modo == 'nuevo' %}
+          <div class="col-md-6">
+            <label class="form-label text-secondary small">Usuario (Login)</label>
+            <input type="text" class="form-control bg-dark text-light border-secondary" name="usuario" required>
+          </div>
+          {% endif %}
+          
+          <div class="col-md-6">
+            <label class="form-label text-secondary small">Nombre Completo</label>
+            <input type="text" class="form-control bg-dark text-light border-secondary" name="nombre" value="{{ usuario.nombre if usuario else '' }}" required>
+          </div>
+          
+          <div class="col-md-6">
+            <label class="form-label text-secondary small">Rol / Tipo</label>
+            <select class="form-select bg-dark text-light border-secondary" name="tipo" required>
+              <option value="operador" {% if usuario and usuario.tipo=='operador' %}selected{% endif %}>Operador</option>
+              <option value="supervisor" {% if usuario and usuario.tipo=='supervisor' %}selected{% endif %}>Supervisor</option>
+              <option value="soporte" {% if usuario and usuario.tipo=='soporte' %}selected{% endif %}>Soporte</option>
+              <option value="administrador" {% if usuario and usuario.tipo=='administrador' %}selected{% endif %}>Administrador</option>
+              <option value="cliente" {% if usuario and usuario.tipo=='cliente' %}selected{% endif %}>Cliente</option>
+            </select>
+          </div>
 
-    <form method="post" action="">
-      {% if modo == 'nuevo' %}
-      <div class="mb-3">
-        <label class="form-label">Usuario</label>
-        <input type="text" class="form-control bg-secondary text-light" name="usuario" required>
-      </div>
-      {% endif %}
-
-      <div class="mb-3">
-        <label class="form-label">Nombre</label>
-        <input type="text" class="form-control bg-secondary text-light" name="nombre" value="{{ usuario.nombre if usuario else '' }}" required>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Tipo</label>
-        <select class="form-select bg-secondary text-light" name="tipo" required>
-          <option value="administrador" {% if usuario and usuario.tipo=='administrador' %}selected{% endif %}>Administrador</option>
-          <option value="supervisor" {% if usuario and usuario.tipo=='supervisor' %}selected{% endif %}>Supervisor</option>
-          <option value="operador" {% if usuario and usuario.tipo=='operador' %}selected{% endif %}>Operador</option>
-          <option value="cliente" {% if usuario and usuario.tipo=='cliente' %}selected{% endif %}>Cliente</option>
-          <option value="soporte" {% if usuario and usuario.tipo=='soporte' %}selected{% endif %}>Soporte</option>
-        </select>
-      </div>
-
-      <div class="form-check mb-3">
-        <input class="form-check-input" type="checkbox" name="sin_restriccion" id="sinRestriccion" 
-               {% if usuario and usuario.sin_restriccion %}checked{% endif %}>
-        <label class="form-check-label" for="sinRestriccion">
-          ⚡ Sin restricción de tiempo (Ignorar bloqueo de 5 min)
-        </label>
-      </div>
-
-      <div class="row">
-        <div class="col-6 mb-3">
-          <label class="form-label">Precio Metro - Armado ($)</label>
-          <input type="number" step="0.01" class="form-control bg-secondary text-light" name="precio_metro_armado" value="{{ usuario.precio_metro_armado if usuario and usuario.precio_metro_armado else 0 }}">
+          <div class="col-md-6">
+            <label class="form-label text-secondary small">{{ 'Contraseña' if modo == 'nuevo' else 'Nueva Contraseña (opcional)' }}</label>
+            <input type="password" class="form-control bg-dark text-light border-secondary" name="password" {% if modo == 'nuevo' %}required{% endif %}>
+          </div>
         </div>
-        <div class="col-6 mb-3">
-          <label class="form-label">Precio Metro - Remate ($)</label>
-          <input type="number" step="0.01" class="form-control bg-secondary text-light" name="precio_metro_remate" value="{{ usuario.precio_metro_remate if usuario and usuario.precio_metro_remate else 0 }}">
-        </div>
-      </div>
 
-      <div class="row">
-        <div class="col-6 mb-3">
-          <label class="form-label">Precio Avo - Armado ($)</label>
-          <input type="number" step="0.01" class="form-control bg-secondary text-light" name="precio_avo_armado" value="{{ usuario.precio_avo_armado if usuario and usuario.precio_avo_armado else 0 }}">
+        <div class="form-check form-switch mb-5">
+            <input class="form-check-input" type="checkbox" name="sin_restriccion" id="sinRestriccion" 
+                   {% if usuario and usuario.sin_restriccion %}checked{% endif %}>
+            <label class="form-check-label text-light" for="sinRestriccion">
+                ⚡ Sin restricción de tiempo (Ignorar bloqueo de 5 min)
+            </label>
         </div>
-        <div class="col-6 mb-3">
-          <label class="form-label">Precio Avo - Remate ($)</label>
-          <input type="number" step="0.01" class="form-control bg-secondary text-light" name="precio_avo_remate" value="{{ usuario.precio_avo_remate if usuario and usuario.precio_avo_remate else 0 }}">
+
+        <h5 class="text-accent mb-4">Tarifas de Producción ($)</h5>
+        
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <label class="form-label text-secondary small">Metro - Armado</label>
+            <input type="number" step="0.01" class="form-control bg-dark text-light border-secondary" name="precio_metro_armado" value="{{ usuario.precio_metro_armado if usuario and usuario.precio_metro_armado else 0 }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label text-secondary small">Metro - Remate</label>
+            <input type="number" step="0.01" class="form-control bg-dark text-light border-secondary" name="precio_metro_remate" value="{{ usuario.precio_metro_remate if usuario and usuario.precio_metro_remate else 0 }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label text-secondary small">Avo - Armado</label>
+            <input type="number" step="0.01" class="form-control bg-dark text-light border-secondary" name="precio_avo_armado" value="{{ usuario.precio_avo_armado if usuario and usuario.precio_avo_armado else 0 }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label text-secondary small">Avo - Remate</label>
+            <input type="number" step="0.01" class="form-control bg-dark text-light border-secondary" name="precio_avo_remate" value="{{ usuario.precio_avo_remate if usuario and usuario.precio_avo_remate else 0 }}">
+          </div>
         </div>
-      </div>
 
-      <div class="mb-3">
-        <label class="form-label">{{ 'Contraseña' if modo == 'nuevo' else 'Nueva Contraseña (opcional)' }}</label>
-        <input type="password" class="form-control bg-secondary text-light" name="password" {% if modo == 'nuevo' %}required{% endif %}>
-      </div>
-
-      <div class="d-flex justify-content-between mt-4">
-        <a href="{{ url_for('usuarios_list') }}" class="btn btn-secondary">← Volver</a>
-        <button type="submit" class="btn btn-accent">{{ 'Guardar' if modo == 'nuevo' else 'Actualizar' }}</button>
-      </div>
-    </form>
+        <div class="d-flex justify-content-end gap-3">
+          <a href="{{ url_for('usuarios_list') }}" class="btn btn-outline-secondary">Cancelar</a>
+          <button type="submit" class="btn btn-success px-4">
+            <i class='bx bx-save'></i> {{ 'Guardar Usuario' if modo == 'nuevo' else 'Actualizar Datos' }}
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 

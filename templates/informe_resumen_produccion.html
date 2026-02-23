@@ -1,11 +1,10 @@
-{% extends 'base.html' %}
-{% block title %}Resumen de Producción{% endblock %}
-{% block content %}
+{% extends 'admin_layout.html' %}
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="mb-0">Resumen de Producción</h2>
-    <a href="{{ url_for('admin_informes') }}" class="btn btn-secondary">← Volver a Informes</a>
-</div>
+{% block title %}Resumen de Producción{% endblock %}
+{% block header_title %}Resumen de Producción{% endblock %}
+{% block header_subtitle %}Kilos diarios, mensuales y global{% endblock %}
+
+{% block content %}
 
 <!-- TARJETAS DE KILOS -->
 <div class="row g-4 mb-5">

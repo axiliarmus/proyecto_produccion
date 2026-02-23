@@ -1,129 +1,100 @@
-{% extends 'base.html' %}
-{% block title %}
-  {{ 'Nueva Pieza' if modo == 'nuevo' else 'Editar Pieza' }}
-{% endblock %}
+{% extends 'admin_layout.html' %}
+
+{% block title %}{{ 'Nueva Pieza' if modo == 'nuevo' else 'Editar Pieza' }}{% endblock %}
+{% block header_title %}{{ 'Nueva Pieza' if modo == 'nuevo' else 'Editar Pieza' }}{% endblock %}
+{% block header_subtitle %}Define las características de la pieza{% endblock %}
+
 {% block content %}
 
-<div class="card bg-dark text-light shadow-lg mx-auto" style="max-width: 650px;">
-  <div class="card-body">
-    <h3 class="card-title text-center mb-4">
-      {{ 'Crear Nueva Pieza' if modo == 'nuevo' else 'Editar Pieza' }}
-    </h3>
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="admin-card">
+      <form method="post" action="">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
 
-    <form method="post" action="">
+        <h5 class="text-accent mb-4">Detalles Generales</h5>
 
-      <!-- CLIENTE -->
-      <div class="mb-3">
-        <label class="form-label">Cliente</label>
-        <input 
-          type="text" 
-          class="form-control bg-secondary text-light" 
-          name="empresa" 
-          value="{{ pieza.empresa if pieza else '' }}" 
-          required>
-      </div>
+        <div class="row g-3 mb-4">
+          <!-- CLIENTE -->
+          <div class="col-md-6">
+            <label class="form-label text-secondary small">Cliente / Empresa</label>
+            <input type="text" class="form-control bg-dark text-light border-secondary" name="empresa" value="{{ pieza.empresa if pieza else '' }}" required>
+          </div>
 
-      <!-- MARCO -->
-      <div class="mb-3">
-        <label class="form-label">Marco</label>
-        <input 
-          type="text" 
-          class="form-control bg-secondary text-light" 
-          name="marco" 
-          value="{{ pieza.marco if pieza else '' }}" 
-          required>
-      </div>
+          <!-- MARCO -->
+          <div class="col-md-6">
+            <label class="form-label text-secondary small">Marco</label>
+            <input type="text" class="form-control bg-dark text-light border-secondary" name="marco" value="{{ pieza.marco if pieza else '' }}" required>
+          </div>
 
-      <!-- TRAMO -->
-      <div class="mb-3">
-        <label class="form-label">Tramo</label>
-        <input 
-          type="text" 
-          class="form-control bg-secondary text-light" 
-          name="tramo" 
-          value="{{ pieza.tramo if pieza else '' }}" 
-          required>
-      </div>
+          <!-- TRAMO -->
+          <div class="col-md-6">
+            <label class="form-label text-secondary small">Tramo</label>
+            <input type="text" class="form-control bg-dark text-light border-secondary" name="tramo" value="{{ pieza.tramo if pieza else '' }}" required>
+          </div>
 
-      <!-- TIPO DE PRECIO (METRO / AVO) -->
-      <div class="mb-3">
-        <label class="form-label">Tipo de Precio</label>
-        <select class="form-select bg-secondary text-light" name="tipo_precio" required>
-          <option value="metro" {% if pieza and pieza.tipo_precio == 'metro' %}selected{% endif %}>Metro</option>
-          <option value="avo" {% if pieza and pieza.tipo_precio == 'avo' %}selected{% endif %}>Avo</option>
-        </select>
-      </div>
+          <!-- TIPO DE PRECIO -->
+          <div class="col-md-6">
+            <label class="form-label text-secondary small">Tipo de Precio</label>
+            <select class="form-select bg-dark text-light border-secondary" name="tipo_precio" required>
+              <option value="metro" {% if pieza and pieza.tipo_precio == 'metro' %}selected{% endif %}>Metro</option>
+              <option value="avo" {% if pieza and pieza.tipo_precio == 'avo' %}selected{% endif %}>Avo</option>
+            </select>
+          </div>
+        </div>
 
-      <!-- KILO POR PIEZA -->
-      <div class="mb-3">
-        <label class="form-label">Peso por pieza (Kg)</label>
-        <input 
-          type="number" 
-          step="0.01"
-          min="0"
-          class="form-control bg-secondary text-light" 
-          name="kilo_pieza" 
-          value="{{ pieza.kilo_pieza if pieza else '' }}" 
-          required>
-      </div>
+        <h5 class="text-accent mb-4">Dimensiones y Peso</h5>
 
-      <!-- CUERDAS (Interna / Externa) -->
-      <div class="row">
-      <!-- CUERDA INTERNA -->
-      <div class="mb-3">
-        <label class="form-label">Cuerda Interna</label>
-        <input 
-          type="number"
-          step="0.01"
-          min="0"
-          class="form-control bg-secondary text-light" 
-          name="cuerda_interna" 
-          value="{{ pieza.cuerda_interna if pieza and pieza.cuerda_interna is defined else '' }}">
-      </div>
+        <div class="row g-3 mb-4">
+          <!-- KILO POR PIEZA -->
+          <div class="col-md-4">
+            <label class="form-label text-secondary small">Peso (Kg)</label>
+            <input type="number" step="0.01" min="0" class="form-control bg-dark text-light border-secondary" name="kilo_pieza" value="{{ pieza.kilo_pieza if pieza else '' }}" required>
+          </div>
 
-      <!-- CUERDA EXTERNA -->
-      <div class="mb-3">
-        <label class="form-label">Cuerda Externa</label>
-        <input 
-          type="number"
-          step="0.01"
-          min="0"
-          class="form-control bg-secondary text-light" 
-          name="cuerda_externa" 
-          value="{{ pieza.cuerda_externa if pieza and pieza.cuerda_externa is defined else '' }}">
-      </div>
+          <!-- CUERDA INTERNA -->
+          <div class="col-md-4">
+            <label class="form-label text-secondary small">Cuerda Interna</label>
+            <input type="number" step="0.01" min="0" class="form-control bg-dark text-light border-secondary" name="cuerda_interna" value="{{ pieza.cuerda_interna if pieza and pieza.cuerda_interna is defined else '' }}">
+          </div>
 
-      <!-- CANTIDAD (solo en nuevo) -->
-      {% if modo == 'nuevo' %}
-      <div class="mb-3">
-        <label class="form-label">Cantidad de piezas a generar</label>
-        <input 
-          type="number" 
-          min="1" 
-          class="form-control bg-secondary text-light" 
-          name="cantidad" 
-          required>
-      </div>
-      {% endif %}
+          <!-- CUERDA EXTERNA -->
+          <div class="col-md-4">
+            <label class="form-label text-secondary small">Cuerda Externa</label>
+            <input type="number" step="0.01" min="0" class="form-control bg-dark text-light border-secondary" name="cuerda_externa" value="{{ pieza.cuerda_externa if pieza and pieza.cuerda_externa is defined else '' }}">
+          </div>
+        </div>
 
-      <div class="d-flex justify-content-between mt-4">
-        <a href="{{ url_for('piezas_list') }}" class="btn btn-secondary">← Volver</a>
-        <button type="submit" class="btn btn-accent" id="btnSubmit">
-          {{ 'Guardar' if modo == 'nuevo' else 'Actualizar' }}
-        </button>
-      </div>
+        {% if modo == 'nuevo' %}
+        <div class="mb-5 p-3 bg-dark border border-warning rounded">
+          <label class="form-label text-warning small fw-bold">Cantidad de piezas a generar</label>
+          <input type="number" min="1" class="form-control bg-dark text-light border-warning" name="cantidad" value="1" required>
+          <small class="text-secondary">Se crearán múltiples registros con códigos únicos secuenciales.</small>
+        </div>
+        {% endif %}
 
-    </form>
+        <div class="d-flex justify-content-end gap-3">
+          <a href="{{ url_for('piezas_list') }}" class="btn btn-outline-secondary">Cancelar</a>
+          <button type="submit" class="btn btn-success px-4" id="btnSubmit">
+            <i class='bx bx-save'></i> {{ 'Guardar' if modo == 'nuevo' else 'Actualizar' }}
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
 <script>
   document.querySelector("form").addEventListener("submit", function(e) {
-      // La validación HTML5 previene el envío si faltan campos, 
-      // así que si llegamos aquí, el form es válido.
       const btn = document.getElementById("btnSubmit");
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...';
+      // btn.disabled = true; // Comentado para evitar doble envío si el form es inválido y el navegador lo detiene
+      // Pero si es válido, el navegador envía.
+      // Mejor confiar en required.
+      // Si queremos spinner:
+      if(this.checkValidity()){
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...';
+      }
   });
 </script>
 

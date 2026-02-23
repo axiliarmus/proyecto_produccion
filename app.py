@@ -589,8 +589,15 @@ def boxes_delete(id):
 @app.route('/admin/piezas')
 @login_required(['administrador', 'soporte'])
 def piezas_list():
-    piezas = list(db.piezas.find().sort('codigo', 1))
-    return render_template('crud_piezas.html', piezas=piezas)
+    codigo = request.args.get('codigo', '').strip()
+    filtro = {}
+    
+    if codigo:
+        # Filtro case-insensitive parcial
+        filtro['codigo'] = {'$regex': codigo, '$options': 'i'}
+        
+    piezas = list(db.piezas.find(filtro).sort('codigo', 1))
+    return render_template('crud_piezas.html', piezas=piezas, codigo_sel=codigo)
 
 
 # ==================== NUEVA PIEZA ====================
@@ -880,14 +887,100 @@ def admin_dashboard():
     total_boxes = db.boxes.count_documents({})
     total_piezas = db.piezas.count_documents({})
     total_produccion = db.produccion.count_documents({})
+    
+    # --- Datos para Gráfico de Producción (Hoy y Mes) ---
+    today = now_cl().date()
+    start_today = datetime.combine(today, datetime.min.time()).replace(tzinfo=CL)
+    end_today = datetime.combine(today, datetime.max.time()).replace(tzinfo=CL)
+    
+    start_month = today.replace(day=1)
+    # Fin de mes (día 1 del mes siguiente a las 00:00)
+    next_month = (start_month + timedelta(days=32)).replace(day=1)
+    end_month = datetime.combine(next_month, datetime.min.time()).replace(tzinfo=CL)
+    start_month = datetime.combine(start_month, datetime.min.time()).replace(tzinfo=CL)
 
-    return render_template(
-        'admin_dashboard.html',
-        total_usuarios=total_usuarios,
-        total_boxes=total_boxes,
-        total_piezas=total_piezas,
-        total_produccion=total_produccion
-    )
+    # 1. Kilos Hoy
+    prod_hoy = list(db.produccion.find({"fecha": {"$gte": start_today.astimezone(timezone.utc), "$lte": end_today.astimezone(timezone.utc)}}))
+    kilos_hoy = {"avo": 0.0, "metro": 0.0}
+    
+    # 2. Kilos Mes
+    prod_mes = list(db.produccion.find({"fecha": {"$gte": start_month.astimezone(timezone.utc), "$lt": end_month.astimezone(timezone.utc)}}))
+    kilos_mes = {"avo": 0.0, "metro": 0.0}
+
+    # Pre-cargar piezas para cálculos rápidos
+    all_piezas = list(db.piezas.find())
+    mapa_piezas = {str(p["codigo"]): p for p in all_piezas}
+
+    def calcular_kilos(registros):
+        res = {"avo": 0.0, "metro": 0.0}
+        
+        for r in registros:
+            cod = str(r.get("codigo_pieza"))
+            pieza = mapa_piezas.get(cod)
+            if pieza:
+                peso = float(pieza.get("kilo_pieza", 0) or 0)
+                tipo = pieza.get("tipo_precio", "metro")
+                if tipo == "avo":
+                    res["avo"] += peso
+                else:
+                    res["metro"] += peso
+            else:
+                # Fallback al registro si tiene el dato snapshot
+                peso = float(r.get("kilo_pieza", 0) or 0)
+                tipo = r.get("tipo_precio", "metro")
+                if tipo == "avo":
+                    res["avo"] += peso
+                else:
+                    res["metro"] += peso
+        return res
+
+    kilos_hoy = calcular_kilos(prod_hoy)
+    kilos_mes = calcular_kilos(prod_mes)
+
+    # --- Datos para Gráfico de Estado de Piezas ---
+    # Piezas Totales
+    total_p = len(all_piezas)
+    
+    # Piezas con producción (Armado / Rematado)
+    pipeline_estado = [
+        {"$sort": {"fecha": 1}}, 
+        {"$group": {
+            "_id": "$codigo_pieza",
+            "ultimo_modo": {"$last": "$modo"}
+        }}
+    ]
+    estados_prod = list(db.produccion.aggregate(pipeline_estado))
+    
+    codigos_con_prod = set(e["_id"] for e in estados_prod)
+    codigos_totales = set(mapa_piezas.keys())
+    
+    real_rematado = 0
+    real_armado = 0
+    
+    for e in estados_prod:
+        if e["_id"] in codigos_totales:
+            if e["ultimo_modo"] == "rematador":
+                real_rematado += 1
+            else:
+                real_armado += 1
+                
+    real_sin_prod = total_p - (real_rematado + real_armado)
+    
+    stats_piezas = {
+        "sin_produccion": max(0, real_sin_prod),
+        "armado": real_armado,
+        "rematado": real_rematado,
+        "total": total_p
+    }
+
+    return render_template('admin_dashboard.html', 
+                           total_usuarios=total_usuarios,
+                           total_boxes=total_boxes,
+                           total_piezas=total_piezas,
+                           total_produccion=total_produccion,
+                           kilos_hoy=kilos_hoy,
+                           kilos_mes=kilos_mes,
+                           stats_piezas=stats_piezas)
 
 
 # ============================================================
@@ -1441,6 +1534,16 @@ def exportar_produccion_excel():
         as_attachment=True,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+
+@app.route('/admin/archivados/menu')
+@login_required(['administrador', 'soporte', 'supervisor'])
+def admin_archivados_menu():
+    cortes = list(db.cortes.find().sort("creado_en", -1))
+    for c in cortes:
+        if c.get('creado_en'):
+            c['creado_en'] = to_cl(c['creado_en'])
+    return render_template('admin_archivados.html', cortes=cortes)
 
 @app.route('/admin/produccion/archivada', methods=['GET', 'POST'])
 @login_required(['administrador', 'soporte', 'supervisor'])
@@ -2087,16 +2190,7 @@ def soporte_produccion_delete(id):
 def admin_informes():
     return render_template('admin_informes.html', is_cliente=(session.get('role') == 'cliente'), role=session.get('role'))
 
-@app.route('/admin/archivados', methods=['GET', 'POST'])
-@login_required(['administrador', 'soporte', 'supervisor'])
-def admin_archivados_menu():
-    corte_nombre = None
-    if request.method == 'POST':
-        corte_nombre = request.form.get('corte_nombre')
-    else:
-        corte_nombre = request.args.get('corte_nombre')
-    cortes = list(db.cortes.find().sort('creado_en', -1))
-    return render_template('admin_archivados.html', corte_nombre=corte_nombre, cortes=cortes)
+# (Ruta eliminada para evitar conflicto)
 
 
 # ============================================================
@@ -3150,6 +3244,112 @@ def supervisor_validar_pieza(id):
 
     flash(f"Pieza actualizada como {decision}", "success")
     return redirect(url_for("supervisor_home"))
+
+
+# ============================================================
+#                 PICKING / SCANNING TOOL
+# ============================================================
+
+@app.route('/admin/picking')
+@login_required(['administrador', 'soporte', 'supervisor'])
+def admin_picking():
+    # Cargar datos existentes
+    registros = list(db.picking.find().sort("fecha", -1))
+    
+    # Estructurar datos para el frontend
+    data = {}
+    scanned_codes = set()
+    
+    for r in registros:
+        c = r.get("empresa")
+        m = r.get("marco")
+        t = r.get("tramo")
+        st = r.get("estado")
+        code = r.get("codigo")
+        
+        scanned_codes.add(code)
+        
+        if c not in data: data[c] = {}
+        if m not in data[c]: data[c][m] = {}
+        if t not in data[c][m]: data[c][m][t] = {"armado": 0, "rematado": 0, "sin_prod": 0, "total": 0}
+        
+        data[c][m][t]["total"] += 1
+        if st == "Armado": data[c][m][t]["armado"] += 1
+        elif st == "Rematado": data[c][m][t]["rematado"] += 1
+        else: data[c][m][t]["sin_prod"] += 1
+
+    return render_template('admin_picking.html', initial_data=data, scanned_codes=list(scanned_codes))
+
+@app.route('/api/picking/scan', methods=['POST'])
+@login_required(['administrador', 'soporte', 'supervisor'])
+def api_picking_scan():
+    try:
+        data = request.json
+        codigo = data.get('codigo')
+        
+        if not codigo:
+            return {"success": False, "message": "Código vacío"}, 400
+            
+        # Verificar duplicado en Picking
+        if db.picking.find_one({"codigo": codigo}):
+             return {"success": False, "message": f"Pieza {codigo} YA fue escaneada previamente"}, 400
+
+        # 1. Buscar pieza en DB activa
+        pieza = db.piezas.find_one({"codigo": codigo})
+        
+        if not pieza:
+            # Buscar en histórico (opcional)
+            return {"success": False, "message": f"Pieza {codigo} no encontrada en sistema"}, 404
+            
+        # 2. Determinar estado actual
+        last_prod = db.produccion.find_one(
+            {"codigo_pieza": codigo},
+            sort=[("fecha", -1)]
+        )
+        
+        estado = "Sin Producción"
+        if last_prod:
+            modo = last_prod.get("modo")
+            if modo == "armador":
+                estado = "Armado"
+            elif modo == "rematador":
+                estado = "Rematado"
+        
+        # 3. Guardar en DB Picking
+        scan_entry = {
+            "codigo": codigo,
+            "empresa": pieza.get("empresa"),
+            "marco": pieza.get("marco"),
+            "tramo": pieza.get("tramo"),
+            "estado": estado,
+            "fecha": datetime.now(timezone.utc),
+            "usuario": session.get("nombre")
+        }
+        db.picking.insert_one(scan_entry)
+                
+        return {
+            "success": True,
+            "pieza": {
+                "codigo": pieza.get("codigo"),
+                "empresa": pieza.get("empresa"),
+                "marco": pieza.get("marco"),
+                "tramo": pieza.get("tramo"),
+                "kilo_pieza": pieza.get("kilo_pieza", 0)
+            },
+            "estado": estado
+        }
+    except Exception as e:
+        print(f"Error picking scan: {e}")
+        return {"success": False, "message": "Error interno"}, 500
+
+@app.route('/api/picking/reset', methods=['POST'])
+@login_required(['administrador', 'soporte', 'supervisor'])
+def api_picking_reset():
+    try:
+        db.picking.delete_many({})
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "message": str(e)}, 500
 
 # ============================================================
 #     INFORME – VALOR TOTAL POR OPERADOR

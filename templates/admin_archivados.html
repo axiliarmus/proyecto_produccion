@@ -1,34 +1,56 @@
-{% extends 'base.html' %}
-{% block title %}Archivados{% endblock %}
-{% block content %}
+{% extends 'admin_layout.html' %}
 
-<h2 class="mb-4 text-center">🗄️ Centro de Archivados</h2>
+{% block title %}Archivados{% endblock %}
+{% block header_title %}Centro de Archivados{% endblock %}
+{% block header_subtitle %}Historial de cortes mensuales{% endblock %}
+
+{% block content %}
 
 <!-- LISTA DE CORTES (Grid de tarjetas) -->
 <div class="row row-cols-1 row-cols-md-3 g-4">
   {% for c in cortes %}
   <div class="col">
-    <div class="card bg-dark border-light shadow h-100">
-      <div class="card-header bg-secondary text-white text-center py-3">
-        <h5 class="mb-0 fw-bold">{{ c.nombre }}</h5>
-        <small class="text-light opacity-75">Creado: {{ c.creado_en.strftime('%d/%m/%Y') if c.creado_en else 'Fecha N/A' }}</small>
+    <div class="admin-card h-100 position-relative overflow-hidden border-0 shadow-lg" style="background: #1f2937;">
+      <!-- Decoración de fondo -->
+      <div class="position-absolute top-0 end-0 p-3 opacity-25">
+        <i class='bx bxs-archive text-white' style="font-size: 5rem;"></i>
       </div>
-      <div class="card-body d-flex flex-column justify-content-center">
-         <a href="{{ url_for('admin_produccion_archivada') }}?corte_nombre={{ c.nombre }}" class="btn btn-outline-info w-100 mb-2 text-start">
-            <i class="me-2">📄</i> Ver Producción
-         </a>
-         <a href="{{ url_for('archivados_valor_operador') }}?corte_nombre={{ c.nombre }}" class="btn btn-outline-success w-100 mb-2 text-start">
-            <i class="me-2">💰</i> Valor Operador Archivado
-         </a>
-         <a href="{{ url_for('archivados_piezas_cliente') }}?corte_nombre={{ c.nombre }}" class="btn btn-outline-warning w-100 text-start">
-            <i class="me-2">📦</i> Piezas Tarjetas
-         </a>
+      
+      <div class="position-relative z-1">
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <div class="rounded-circle bg-gradient-1 d-flex align-items-center justify-content-center shadow" style="width: 48px; height: 48px;">
+                <i class='bx bxs-calendar-check text-white fs-4'></i>
+            </div>
+            <div>
+                <h5 class="mb-0 text-white fw-bold">{{ c.nombre }}</h5>
+                <small class="text-secondary">Creado: {{ c.creado_en.strftime('%d/%m/%Y') if c.creado_en else 'Fecha N/A' }}</small>
+            </div>
+        </div>
+
+        <div class="d-grid gap-2">
+            <a href="{{ url_for('admin_produccion_archivada') }}?corte_nombre={{ c.nombre }}" class="btn btn-outline-light d-flex align-items-center justify-content-between px-3 py-2 border-secondary bg-dark bg-opacity-50">
+                <span class="d-flex align-items-center gap-2"><i class='bx bxs-file-find text-info'></i> Producción</span>
+                <i class='bx bx-chevron-right'></i>
+            </a>
+            <a href="{{ url_for('archivados_valor_operador') }}?corte_nombre={{ c.nombre }}" class="btn btn-outline-light d-flex align-items-center justify-content-between px-3 py-2 border-secondary bg-dark bg-opacity-50">
+                <span class="d-flex align-items-center gap-2"><i class='bx bxs-dollar-circle text-success'></i> Valor Operador</span>
+                <i class='bx bx-chevron-right'></i>
+            </a>
+            <a href="{{ url_for('archivados_piezas_cliente') }}?corte_nombre={{ c.nombre }}" class="btn btn-outline-light d-flex align-items-center justify-content-between px-3 py-2 border-secondary bg-dark bg-opacity-50">
+                <span class="d-flex align-items-center gap-2"><i class='bx bxs-collection text-warning'></i> Piezas Tarjetas</span>
+                <i class='bx bx-chevron-right'></i>
+            </a>
+        </div>
       </div>
     </div>
   </div>
   {% else %}
   <div class="col-12 text-center mt-5">
-      <p class="text-secondary display-6">No hay cortes archivados todavía.</p>
+      <div class="d-flex flex-column align-items-center justify-content-center py-5">
+          <i class='bx bx-folder-open text-secondary mb-3' style="font-size: 4rem;"></i>
+          <h4 class="text-secondary">No hay cortes archivados todavía.</h4>
+          <p class="text-muted">Los cortes mensuales aparecerán aquí una vez generados.</p>
+      </div>
   </div>
   {% endfor %}
 </div>

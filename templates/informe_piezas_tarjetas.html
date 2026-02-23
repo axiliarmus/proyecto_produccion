@@ -1,8 +1,10 @@
-{% extends 'base.html' %}
+{% extends 'admin_layout.html' %}
+
 {% block title %}Resumen de Piezas por Cliente{% endblock %}
+{% block header_title %}Piezas por Cliente{% endblock %}
+{% block header_subtitle %}Tarjetas agrupadas por cliente y marco{% endblock %}
 
 {% block content %}
-<h2 class="mb-4 text-center">📦 Resumen de Piezas por Cliente</h2>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <p class="text-secondary mb-0">Tarjetas agrupadas por cliente, mostrando marco y tramos con el cálculo N - M = pendientes.</p>

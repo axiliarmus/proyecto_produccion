@@ -1,132 +1,137 @@
-{% extends 'base.html' %}
-{% block title %}Edición Masiva de Piezas{% endblock %}
+{% extends 'admin_layout.html' %}
+
+{% block title %}Edición Masiva{% endblock %}
+{% block header_title %}Edición Masiva de Piezas{% endblock %}
+{% block header_subtitle %}Modificación en bloque de atributos{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Edición Masiva de Piezas</h2>
 
-<!-- 🔙 Botón volver -->
-<div class="mb-3">
-    <a href="{{ url_for('piezas_list') }}" class="btn btn-secondary">
-        ← Volver a Piezas
-    </a>
-</div>
+<div class="row justify-content-center">
+  <div class="col-lg-10">
+    
+    <!-- TARJETA DE FILTROS -->
+    <div class="admin-card mb-4">
+      <h5 class="text-accent mb-4">1. Seleccionar Piezas</h5>
+      
+      <form method="POST" class="row g-3">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
 
-<div class="card mb-4">
-  <div class="card-body">
-
-    <form method="POST" class="row g-3">
-
-      <!-- CLIENTE -->
-      <div class="col-md-4">
-        <label class="form-label">Cliente</label>
-        <select name="empresa" id="empresa" class="form-select">
-          <option value="">Seleccione...</option>
-          {% for e in empresas %}
-            <option value="{{ e }}">{{ e }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- MARCO -->
-      <div class="col-md-4">
-        <label class="form-label">Marco</label>
-        <select name="marco" id="marco" class="form-select" disabled>
-          <option value="">Seleccione una empresa</option>
-        </select>
-      </div>
-
-      <!-- TRAMO -->
-      <div class="col-md-4">
-        <label class="form-label">Tramo</label>
-        <select name="tramo" id="tramo" class="form-select" disabled>
-          <option value="">Seleccione un marco</option>
-        </select>
-      </div>
-
-      <div class="col-md-12">
-        <button class="btn btn-accent w-100">Buscar Piezas</button>
-      </div>
-
-    </form>
-
-  </div>
-</div>
-
-{% if piezas %}
-<h4>Vista previa ({{ piezas|length }} piezas encontradas)</h4>
-
-<div class="table-responsive mb-4">
-  <table class="table table-dark table-striped">
-    <thead>
-      <tr>
-        <th>Código</th>
-        <th>Cliente</th>
-        <th>Marco</th>
-        <th>Tramo</th>
-        <th>Peso</th>
-        <th>C. Interna</th>
-        <th>C. Externa</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for p in piezas %}
-      <tr>
-        <td>{{ p.codigo }}</td>
-        <td>{{ p.empresa }}</td>
-        <td>{{ p.marco }}</td>
-        <td>{{ p.tramo }}</td>
-        <td>{{ p.kilo_pieza }}</td>
-        <td>{{ p.cuerda_interna }}</td>
-        <td>{{ p.cuerda_externa }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-<!-- FORMULARIO DE CONFIRMACIÓN -->
-<div class="card">
-  <div class="card-body">
-
-    <form method="POST" action="{{ url_for('piezas_masivo_confirmar') }}">
-
-      <input type="hidden" name="filtros" value="{{ filtros }}">
-
-      <div class="row g-3">
+        <!-- CLIENTE -->
         <div class="col-md-4">
-          <label class="form-label">Campo a modificar</label>
-          <select name="campo" class="form-select" required>
+          <label class="form-label text-secondary small">Cliente</label>
+          <select name="empresa" id="empresa" class="form-select bg-dark text-light border-secondary">
             <option value="">Seleccione...</option>
-          <option value="empresa">Cliente</option>
-            <option value="marco">Marco</option>
-            <option value="tramo">Tramo</option>
-            <option value="kilo_pieza">Kilo por pieza</option>
-            <option value="cuerda_interna">Cuerda Interna</option>
-            <option value="cuerda_externa">Cuerda Externa</option>
-            <option value="tipo_precio">Tipo de Precio (metro/avo)</option>
+            {% for e in empresas %}
+              <option value="{{ e }}">{{ e }}</option>
+            {% endfor %}
           </select>
         </div>
 
+        <!-- MARCO -->
         <div class="col-md-4">
-          <label class="form-label">Nuevo valor</label>
-          <input name="valor" class="form-control" required>
+          <label class="form-label text-secondary small">Marco</label>
+          <select name="marco" id="marco" class="form-select bg-dark text-light border-secondary" disabled>
+            <option value="">Seleccione una empresa</option>
+          </select>
         </div>
 
-        <div class="col-md-4 d-flex align-items-end">
-          <button class="btn btn-success w-100">Aplicar Cambios</button>
+        <!-- TRAMO -->
+        <div class="col-md-4">
+          <label class="form-label text-secondary small">Tramo</label>
+          <select name="tramo" id="tramo" class="form-select bg-dark text-light border-secondary" disabled>
+            <option value="">Seleccione un marco</option>
+          </select>
         </div>
-      </div>
 
-    </form>
+        <div class="col-md-12 d-flex justify-content-end mt-4">
+          <button class="btn btn-accent px-4 d-flex align-items-center gap-2">
+            <i class='bx bx-search'></i> Buscar Piezas
+          </button>
+        </div>
+
+      </form>
+    </div>
+
+    {% if piezas %}
+    <!-- VISTA PREVIA Y ACCIÓN -->
+    <div class="admin-card">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="text-white mb-0">Vista Previa <span class="badge badge-soft text-accent">{{ piezas|length }} piezas</span></h5>
+        </div>
+
+        <div class="table-responsive mb-4" style="max-height: 400px; overflow-y: auto;">
+          <table class="table table-dark table-hover align-middle mb-0" style="background: transparent;">
+            <thead class="sticky-top bg-dark">
+              <tr>
+                <th>Código</th>
+                <th>Cliente</th>
+                <th>Marco</th>
+                <th>Tramo</th>
+                <th>Peso</th>
+                <th>C. Int</th>
+                <th>C. Ext</th>
+                <th>Tipo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in piezas %}
+              <tr>
+                <td class="fw-bold text-white">{{ p.codigo }}</td>
+                <td>{{ p.empresa }}</td>
+                <td>{{ p.marco }}</td>
+                <td>{{ p.tramo }}</td>
+                <td>{{ p.kilo_pieza }}</td>
+                <td>{{ p.cuerda_interna }}</td>
+                <td>{{ p.cuerda_externa }}</td>
+                <td>{{ p.tipo_precio|default('metro') }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="p-4 bg-dark rounded border border-secondary">
+            <h5 class="text-warning mb-3">2. Aplicar Cambios Masivos</h5>
+            
+            <form method="POST" action="{{ url_for('piezas_masivo_confirmar') }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="filtros" value="{{ filtros }}">
+        
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label text-secondary small">Campo a modificar</label>
+                        <select name="campo" class="form-select bg-dark text-light border-secondary" required>
+                            <option value="">Seleccione...</option>
+                            <option value="empresa">Cliente</option>
+                            <option value="marco">Marco</option>
+                            <option value="tramo">Tramo</option>
+                            <option value="kilo_pieza">Kilo por pieza</option>
+                            <option value="cuerda_interna">Cuerda Interna</option>
+                            <option value="cuerda_externa">Cuerda Externa</option>
+                            <option value="tipo_precio">Tipo de Precio (metro/avo)</option>
+                        </select>
+                    </div>
+            
+                    <div class="col-md-5">
+                        <label class="form-label text-secondary small">Nuevo valor</label>
+                        <input name="valor" class="form-control bg-dark text-light border-secondary" required placeholder="Escribe el nuevo valor...">
+                    </div>
+            
+                    <div class="col-md-3">
+                        <button class="btn btn-success w-100 d-flex align-items-center justify-content-center gap-2" onclick="return confirm('¿Estás SEGURO de modificar {{ piezas|length }} piezas? Esta acción no se puede deshacer.')">
+                            <i class='bx bx-check-circle'></i> Aplicar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
 
   </div>
 </div>
 
-{% endif %}
-
-<!-- ================================
-       SCRIPT LISTAS DINÁMICAS
-================================ -->
+<!-- SCRIPT LISTAS DINÁMICAS -->
 <script>
 document.getElementById("empresa").addEventListener("change", async function () {
     const empresa = this.value;
@@ -141,16 +146,19 @@ document.getElementById("empresa").addEventListener("change", async function () 
 
     if (!empresa) return;
 
-    const res = await fetch(`/api/marcos/${empresa}`);
-    const data = await res.json();
+    try {
+        const res = await fetch(`/api/marcos/${encodeURIComponent(empresa)}`);
+        const data = await res.json();
 
-    selMarco.innerHTML = "<option value=''>Seleccione...</option>";
-
-    data.marcos.forEach(m => {
-        selMarco.innerHTML += `<option value="${m}">${m}</option>`;
-    });
-
-    selMarco.disabled = false;
+        selMarco.innerHTML = "<option value=''>Seleccione...</option>";
+        data.marcos.forEach(m => {
+            selMarco.innerHTML += `<option value="${m}">${m}</option>`;
+        });
+        selMarco.disabled = false;
+    } catch (e) {
+        console.error("Error cargando marcos", e);
+        selMarco.innerHTML = "<option>Error al cargar</option>";
+    }
 });
 
 document.getElementById("marco").addEventListener("change", async function () {
@@ -163,16 +171,19 @@ document.getElementById("marco").addEventListener("change", async function () {
 
     if (!empresa || !marco) return;
 
-    const res = await fetch(`/api/tramos/${empresa}/${marco}`);
-    const data = await res.json();
+    try {
+        const res = await fetch(`/api/tramos/${encodeURIComponent(empresa)}/${encodeURIComponent(marco)}`);
+        const data = await res.json();
 
-    selTramo.innerHTML = "<option value=''>Seleccione...</option>";
-
-    data.tramos.forEach(t => {
-        selTramo.innerHTML += `<option value="${t}">${t}</option>`;
-    });
-
-    selTramo.disabled = false;
+        selTramo.innerHTML = "<option value=''>Seleccione...</option>";
+        data.tramos.forEach(t => {
+            selTramo.innerHTML += `<option value="${t}">${t}</option>`;
+        });
+        selTramo.disabled = false;
+    } catch (e) {
+        console.error("Error cargando tramos", e);
+        selTramo.innerHTML = "<option>Error al cargar</option>";
+    }
 });
 </script>
 

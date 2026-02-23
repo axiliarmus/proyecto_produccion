@@ -1,95 +1,273 @@
-{% extends 'base.html' %}
-{% block title %}Panel de Administración{% endblock %}
+{% extends 'admin_layout.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const canvas = document.getElementById('miniEstadoChart');
+    if (canvas) {
+        const ctxEstado = canvas.getContext('2d');
+        new Chart(ctxEstado, {
+            type: 'doughnut',
+            data: {
+                labels: ['Sin Producción', 'Armado', 'Rematado'],
+                datasets: [{
+                    data: [
+                        {{ stats_piezas.sin_produccion }}, 
+                        {{ stats_piezas.armado }}, 
+                        {{ stats_piezas.rematado }}
+                    ],
+                    backgroundColor: [
+                        '#6c757d', // secondary
+                        '#ffc107', // warning
+                        '#198754'  // success
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        enabled: true
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}"
+    }
+  ]
+}
+{% block header_title %}Dashboard{% endblock %}
+{% block header_subtitle %}Resumen general del sistema{% endblock %}
+
 {% block content %}
-
-<h2 class="mb-4 text-center">Panel de Administración</h2>
-
-<!-- Primera fila: Gestión principal -->
-<div class="row g-4 mb-4 justify-content-center">
-  <!-- Usuarios -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center">
-      <div class="card-body">
-        <h5 class="card-title text-light">👤 Usuarios</h5>
-        <p class="text-secondary mb-2">Administra los usuarios del sistema y sus roles.</p>
-        <p class="display-6 text-white fw-bold">{{ total_usuarios }}</p>
-        <a href="{{ url_for('usuarios_list') }}" class="btn btn-accent w-100 mt-2">Gestionar Usuarios</a>
-      </div>
-    </div>
-  </div>
-
-  <!-- Boxes -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center">
-      <div class="card-body">
-        <h5 class="card-title text-light">🧰 Boxes</h5>
-        <p class="text-secondary mb-2">Crea y edita los boxes disponibles para producción.</p>
-        <p class="display-6 text-white fw-bold">{{ total_boxes }}</p>
-        <a href="{{ url_for('boxes_list') }}" class="btn btn-accent w-100 mt-2">Gestionar Boxes</a>
-      </div>
-    </div>
-  </div>
-
-  <!-- Piezas -->
-  <div class="col-md-3">
-    <div class="card bg-dark border-light shadow text-center">
-      <div class="card-body">
-        <h5 class="card-title text-light">🧩 Piezas</h5>
-        <p class="text-secondary mb-2">Define los tipos de piezas, marcos y tramos.</p>
-        <p class="display-6 text-white fw-bold">{{ total_piezas }}</p>
-        <a href="{{ url_for('piezas_list') }}" class="btn btn-accent w-100 mt-2">Gestionar Piezas</a>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Segunda fila: Informes -->
-<div class="row justify-content-center">
-  <div class="col-md-8">
-    <div class="card bg-dark border-light shadow-lg text-center">
-      <div class="card-body">
-        <h4 class="card-title text-light mb-3">📊 Informes</h4>
-        <p class="text-secondary">
-          Accede a reportes detallados de horarios, producción de piezas y rendimiento por operador.
-        </p>
-        <p class="display-6 text-white fw-bold">{{ total_produccion }}</p>
-        <a href="{{ url_for('admin_informes') }}" class="btn btn-accent mt-2 px-4">Ver Informes del Sistema</a>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Sección: Archivados y Corte -->
-<div class="row justify-content-center mt-4">
-  <div class="col-md-8">
-    <div class="card bg-dark border-light shadow-lg">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h4 class="card-title text-light mb-0">🗄️ Producción Archivada</h4>
-          <a href="{{ url_for('admin_archivados_menu') }}" class="btn btn-accent">Ver Archivados</a>
+<!-- Stats Row -->
+<div class="row g-4 mb-5">
+    <!-- Usuarios Card -->
+    <div class="col-md-3">
+        <div class="admin-card stat-card">
+            <div class="stat-icon bg-gradient-1 text-white">
+                <i class='bx bxs-user'></i>
+            </div>
+            <div>
+                <div class="stat-title">Total Usuarios</div>
+                <div class="stat-value">{{ total_usuarios }}</div>
+            </div>
+            <a href="{{ url_for('usuarios_list') }}" class="stretched-link"></a>
         </div>
-        <hr class="border-secondary">
-        <h5 class="text-light mb-3">✂ Corte Avanzado</h5>
-        <form method="post" action="{{ url_for('admin_corte_mensual') }}" class="row g-3">
-          <div class="col-12">
-            <label class="form-label text-light">Nombre del Corte (Opcional)</label>
-            <input type="text" name="nombre" class="form-control" placeholder="Ej: Enero 2026 - Especial">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label text-light">Fecha inicio</label>
-            <input type="date" name="fecha_inicio" class="form-control" required>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label text-light">Fecha fin</label>
-            <input type="date" name="fecha_fin" class="form-control" required>
-          </div>
-          <div class="col-md-12">
-            <button class="btn btn-danger w-100">Confirmar Corte</button>
-          </div>
-        </form>
-      </div>
     </div>
-  </div>
+
+    <!-- Boxes Card -->
+    <div class="col-md-3">
+        <div class="admin-card stat-card">
+            <div class="stat-icon bg-gradient-2 text-white">
+                <i class='bx bxs-package'></i>
+            </div>
+            <div>
+                <div class="stat-title">Boxes Activos</div>
+                <div class="stat-value">{{ total_boxes }}</div>
+            </div>
+            <a href="{{ url_for('boxes_list') }}" class="stretched-link"></a>
+        </div>
+    </div>
+
+    <!-- Piezas Card -->
+    <div class="col-md-3">
+        <div class="admin-card stat-card">
+            <div class="stat-icon bg-gradient-3 text-white">
+                <i class='bx bxs-extension'></i>
+            </div>
+            <div>
+                <div class="stat-title">Piezas Definidas</div>
+                <div class="stat-value">{{ total_piezas }}</div>
+            </div>
+            <a href="{{ url_for('piezas_list') }}" class="stretched-link"></a>
+        </div>
+    </div>
+
+    <!-- Producción Card -->
+    <div class="col-md-3">
+        <div class="admin-card stat-card">
+            <div class="stat-icon bg-primary text-white">
+                <i class='bx bxs-bar-chart-alt-2'></i>
+            </div>
+            <div>
+                <div class="stat-title">Registros Prod.</div>
+                <div class="stat-value">{{ total_produccion }}</div>
+            </div>
+            <a href="{{ url_for('admin_informes') }}" class="stretched-link"></a>
+        </div>
+    </div>
 </div>
 
+<!-- =======================
+     NUEVOS INDICADORES DE PRODUCCIÓN Y ESTADO
+     ======================= -->
+<div class="row g-4 mb-5">
+    <!-- Kilos Hoy -->
+    <div class="col-md-4">
+        <div class="admin-card h-100">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="text-white mb-0">📅 Producción Hoy</h5>
+                <span class="badge badge-soft text-success">En tiempo real</span>
+            </div>
+            <div class="row text-center">
+                <div class="col-6 border-end border-secondary">
+                    <small class="text-secondary">AVO</small>
+                    <h4 class="text-light fw-bold">{{ "%.1f"|format(kilos_hoy.avo) }}</h4>
+                </div>
+                <div class="col-6">
+                    <small class="text-secondary">METRO</small>
+                    <h4 class="text-light fw-bold">{{ "%.1f"|format(kilos_hoy.metro) }}</h4>
+                </div>
+            </div>
+            <div class="mt-3 pt-3 border-top border-secondary text-center">
+                <small class="text-secondary">TOTAL HOY</small>
+                <h3 class="text-accent fw-bold">{{ "%.1f"|format(kilos_hoy.avo + kilos_hoy.metro) }} <small class="fs-6 text-secondary">kg</small></h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kilos Mes -->
+    <div class="col-md-4">
+        <div class="admin-card h-100">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="text-white mb-0">🗓️ Producción Mes</h5>
+                <span class="badge badge-soft text-info">Acumulado</span>
+            </div>
+            <div class="row text-center">
+                <div class="col-6 border-end border-secondary">
+                    <small class="text-secondary">AVO</small>
+                    <h4 class="text-light fw-bold">{{ "%.1f"|format(kilos_mes.avo) }}</h4>
+                </div>
+                <div class="col-6">
+                    <small class="text-secondary">METRO</small>
+                    <h4 class="text-light fw-bold">{{ "%.1f"|format(kilos_mes.metro) }}</h4>
+                </div>
+            </div>
+            <div class="mt-3 pt-3 border-top border-secondary text-center">
+                <small class="text-secondary">TOTAL MES</small>
+                <h3 class="text-info fw-bold">{{ "%.1f"|format(kilos_mes.avo + kilos_mes.metro) }} <small class="fs-6 text-secondary">kg</small></h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráfico de Estado (Miniatura) -->
+    <div class="col-md-4">
+        <div class="admin-card h-100 position-relative">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <h5 class="text-white mb-0">Estado Piezas</h5>
+                <a href="{{ url_for('informe_estado_piezas') }}" class="btn btn-sm btn-ghost-warning">Ver Detalle</a>
+            </div>
+            <div style="height: 140px;">
+                <canvas id="miniEstadoChart"></canvas>
+            </div>
+            <div class="d-flex justify-content-around mt-2 small">
+                <span class="text-secondary"><i class='bx bxs-circle text-secondary'></i> Sin Prod: {{ stats_piezas.sin_produccion }}</span>
+                <span class="text-warning"><i class='bx bxs-circle text-warning'></i> Armado: {{ stats_piezas.armado }}</span>
+                <span class="text-success"><i class='bx bxs-circle text-success'></i> Rematado: {{ stats_piezas.rematado }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Grid -->
+<div class="row g-4">
+    <!-- Left Column: Quick Actions & Reports -->
+    <div class="col-lg-8">
+        <div class="admin-card h-100">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="text-white mb-0">Gestión Rápida</h4>
+                <span class="badge bg-secondary">Accesos Directos</span>
+            </div>
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <a href="{{ url_for('usuarios_nuevo_form') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3">
+                        <i class='bx bx-plus-circle fs-4 text-accent'></i>
+                        <div>
+                            <div class="fw-bold">Nuevo Usuario</div>
+                            <small class="text-secondary">Registrar operador o admin</small>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="{{ url_for('piezas_nuevo_form') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3">
+                        <i class='bx bx-plus-circle fs-4 text-warning'></i>
+                        <div>
+                            <div class="fw-bold">Nueva Pieza</div>
+                            <small class="text-secondary">Añadir al catálogo</small>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="{{ url_for('admin_informes') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3">
+                        <i class='bx bx-file fs-4 text-info'></i>
+                        <div>
+                            <div class="fw-bold">Ver Informes</div>
+                            <small class="text-secondary">Producción, Horarios, Kilos</small>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="{{ url_for('admin_buscador_piezas') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3">
+                        <i class='bx bx-search fs-4 text-success'></i>
+                        <div>
+                            <div class="fw-bold">Buscador Universal</div>
+                            <small class="text-secondary">Rastrear cualquier pieza</small>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Monthly Cut -->
+    <div class="col-lg-4">
+        <div class="admin-card bg-dark border-danger h-100">
+            <div class="d-flex align-items-center gap-2 mb-3 text-danger">
+                <i class='bx bxs-calendar-x fs-3'></i>
+                <h5 class="mb-0">Cierre de Mes</h5>
+            </div>
+            <p class="text-secondary small mb-4">
+                Realiza el corte mensual para archivar la producción actual y reiniciar contadores.
+            </p>
+            
+            <form method="post" action="{{ url_for('admin_corte_mensual') }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                
+                <div class="mb-3">
+                    <label class="form-label text-light small">Nombre del Corte</label>
+                    <input type="text" name="nombre" class="form-control bg-dark text-light border-secondary" placeholder="Ej: Enero 2026">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label text-light small">Fecha Inicio</label>
+                    <input type="date" name="fecha_inicio" class="form-control bg-dark text-light border-secondary" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label text-light small">Fecha Fin</label>
+                    <input type="date" name="fecha_fin" class="form-control bg-dark text-light border-secondary" required>
+                </div>
+                
+                <button class="btn btn-danger w-100 d-flex align-items-center justify-content-center gap-2">
+                    <i class='bx bx-archive-in'></i> Ejecutar Corte
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

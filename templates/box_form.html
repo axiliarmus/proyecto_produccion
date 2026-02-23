@@ -1,30 +1,35 @@
-{% extends 'base.html' %}
+{% extends 'admin_layout.html' %}
+
 {% block title %}{{ 'Nuevo Box' if modo == 'nuevo' else 'Editar Box' }}{% endblock %}
+{% block header_title %}{{ 'Nuevo Box' if modo == 'nuevo' else 'Editar Box' }}{% endblock %}
+{% block header_subtitle %}Configura las estaciones de trabajo{% endblock %}
+
 {% block content %}
 
-<div class="card bg-dark text-light shadow-lg mx-auto" style="max-width: 600px;">
-  <div class="card-body">
-    <h3 class="card-title text-center mb-4">
-      {{ 'Crear Nuevo Box' if modo == 'nuevo' else 'Editar Box' }}
-    </h3>
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="admin-card">
+      <form method="post" action="">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        
+        <div class="mb-4">
+          <label class="form-label text-secondary small">Código</label>
+          <input type="text" class="form-control bg-dark text-light border-secondary" name="codigo" value="{{ box.codigo if box else '' }}" required>
+        </div>
 
-    <form method="post" action="">
-      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-      <div class="mb-3">
-        <label class="form-label">Código</label>
-        <input type="text" class="form-control bg-secondary text-light" name="codigo" value="{{ box.codigo if box else '' }}" required>
-      </div>
+        <div class="mb-5">
+          <label class="form-label text-secondary small">Descripción</label>
+          <input type="text" class="form-control bg-dark text-light border-secondary" name="descripcion" value="{{ box.descripcion if box else '' }}" required>
+        </div>
 
-      <div class="mb-3">
-        <label class="form-label">Descripción</label>
-        <input type="text" class="form-control bg-secondary text-light" name="descripcion" value="{{ box.descripcion if box else '' }}" required>
-      </div>
-
-      <div class="d-flex justify-content-between mt-4">
-        <a href="{{ url_for('boxes_list') }}" class="btn btn-secondary">← Volver</a>
-        <button type="submit" class="btn btn-accent">{{ 'Guardar' if modo == 'nuevo' else 'Actualizar' }}</button>
-      </div>
-    </form>
+        <div class="d-flex justify-content-end gap-3">
+          <a href="{{ url_for('boxes_list') }}" class="btn btn-outline-secondary">Cancelar</a>
+          <button type="submit" class="btn btn-success px-4">
+            <i class='bx bx-save'></i> {{ 'Guardar Box' if modo == 'nuevo' else 'Actualizar' }}
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 

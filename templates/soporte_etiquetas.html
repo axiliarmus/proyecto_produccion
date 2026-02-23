@@ -1,19 +1,18 @@
-{% extends 'base.html' %}
+{% extends 'admin_layout.html' %}
+
 {% block title %}Generador de Etiquetas{% endblock %}
+{% block header_title %}Generador de Etiquetas (Zebra){% endblock %}
+{% block header_subtitle %}Impresión de códigos de barra{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>🏷️ Generador de Etiquetas (Zebra)</h2>
-    <a href="{{ url_for('soporte_dashboard') }}" class="btn btn-secondary">← Volver al Panel</a>
-</div>
 
 <div class="card bg-dark border-light shadow mb-4">
     <div class="card-body">
         <form method="POST" class="row g-3">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
             <div class="col-md-4">
-                <label class="form-label text-light">Cliente</label>
-                <select name="cliente" class="form-select form-select-lg">
+                <label class="form-label text-secondary small">Cliente</label>
+                <select name="cliente" class="form-select bg-dark text-light border-secondary">
                     <option value="todos">Todos los Clientes</option>
                     {% for c in clientes %}
                     <option value="{{ c }}" {% if cliente_sel == c|string %}selected{% endif %}>{{ c }}</option>
@@ -21,8 +20,8 @@
                 </select>
             </div>
             <div class="col-md-4">
-                <label class="form-label text-light">Marco</label>
-                <select name="marco" class="form-select form-select-lg">
+                <label class="form-label text-secondary small">Marco</label>
+                <select name="marco" class="form-select bg-dark text-light border-secondary">
                     <option value="todos">Todos los Marcos</option>
                     {% for m in marcos %}
                     <option value="{{ m }}" {% if marco_sel == m|string %}selected{% endif %}>{{ m }}</option>
@@ -30,8 +29,8 @@
                 </select>
             </div>
             <div class="col-md-4">
-                <label class="form-label text-light">Tramo</label>
-                <select name="tramo" class="form-select form-select-lg">
+                <label class="form-label text-secondary small">Tramo</label>
+                <select name="tramo" class="form-select bg-dark text-light border-secondary">
                     <option value="todos">Todos los Tramos</option>
                     {% for t in tramos %}
                     <option value="{{ t }}" {% if tramo_sel == t|string %}selected{% endif %}>{{ t }}</option>
@@ -39,8 +38,8 @@
                 </select>
             </div>
             <div class="col-md-6">
-                <label class="form-label text-light">Estado</label>
-                <select name="estado" class="form-select form-select-lg">
+                <label class="form-label text-secondary small">Estado</label>
+                <select name="estado" class="form-select bg-dark text-light border-secondary">
                     <option value="todos" {% if estado_sel == 'todos' %}selected{% endif %}>Todos los estados</option>
                     <option value="Sin producción" {% if estado_sel == 'Sin producción' %}selected{% endif %}>Sin producción</option>
                     <option value="Armado" {% if estado_sel == 'Armado' %}selected{% endif %}>Armado</option>
@@ -48,7 +47,9 @@
                 </select>
             </div>
             <div class="col-md-6 d-flex align-items-end">
-                <button class="btn btn-accent w-100 btn-lg">🔍 Buscar</button>
+                <button class="btn btn-accent w-100">
+                    <i class='bx bx-search'></i> Buscar
+                </button>
             </div>
         </form>
     </div>
@@ -56,63 +57,67 @@
 
 {% if piezas %}
 <div class="d-flex justify-content-end mb-3">
-    <button class="btn btn-info" onclick="imprimirSeleccionados()">🖨️ Imprimir Seleccionadas</button>
+    <button class="btn btn-info d-flex align-items-center gap-2" onclick="imprimirSeleccionados()">
+        <i class='bx bxs-printer'></i> Imprimir Seleccionadas
+    </button>
 </div>
 
-<div class="table-responsive">
-    <table class="table table-dark table-hover align-middle">
-        <thead>
-            <tr>
-                <th style="width: 40px;">
-                    <input type="checkbox" class="form-check-input" id="selectAll">
-                </th>
-                <th>Código</th>
-                <th>Cliente</th>
-                <th>Marco</th>
-                <th>Tramo</th>
-                <th>Estado</th>
-                <th>Vista Previa</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in piezas %}
-            <tr>
-                <td>
-                    <input type="checkbox" class="form-check-input item-check" 
-                           data-codigo="{{ p.codigo }}" 
-                           data-cliente="{{ p.empresa }}" 
-                           data-marco="{{ p.marco }}"
-                           data-tramo="{{ p.tramo }}">
-                </td>
-                <td class="fw-bold">{{ p.codigo }}</td>
-                <td>{{ p.empresa }}</td>
-                <td>{{ p.marco }}</td>
-                <td>{{ p.tramo }}</td>
-                <td>
-                    {% if p.estado_prod == 'Rematado' %}
-                        <span class="badge bg-success">Rematado</span>
-                    {% elif p.estado_prod == 'Armado' %}
-                        <span class="badge bg-warning text-dark">Armado</span>
-                    {% else %}
-                        <span class="badge bg-secondary">Sin Prod.</span>
-                    {% endif %}
-                </td>
-                <td>
-                    <svg class="barcode" 
-                         jsbarcode-format="CODE128" 
-                         jsbarcode-value="{{ p.codigo }}" 
-                         jsbarcode-textmargin="0" 
-                         jsbarcode-fontoptions="bold"
-                         jsbarcode-height="30"
-                         jsbarcode-width="1"
-                         jsbarcode-displayValue="true"
-                         jsbarcode-fontSize="12">
-                    </svg>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="admin-card">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0" style="background: transparent;">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">
+                        <input type="checkbox" class="form-check-input" id="selectAll">
+                    </th>
+                    <th>Código</th>
+                    <th>Cliente</th>
+                    <th>Marco</th>
+                    <th>Tramo</th>
+                    <th>Estado</th>
+                    <th>Vista Previa</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in piezas %}
+                <tr>
+                    <td>
+                        <input type="checkbox" class="form-check-input item-check" 
+                               data-codigo="{{ p.codigo }}" 
+                               data-cliente="{{ p.empresa }}" 
+                               data-marco="{{ p.marco }}"
+                               data-tramo="{{ p.tramo }}">
+                    </td>
+                    <td class="fw-bold text-white">{{ p.codigo }}</td>
+                    <td>{{ p.empresa }}</td>
+                    <td>{{ p.marco }}</td>
+                    <td>{{ p.tramo }}</td>
+                    <td>
+                        {% if p.estado_prod == 'Rematado' %}
+                            <span class="badge badge-soft text-success">Rematado</span>
+                        {% elif p.estado_prod == 'Armado' %}
+                            <span class="badge badge-soft text-warning">Armado</span>
+                        {% else %}
+                            <span class="badge badge-soft text-secondary">Sin Prod.</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <svg class="barcode" 
+                             jsbarcode-format="CODE128" 
+                             jsbarcode-value="{{ p.codigo }}" 
+                             jsbarcode-textmargin="0" 
+                             jsbarcode-fontoptions="bold"
+                             jsbarcode-height="30"
+                             jsbarcode-width="1"
+                             jsbarcode-displayValue="true"
+                             jsbarcode-fontSize="12">
+                        </svg>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% else %}
 <div class="alert alert-secondary text-center">

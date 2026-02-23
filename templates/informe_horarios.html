@@ -1,8 +1,10 @@
-{% extends 'base.html' %}
-{% block title %}Informe de Horarios{% endblock %}
-{% block content %}
+{% extends 'admin_layout.html' %}
 
-<h2 class="mb-4 text-center">⏰ Informe de Horarios</h2>
+{% block title %}Informe de Horarios{% endblock %}
+{% block header_title %}Informe de Horarios{% endblock %}
+{% block header_subtitle %}Registros de asistencia{% endblock %}
+
+{% block content %}
 
 <div class="card bg-dark border-light shadow-lg mx-auto" style="max-width: 900px;">
   <div class="card-body">
@@ -10,7 +12,7 @@
       <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <div class="col-md-8">
         <label class="form-label text-light">Seleccionar Operador:</label>
-        <select name="operador" class="form-select bg-secondary text-light">
+        <select name="operador" class="form-select bg-dark text-light border-secondary">
           <option value="todos">Todos los operadores</option>
           {% for op in operadores %}
           <option value="{{ op._id }}" {% if operador_sel == op._id|string %}selected{% endif %}>
@@ -60,7 +62,5 @@
     {% endif %}
   </div>
 </div>
-
- 
 
 {% endblock %}

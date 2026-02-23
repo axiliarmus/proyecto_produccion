@@ -1,112 +1,134 @@
-{% extends 'base.html' %}
-{% block title %}{% if archived_view %}Registros Archivados (Admin){% else %}Registros de Producción (Admin){% endif %}{% endblock %}
+{% extends 'admin_layout.html' %}
+
+{% block title %}{% if archived_view %}Registros Archivados{% else %}Registros de Producción{% endif %}{% endblock %}
+{% block header_title %}{% if archived_view %}Registros Archivados{% else %}Registros de Producción{% endif %}{% endblock %}
+{% block header_subtitle %}Historial completo de operaciones{% endblock %}
 
 {% block content %}
 
-<h2 class="mb-3">{% if archived_view %}Registros Archivados{% else %}Registros de Producción{% endif %}</h2>
-
-<div class="card bg-dark border-light shadow mb-4">
-  <div class="card-body">
-    <form method="POST" class="row g-3">
-      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-      <div class="col-md-3">
-        <label class="form-label text-light">Operador</label>
-        <select name="operador" class="form-select">
-          <option value="todos">Todos</option>
-          {% for op in operadores %}
-            <option value="{{ op }}" {% if operador_sel == op %}selected{% endif %}>{{ op }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      {% if archived_view %}
-      <div class="col-md-3">
-        <label class="form-label text-light">Mes</label>
-        <input type="month" name="mes" class="form-control" value="{{ mes_sel or '' }}">
-      </div>
-      {% endif %}
-
-      <div class="col-md-3">
-        <label class="form-label text-light">Código</label>
-        <input type="text" name="codigo" class="form-control" value="{{ codigo_sel or '' }}">
-      </div>
-
-      <div class="col-md-3">
-        <label class="form-label text-light">Desde</label>
-        <input type="date" name="fecha_inicio" class="form-control" value="{{ fecha_inicio or '' }}">
-      </div>
-
-      <div class="col-md-3">
-        <label class="form-label text-light">Hasta</label>
-        <input type="date" name="fecha_fin" class="form-control" value="{{ fecha_fin or '' }}">
-      </div>
-
-      <div class="col-md-12 text-end">
-        <button class="btn btn-accent w-100">Filtrar</button>
-      </div>
-    </form>
-    
-    <div class="row mt-3 g-2">
-      <div class="col-md-6">
-        <form method="POST" action="{{ archived_view and url_for('exportar_produccion_archivada_excel') or url_for('exportar_produccion_excel') }}">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-            <input type="hidden" name="operador" value="{{ operador_sel or 'todos' }}">
-            <input type="hidden" name="codigo" value="{{ codigo_sel or '' }}">
-            <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
-            <input type="hidden" name="fecha_fin" value="{{ fecha_fin or '' }}">
-            {% if archived_view %}
-            <input type="hidden" name="corte_nombre" value="{{ corte_nombre or '' }}">
-            {% endif %}
-            <button class="btn btn-success w-100">📥 Exportar a Excel</button>
-        </form>
-      </div>
-
-      {% if archived_view and corte_nombre %}
-      <div class="col-md-6">
-          <a href="{{ url_for('admin_piezas_archivadas', corte_nombre=corte_nombre) }}" class="btn btn-info w-100">🏷️ Ver Piezas y Etiquetas (Corte)</a>
-      </div>
-      {% endif %}
+<div class="admin-card mb-4">
+  <form method="POST" class="row g-3">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <div class="col-md-3">
+      <label class="form-label text-secondary small">Operador</label>
+      <select name="operador" class="form-select bg-dark text-light border-secondary">
+        <option value="todos">Todos</option>
+        {% for op in operadores %}
+          <option value="{{ op }}" {% if operador_sel == op %}selected{% endif %}>{{ op }}</option>
+        {% endfor %}
+      </select>
     </div>
+
+    {% if archived_view %}
+    <div class="col-md-3">
+      <label class="form-label text-secondary small">Mes</label>
+      <input type="month" name="mes" class="form-control bg-dark text-light border-secondary" value="{{ mes_sel or '' }}">
+    </div>
+    {% endif %}
+
+    <div class="col-md-3">
+      <label class="form-label text-secondary small">Código</label>
+      <input type="text" name="codigo" class="form-control bg-dark text-light border-secondary" value="{{ codigo_sel or '' }}">
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label text-secondary small">Desde</label>
+      <input type="date" name="fecha_inicio" class="form-control bg-dark text-light border-secondary" value="{{ fecha_inicio or '' }}">
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label text-secondary small">Hasta</label>
+      <input type="date" name="fecha_fin" class="form-control bg-dark text-light border-secondary" value="{{ fecha_fin or '' }}">
+    </div>
+
+    <div class="col-md-12 text-end">
+      <button class="btn btn-accent px-4">
+        <i class='bx bx-filter-alt'></i> Filtrar
+      </button>
+    </div>
+  </form>
+  
+  <div class="row mt-4 g-2">
+    <div class="col-md-auto">
+      <form method="POST" action="{{ archived_view and url_for('exportar_produccion_archivada_excel') or url_for('exportar_produccion_excel') }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="operador" value="{{ operador_sel or 'todos' }}">
+          <input type="hidden" name="codigo" value="{{ codigo_sel or '' }}">
+          <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
+          <input type="hidden" name="fecha_fin" value="{{ fecha_fin or '' }}">
+          {% if archived_view %}
+          <input type="hidden" name="corte_nombre" value="{{ corte_nombre or '' }}">
+          {% endif %}
+          <button class="btn btn-success w-100 d-flex align-items-center gap-2">
+            <i class='bx bxs-spreadsheet'></i> Exportar Excel
+          </button>
+      </form>
+    </div>
+
+    {% if archived_view and corte_nombre %}
+    <div class="col-md-auto">
+        <a href="{{ url_for('admin_piezas_archivadas', corte_nombre=corte_nombre) }}" class="btn btn-info w-100 d-flex align-items-center gap-2">
+          <i class='bx bxs-purchase-tag'></i> Ver Piezas y Etiquetas (Corte)
+        </a>
+    </div>
+    {% endif %}
   </div>
 </div>
 
-<div class="table-responsive">
-  <table class="table table-dark table-striped align-middle">
-    <thead>
-      <tr>
-        <th>Fecha</th>
-        <th>Modo</th>
-        <th>Operador</th>
-        <th>Box</th>
-        <th>Código</th>
-        <th>Cliente</th>
-        <th>Marco</th>
-        <th>Tramo</th>
-        <th>C. Interna</th>
-        <th>C. Externa</th>
-        <th>Estado</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in registros %}
-      <tr>
-        <td>{% if r.fecha %}{{ r.fecha.strftime('%d-%m-%Y %H:%M') }}{% else %}—{% endif %}</td>
-        <td>{{ r.modo }}</td>
-        <td>{{ r.usuario }}</td>
-        <td>{{ r.box }}</td>
-        <td>{{ r.codigo_pieza }}</td>
-        <td>{{ r.empresa }}</td>
-        <td>{{ r.marco }}</td>
-        <td>{{ r.tramo }}</td>
-        <td>{{ r.cuerda_interna if r.cuerda_interna is defined else '—' }}</td>
-        <td>{{ r.cuerda_externa if r.cuerda_externa is defined else '—' }}</td>
-        <td>{{ r.calidad_status|capitalize }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="admin-card">
+  <div class="table-responsive">
+    <table class="table table-dark table-hover align-middle mb-0" style="background: transparent;">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Modo</th>
+          <th>Operador</th>
+          <th>Box</th>
+          <th>Código</th>
+          <th>Cliente</th>
+          <th>Marco</th>
+          <th>Tramo</th>
+          <th>C. Int</th>
+          <th>C. Ext</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in registros %}
+        <tr>
+          <td class="text-secondary small">{% if r.fecha %}{{ r.fecha.strftime('%d-%m-%Y %H:%M') }}{% else %}—{% endif %}</td>
+          <td>
+            {% if r.modo == 'armador' %}
+              <span class="badge badge-soft text-warning">Armado</span>
+            {% else %}
+              <span class="badge badge-soft text-success">Remate</span>
+            {% endif %}
+          </td>
+          <td class="fw-bold">{{ r.usuario }}</td>
+          <td>{{ r.box }}</td>
+          <td class="text-info">{{ r.codigo_pieza }}</td>
+          <td>{{ r.empresa }}</td>
+          <td>{{ r.marco }}</td>
+          <td>{{ r.tramo }}</td>
+          <td>{{ r.cuerda_interna if r.cuerda_interna is defined else '—' }}</td>
+          <td>{{ r.cuerda_externa if r.cuerda_externa is defined else '—' }}</td>
+          <td>
+            {% if r.calidad_status == 'aprobado' %}
+              <i class='bx bxs-check-circle text-success'></i>
+            {% elif r.calidad_status == 'rechazado' %}
+              <i class='bx bxs-x-circle text-danger'></i>
+            {% else %}
+              <i class='bx bxs-circle text-secondary' style="font-size: 0.6rem;"></i>
+            {% endif %}
+            {{ r.calidad_status|capitalize }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% if registros|length == 0 %}
-    <div class="alert alert-secondary text-center mt-3">No hay registros de producción.</div>
+    <div class="p-4 text-center text-secondary">No hay registros de producción.</div>
   {% endif %}
 </div>
 

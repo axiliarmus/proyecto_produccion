@@ -1,8 +1,10 @@
-{% extends 'base.html' %}
-{% block title %}Producción por Operador{% endblock %}
-{% block content %}
+{% extends 'admin_layout.html' %}
 
-<h2 class="mb-4 text-center">👷 Informe de Producción por Operador</h2>
+{% block title %}Producción por Operador{% endblock %}
+{% block header_title %}Producción por Operador{% endblock %}
+{% block header_subtitle %}Desempeño individual detallado{% endblock %}
+
+{% block content %}
 
 <div class="card bg-dark border-light shadow-lg mx-auto" style="max-width: 1000px;">
   <div class="card-body">
@@ -12,7 +14,7 @@
       <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <div class="col-md-4">
         <label class="form-label text-light">Operador:</label>
-        <select name="operador" class="form-select bg-secondary text-light">
+        <select name="operador" class="form-select bg-dark text-light border-secondary">
           <option value="todos">Todos los operadores</option>
           {% for op in operadores %}
           <option value="{{ op._id }}" {% if operador_sel == op._id|string %}selected{% endif %}>
@@ -24,13 +26,13 @@
 
       <div class="col-md-3">
         <label class="form-label text-light">Desde:</label>
-        <input type="date" class="form-control bg-secondary text-light" name="fecha_inicio"
+        <input type="date" class="form-control bg-dark text-light border-secondary" name="fecha_inicio"
                value="{{ fecha_inicio or '' }}">
       </div>
 
       <div class="col-md-3">
         <label class="form-label text-light">Hasta:</label>
-        <input type="date" class="form-control bg-secondary text-light" name="fecha_fin"
+        <input type="date" class="form-control bg-dark text-light border-secondary" name="fecha_fin"
                value="{{ fecha_fin or '' }}">
       </div>
 
@@ -97,7 +99,5 @@
     {% endif %}
   </div>
 </div>
-
- 
 
 {% endblock %}
