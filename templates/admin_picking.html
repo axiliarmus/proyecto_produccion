@@ -12,9 +12,6 @@
         <div class="admin-card mb-4 sticky-top" style="top: 20px; z-index: 100;">
             <h5 class="text-white mb-3">📸 Escáner</h5>
             
-            <!-- Visor de Cámara -->
-            <div id="reader" class="mb-3 border border-secondary rounded overflow-hidden bg-black" style="min-height: 250px; display: none;"></div>
-            
             <button class="btn btn-accent w-100 mb-3 d-flex align-items-center justify-content-center gap-2" id="btn-scan-qr">
                 <i class='bx bx-camera fs-4'></i> Activar Cámara
             </button>
@@ -61,6 +58,22 @@
     </div>
 </div>
 
+<!-- Modal para Escáner QR (Igual que Operador) -->
+<div class="modal fade" id="qrModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-white">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Escanear Código de Barras</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <div id="reader" style="width: 100%;"></div>
+        <p class="mt-2 text-muted small">Apunta la cámara al código de barras de la pieza</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- SONIDOS -->
 <audio id="soundSuccess" src="https://cdn.freesound.org/previews/341/341695_5858296-lq.mp3"></audio>
 <audio id="soundError" src="https://cdn.freesound.org/previews/142/142608_1840739-lq.mp3"></audio>
@@ -69,7 +82,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script src="{{ url_for('static', filename='js/html5-qrcode.min.js') }}"></script>
 <script>
 // ESTADO DE LA APLICACIÓN
 const state = {
@@ -281,6 +294,18 @@ if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
 
 const html5QrCode = new Html5Qrcode("reader", configHtml5QrCode);
 let isScanning = false;
+let qrModal;
+
+document.addEventListener('DOMContentLoaded', function() {
+    updateUI();
+    checkSecureConnection();
+    // Inicializar Modal
+    if (typeof bootstrap !== 'undefined') {
+        qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
+    } else {
+        console.error("Bootstrap no está definido");
+    }
+});
 
 function checkSecureConnection() {
     if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && tunnelUrl) {
@@ -312,10 +337,24 @@ function checkSecureConnection() {
 }
 
 document.getElementById('btn-scan-qr').addEventListener('click', () => {
-    const readerDiv = document.getElementById('reader');
+    // Diagnóstico
+    console.log("Botón cámara presionado");
     
-    if (isScanning) {
-        stopScanning();
+    if (typeof Html5Qrcode === 'undefined') {
+        alert("Error: Librería de escáner no cargada. Recarga la página.");
+        return;
+    }
+
+    if (!qrModal) {
+        // Intentar reinicializar
+        if (typeof bootstrap !== 'undefined') {
+            const el = document.getElementById('qrModal');
+            if (el) qrModal = new bootstrap.Modal(el);
+        }
+    }
+
+    if (!qrModal) {
+        alert("Error: No se pudo iniciar el componente Modal.");
         return;
     }
 
@@ -334,11 +373,22 @@ document.getElementById('btn-scan-qr').addEventListener('click', () => {
         }
     }
 
-    readerDiv.style.display = 'block';
-    startScanning(readerDiv);
+    qrModal.show();
+    
+    // Pequeño delay para asegurar que el modal esté visible antes de iniciar
+    setTimeout(() => {
+        startScanning();
+    }, 500);
 });
 
-function startScanning(readerDiv) {
+// Detener escaneo al cerrar modal
+document.getElementById('qrModal').addEventListener('hidden.bs.modal', () => {
+    stopScanning();
+});
+
+function startScanning() {
+    if (isScanning) return;
+    
     Html5Qrcode.getCameras().then(devices => {
         if (devices && devices.length) {
             let cameraId = devices[0].id;
@@ -354,10 +404,12 @@ function startScanning(readerDiv) {
                 cameraId, 
                 { fps: 10, qrbox: { width: 250, height: 250 } },
                 (decodedText) => {
-                    // Pausa breve para evitar lecturas múltiples muy rápidas
+                    // Pausa breve
                     html5QrCode.pause();
                     processCode(decodedText).then(() => {
-                         setTimeout(() => html5QrCode.resume(), 1500);
+                         // Cerrar modal tras escaneo exitoso (comportamiento Operador)
+                         stopScanning();
+                         qrModal.hide();
                     });
                 },
                 (errorMessage) => {
@@ -365,31 +417,29 @@ function startScanning(readerDiv) {
                 }
             ).then(() => {
                 isScanning = true;
-                document.getElementById('btn-scan-qr').innerHTML = "<i class='bx bx-stop-circle fs-4'></i> Detener Cámara";
-                document.getElementById('btn-scan-qr').classList.replace('btn-accent', 'btn-danger');
             }).catch(err => {
                 isScanning = false;
+                const readerDiv = document.getElementById('reader');
                 mostrarErrorUI(readerDiv, err);
             });
         } else {
             alert('No se encontraron cámaras.');
         }
     }).catch(err => {
+        const readerDiv = document.getElementById('reader');
         mostrarErrorUI(readerDiv, err);
     });
 }
 
 function stopScanning() {
-    const readerDiv = document.getElementById('reader');
-    html5QrCode.stop().then(() => {
-        isScanning = false;
-        readerDiv.style.display = 'none';
-        document.getElementById('btn-scan-qr').innerHTML = "<i class='bx bx-camera fs-4'></i> Activar Cámara";
-        document.getElementById('btn-scan-qr').classList.replace('btn-danger', 'btn-accent');
-        html5QrCode.clear();
-    }).catch(err => {
-        console.error("Error al detener cámara", err);
-    });
+    if (isScanning) {
+        html5QrCode.stop().then(() => {
+            isScanning = false;
+            html5QrCode.clear();
+        }).catch(err => {
+            console.error("Error al detener cámara", err);
+        });
+    }
 }
 
 function mostrarErrorUI(container, err) {
