@@ -64,10 +64,11 @@ def add_security_headers(response):
     # Se permiten scripts inline y desde CDN conocidos.
     csp = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net blob: data: https://translate.googleapis.com; "
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com blob: data: https://translate.googleapis.com; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com https://unpkg.com; "
         "img-src 'self' data: blob: https://www.gstatic.com; "
-        "font-src 'self' data: https://cdn.jsdelivr.net; "
+        "font-src 'self' data: https://cdn.jsdelivr.net https://unpkg.com; "
+        "media-src 'self' https://cdn.freesound.org; "
         "connect-src 'self' https://cdn.jsdelivr.net https://translate.googleapis.com;"
     )
     response.headers['Content-Security-Policy'] = csp
