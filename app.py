@@ -5,6 +5,7 @@
 import os
 import json
 import secrets
+import re
 from datetime import datetime, date, timedelta
 from bson import ObjectId
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
@@ -3288,27 +3289,32 @@ def admin_picking():
 def api_picking_scan():
     try:
         data = request.json
-        codigo = data.get('codigo')
+        codigo = data.get('codigo', '').strip()
         
         if not codigo:
             return {"success": False, "message": "Código vacío"}, 400
             
-        # Verificar duplicado en Picking
-        if db.picking.find_one({"codigo": codigo}):
+        # Regex para búsqueda case-insensitive
+        # re.escape asegura que caracteres especiales no rompan el regex
+        patron_regex = f"^{re.escape(codigo)}$"
+        filtro_regex = {"$regex": patron_regex, "$options": "i"}
+
+        # Verificar duplicado en Picking (case insensitive)
+        if db.picking.find_one({"codigo": filtro_regex}):
              return {"success": False, "message": f"Pieza {codigo} YA fue escaneada previamente"}, 400
 
         # 1. Buscar pieza en DB activa (Maestro)
-        pieza = db.piezas.find_one({"codigo": codigo})
+        pieza = db.piezas.find_one({"codigo": filtro_regex})
         
         # 2. Buscar último estado en Producción Activa
         last_prod_active = db.produccion.find_one(
-            {"codigo_pieza": codigo},
+            {"codigo_pieza": filtro_regex},
             sort=[("fecha", -1)]
         )
 
         # 3. Buscar último estado en Producción Histórica
         last_prod_hist = db.produccion_historica.find_one(
-            {"codigo_pieza": codigo},
+            {"codigo_pieza": filtro_regex},
             sort=[("fecha", -1)]
         )
 
@@ -3327,8 +3333,10 @@ def api_picking_scan():
         # Si no existe en maestro, intentar recuperar datos del registro de producción
         if not pieza:
             if last_prod:
+                # Usamos el código encontrado en producción para normalizar (si difiere en case)
+                codigo_encontrado = str(last_prod.get("codigo_pieza", codigo))
                 pieza = {
-                    "codigo": codigo,
+                    "codigo": codigo_encontrado,
                     "empresa": last_prod.get("empresa", "Desconocido"),
                     "marco": last_prod.get("marco", "Desconocido"),
                     "tramo": last_prod.get("tramo", "Desconocido"),
@@ -3336,6 +3344,9 @@ def api_picking_scan():
                 }
             else:
                 return {"success": False, "message": f"Pieza {codigo} no encontrada en sistema ni históricos"}, 404
+        
+        # Usar el código "real" de la pieza encontrada (canonical) para guardar en picking
+        codigo_final = pieza.get("codigo")
             
         estado = "Sin Producción"
         if last_prod:
@@ -3345,9 +3356,9 @@ def api_picking_scan():
             elif modo == "rematador":
                 estado = "Rematado"
         
-        # 3. Guardar en DB Picking
+        # 3. Guardar en DB Picking (Usando código canónico)
         scan_entry = {
-            "codigo": codigo,
+            "codigo": codigo_final,
             "empresa": pieza.get("empresa", "Desconocido"),
             "marco": pieza.get("marco", "Desconocido"),
             "tramo": pieza.get("tramo", "Desconocido"),
@@ -3360,7 +3371,7 @@ def api_picking_scan():
         return {
             "success": True,
             "pieza": {
-                "codigo": pieza.get("codigo"),
+                "codigo": codigo_final,
                 "empresa": pieza.get("empresa", "Desconocido"),
                 "marco": pieza.get("marco", "Desconocido"),
                 "tramo": pieza.get("tramo", "Desconocido"),

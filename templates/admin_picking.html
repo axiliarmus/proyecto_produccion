@@ -118,11 +118,17 @@ const playSound = (type) => {
 
 // LÓGICA DE NEGOCIO (Picking)
 async function processCode(code) {
-    code = code.trim().toUpperCase();
+    code = code.trim(); // Se elimina toUpperCase() para respetar input original
     if (!code) return;
 
-    // 1. Verificar duplicado
-    if (state.scannedCodes.has(code)) {
+    // 1. Verificar duplicado (Case Insensitive en frontend también)
+    const codeUpper = code.toUpperCase();
+    let isDuplicate = false;
+    state.scannedCodes.forEach(c => {
+        if (c.toUpperCase() === codeUpper) isDuplicate = true;
+    });
+
+    if (isDuplicate) {
         playSound('duplicate');
         alert(`⚠️ ¡La pieza ${code} YA FUE ESCANEADA!`);
         return;
@@ -144,8 +150,9 @@ async function processCode(code) {
             return;
         }
 
-        // 3. Agregar a estado
-        state.scannedCodes.add(code);
+        // 3. Agregar a estado (Usar el código CANÓNICO devuelto por el servidor)
+        const canonicalCode = data.pieza.codigo;
+        state.scannedCodes.add(canonicalCode);
         addToData(data.pieza, data.estado);
         
         // 4. Actualizar UI
