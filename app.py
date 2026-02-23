@@ -3297,19 +3297,46 @@ def api_picking_scan():
         if db.picking.find_one({"codigo": codigo}):
              return {"success": False, "message": f"Pieza {codigo} YA fue escaneada previamente"}, 400
 
-        # 1. Buscar pieza en DB activa
+        # 1. Buscar pieza en DB activa (Maestro)
         pieza = db.piezas.find_one({"codigo": codigo})
         
-        if not pieza:
-            # Buscar en histórico (opcional)
-            return {"success": False, "message": f"Pieza {codigo} no encontrada en sistema"}, 404
-            
-        # 2. Determinar estado actual
-        last_prod = db.produccion.find_one(
+        # 2. Buscar último estado en Producción Activa
+        last_prod_active = db.produccion.find_one(
             {"codigo_pieza": codigo},
             sort=[("fecha", -1)]
         )
-        
+
+        # 3. Buscar último estado en Producción Histórica
+        last_prod_hist = db.produccion_historica.find_one(
+            {"codigo_pieza": codigo},
+            sort=[("fecha", -1)]
+        )
+
+        # Determinar cuál es el registro más reciente
+        last_prod = None
+        if last_prod_active and last_prod_hist:
+            if last_prod_active["fecha"] >= last_prod_hist["fecha"]:
+                last_prod = last_prod_active
+            else:
+                last_prod = last_prod_hist
+        elif last_prod_active:
+            last_prod = last_prod_active
+        elif last_prod_hist:
+            last_prod = last_prod_hist
+
+        # Si no existe en maestro, intentar recuperar datos del registro de producción
+        if not pieza:
+            if last_prod:
+                pieza = {
+                    "codigo": codigo,
+                    "empresa": last_prod.get("empresa", "Desconocido"),
+                    "marco": last_prod.get("marco", "Desconocido"),
+                    "tramo": last_prod.get("tramo", "Desconocido"),
+                    "kilo_pieza": last_prod.get("peso_calculado", 0) # Estimado
+                }
+            else:
+                return {"success": False, "message": f"Pieza {codigo} no encontrada en sistema ni históricos"}, 404
+            
         estado = "Sin Producción"
         if last_prod:
             modo = last_prod.get("modo")
@@ -3321,9 +3348,9 @@ def api_picking_scan():
         # 3. Guardar en DB Picking
         scan_entry = {
             "codigo": codigo,
-            "empresa": pieza.get("empresa"),
-            "marco": pieza.get("marco"),
-            "tramo": pieza.get("tramo"),
+            "empresa": pieza.get("empresa", "Desconocido"),
+            "marco": pieza.get("marco", "Desconocido"),
+            "tramo": pieza.get("tramo", "Desconocido"),
             "estado": estado,
             "fecha": datetime.now(timezone.utc),
             "usuario": session.get("nombre")
@@ -3334,9 +3361,9 @@ def api_picking_scan():
             "success": True,
             "pieza": {
                 "codigo": pieza.get("codigo"),
-                "empresa": pieza.get("empresa"),
-                "marco": pieza.get("marco"),
-                "tramo": pieza.get("tramo"),
+                "empresa": pieza.get("empresa", "Desconocido"),
+                "marco": pieza.get("marco", "Desconocido"),
+                "tramo": pieza.get("tramo", "Desconocido"),
                 "kilo_pieza": pieza.get("kilo_pieza", 0)
             },
             "estado": estado
