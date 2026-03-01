@@ -23,12 +23,17 @@
       
       <!-- Botones de Acción -->
       <div class="col-md-6 text-end">
-        <a href="{{ url_for('piezas_masivo') }}" class="btn btn-outline-warning d-inline-flex align-items-center gap-2 me-2">
-          <i class='bx bx-wrench'></i> Edición Masiva
-        </a>
-        <a href="{{ url_for('piezas_nuevo_form') }}" class="btn btn-success d-inline-flex align-items-center gap-2">
-          <i class='bx bx-plus-circle'></i> Nueva Pieza
-        </a>
+        <div class="d-flex justify-content-end gap-2">
+            <a href="{{ url_for('piezas_eliminar_masivo') }}" class="btn btn-outline-danger d-inline-flex align-items-center gap-2" title="Eliminar múltiples piezas">
+              <i class='bx bx-trash'></i> Masivo
+            </a>
+            <a href="{{ url_for('piezas_masivo') }}" class="btn btn-outline-warning d-inline-flex align-items-center gap-2">
+              <i class='bx bx-wrench'></i> Edición Masiva
+            </a>
+            <a href="{{ url_for('piezas_nuevo_form') }}" class="btn btn-success d-inline-flex align-items-center gap-2">
+              <i class='bx bx-plus-circle'></i> Nueva Pieza
+            </a>
+        </div>
       </div>
     </div>
   </div>

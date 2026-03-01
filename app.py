@@ -605,6 +605,119 @@ def piezas_list():
     return render_template('crud_piezas.html', piezas=piezas, codigo_sel=codigo)
 
 
+@app.route('/api/piezas/filtros-dinamicos', methods=['GET'])
+@login_required(['administrador', 'soporte'])
+def api_piezas_filtros():
+    try:
+        cliente = request.args.get('cliente')
+        marco = request.args.get('marco')
+        
+        match = {}
+        if cliente: match['empresa'] = cliente
+        if marco: match['marco'] = marco
+        
+        # Obtener valores únicos basados en la selección anterior
+        data = {
+            'marcos': sorted(db.piezas.distinct('marco', match)) if cliente else [],
+            'tramos': sorted(db.piezas.distinct('tramo', match)) if marco else []
+        }
+        
+        # Si no hay cliente seleccionado, devolver todos los clientes (carga inicial)
+        if not cliente:
+            data['empresas'] = sorted(db.piezas.distinct('empresa'))
+            
+        return data
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+@app.route('/admin/piezas/eliminar-masivo')
+@login_required(['administrador', 'soporte'])
+def piezas_eliminar_masivo():
+    # Carga inicial solo de empresas
+    empresas = sorted(db.piezas.distinct('empresa'))
+    return render_template('piezas_eliminar_masivo.html', empresas=empresas)
+
+@app.route('/api/piezas/filtrar-eliminar', methods=['POST'])
+@login_required(['administrador', 'soporte'])
+def api_filtrar_eliminar():
+    try:
+        data = request.json
+        cliente = data.get('cliente')
+        marco = data.get('marco')
+        tramo = data.get('tramo')
+        estado_filtro = data.get('estado') # 'sin_produccion', 'armado', 'rematado', 'todos'
+
+        # 1. Filtro base en Piezas
+        match_query = {}
+        if cliente: match_query['empresa'] = cliente
+        if marco: match_query['marco'] = marco
+        if tramo: match_query['tramo'] = tramo
+
+        piezas_candidatas = list(db.piezas.find(match_query, {'_id': 0, 'codigo': 1, 'empresa': 1, 'marco': 1, 'tramo': 1}))
+        
+        if not piezas_candidatas:
+            return {'piezas': []}
+
+        codigos_candidatos = [p['codigo'] for p in piezas_candidatas]
+
+        # 2. Buscar última producción para estos códigos
+        pipeline = [
+            {'$match': {'codigo_pieza': {'$in': codigos_candidatos}}},
+            {'$sort': {'fecha': 1}}, # Orden ascendente
+            {'$group': {
+                '_id': '$codigo_pieza',
+                'ultimo_modo': {'$last': '$modo'},
+                'fecha': {'$last': '$fecha'}
+            }}
+        ]
+        
+        produccion_status = {doc['_id']: doc['ultimo_modo'] for doc in db.produccion.aggregate(pipeline)}
+
+        # 3. Combinar y filtrar por estado
+        resultados = []
+        for p in piezas_candidatas:
+            cod = p['codigo']
+            modo = produccion_status.get(cod)
+            
+            estado = 'Sin Producción'
+            if modo == 'armador': estado = 'Armado'
+            elif modo == 'rematador': estado = 'Rematado'
+            
+            # Aplicar filtro de estado si se seleccionó uno específico
+            if estado_filtro and estado_filtro != 'todos':
+                if estado_filtro == 'sin_produccion' and estado != 'Sin Producción': continue
+                if estado_filtro == 'armado' and estado != 'Armado': continue
+                if estado_filtro == 'rematado' and estado != 'Rematado': continue
+
+            p['estado'] = estado
+            resultados.append(p)
+
+        return {'piezas': resultados}
+    except Exception as e:
+        print(f"Error filtrar eliminar: {e}")
+        return {'piezas': []}, 500 # Should probably return error
+
+@app.route('/admin/piezas/eliminar-confirmar', methods=['POST'])
+@login_required(['administrador', 'soporte'])
+def piezas_eliminar_confirmar():
+    try:
+        codigos = request.json.get('codigos', [])
+        if not codigos:
+            return {'success': False, 'message': 'No se seleccionaron piezas'}, 400
+            
+        result = db.piezas.delete_many({'codigo': {'$in': codigos}})
+        
+        # Opcional: ¿Eliminar también producción?
+        # Por seguridad, el usuario pidió "eliminar piezas". Normalmente esto es el maestro.
+        # Si quisiera eliminar todo, lo especificaría. Dejamos producción huérfana o la borramos?
+        # Para mantener consistencia, mejor NO borrar producción histórica automáticamente sin aviso explícito.
+        # Pero si borramos la pieza del maestro, el dashboard histórico podría fallar si hace joins.
+        # En este sistema, la producción guarda copias de datos, así que debería estar bien.
+        
+        return {'success': True, 'deleted_count': result.deleted_count}
+    except Exception as e:
+        return {'success': False, 'message': str(e)}, 500
+
 # ==================== NUEVA PIEZA ====================
 
 @app.route('/admin/piezas/nuevo')
@@ -3264,26 +3377,48 @@ def admin_picking():
     # Estructurar datos para el frontend
     data = {}
     scanned_codes = set()
+    rejected_details = [] # Nueva lista para enviar al frontend
     
     for r in registros:
         c = r.get("empresa")
         m = r.get("marco")
         t = r.get("tramo")
-        st = r.get("estado")
+        st = r.get("estado") # Armado, Rematado, Sin Producción
+        calidad = r.get("calidad") # aprobado, rechazado
         code = r.get("codigo")
         
         scanned_codes.add(code)
         
         if c not in data: data[c] = {}
         if m not in data[c]: data[c][m] = {}
-        if t not in data[c][m]: data[c][m][t] = {"armado": 0, "rematado": 0, "sin_prod": 0, "total": 0}
+        if t not in data[c][m]: 
+            data[c][m][t] = {"armado": 0, "validado": 0, "rechazado": 0, "sin_prod": 0, "total": 0}
         
         data[c][m][t]["total"] += 1
-        if st == "Armado": data[c][m][t]["armado"] += 1
-        elif st == "Rematado": data[c][m][t]["rematado"] += 1
-        else: data[c][m][t]["sin_prod"] += 1
+        
+        if st == "Armado": 
+            data[c][m][t]["armado"] += 1
+        elif st == "Rematado": 
+            if calidad == "aprobado":
+                data[c][m][t]["validado"] += 1
+            elif calidad == "rechazado":
+                data[c][m][t]["rechazado"] += 1
+                # Agregar a la lista de detalles rechazados
+                rejected_details.append({
+                    "codigo": code,
+                    "empresa": c,
+                    "marco": m,
+                    "tramo": t
+                })
+            else:
+                data[c][m][t]["validado"] += 1 
+        else: 
+            data[c][m][t]["sin_prod"] += 1
 
-    return render_template('admin_picking.html', initial_data=data, scanned_codes=list(scanned_codes))
+    return render_template('admin_picking.html', 
+                         initial_data=data, 
+                         scanned_codes=list(scanned_codes),
+                         initial_rejected=rejected_details) # Pasar la lista al template
 
 @app.route('/api/picking/scan', methods=['POST'])
 @login_required(['administrador', 'soporte', 'supervisor'])
@@ -3295,94 +3430,132 @@ def api_picking_scan():
         if not codigo:
             return {"success": False, "message": "Código vacío"}, 400
             
-        # Regex para búsqueda case-insensitive
-        # re.escape asegura que caracteres especiales no rompan el regex
         patron_regex = f"^{re.escape(codigo)}$"
         filtro_regex = {"$regex": patron_regex, "$options": "i"}
 
-        # Verificar duplicado en Picking (case insensitive)
         if db.picking.find_one({"codigo": filtro_regex}):
              return {"success": False, "message": f"Pieza {codigo} YA fue escaneada previamente"}, 400
 
-        # 1. Buscar pieza en DB activa (Maestro)
         pieza = db.piezas.find_one({"codigo": filtro_regex})
         
-        # 2. Buscar último estado en Producción Activa
         last_prod_active = db.produccion.find_one(
             {"codigo_pieza": filtro_regex},
             sort=[("fecha", -1)]
         )
 
-        # 3. Buscar último estado en Producción Histórica
         last_prod_hist = db.produccion_historica.find_one(
             {"codigo_pieza": filtro_regex},
             sort=[("fecha", -1)]
         )
 
-        # Determinar cuál es el registro más reciente
         last_prod = None
         if last_prod_active and last_prod_hist:
-            if last_prod_active["fecha"] >= last_prod_hist["fecha"]:
-                last_prod = last_prod_active
-            else:
-                last_prod = last_prod_hist
+            last_prod = last_prod_active if last_prod_active["fecha"] >= last_prod_hist["fecha"] else last_prod_hist
         elif last_prod_active:
             last_prod = last_prod_active
         elif last_prod_hist:
             last_prod = last_prod_hist
 
-        # Si no existe en maestro, intentar recuperar datos del registro de producción
         if not pieza:
             if last_prod:
-                # Usamos el código encontrado en producción para normalizar (si difiere en case)
                 codigo_encontrado = str(last_prod.get("codigo_pieza", codigo))
                 pieza = {
                     "codigo": codigo_encontrado,
                     "empresa": last_prod.get("empresa", "Desconocido"),
                     "marco": last_prod.get("marco", "Desconocido"),
                     "tramo": last_prod.get("tramo", "Desconocido"),
-                    "kilo_pieza": last_prod.get("peso_calculado", 0) # Estimado
+                    "kilo_pieza": last_prod.get("peso_calculado", 0)
                 }
             else:
                 return {"success": False, "message": f"Pieza {codigo} no encontrada en sistema ni históricos"}, 404
         
-        # Usar el código "real" de la pieza encontrada (canonical) para guardar en picking
         codigo_final = pieza.get("codigo")
             
         estado = "Sin Producción"
+        calidad_status = None
+        prod_id = None
+        
         if last_prod:
             modo = last_prod.get("modo")
+            prod_id = str(last_prod.get("_id"))
             if modo == "armador":
                 estado = "Armado"
             elif modo == "rematador":
                 estado = "Rematado"
+                calidad_status = last_prod.get("calidad_status") # aprobado, rechazado, None
         
-        # 3. Guardar en DB Picking (Usando código canónico)
-        scan_entry = {
-            "codigo": codigo_final,
-            "empresa": pieza.get("empresa", "Desconocido"),
-            "marco": pieza.get("marco", "Desconocido"),
-            "tramo": pieza.get("tramo", "Desconocido"),
-            "estado": estado,
-            "fecha": datetime.now(timezone.utc),
-            "usuario": session.get("nombre")
-        }
-        db.picking.insert_one(scan_entry)
-                
+        # Si está en Armado o Sin Producción, guardamos directo en picking
+        if estado != "Rematado":
+            scan_entry = {
+                "codigo": codigo_final,
+                "empresa": pieza.get("empresa", "Desconocido"),
+                "marco": pieza.get("marco", "Desconocido"),
+                "tramo": pieza.get("tramo", "Desconocido"),
+                "estado": estado,
+                "calidad": None,
+                "fecha": datetime.now(timezone.utc),
+                "usuario": session.get("nombre")
+            }
+            db.picking.insert_one(scan_entry)
+        
+        # Si está rematado, devolvemos info para que el frontend decida si abrir modal
         return {
             "success": True,
             "pieza": {
                 "codigo": codigo_final,
                 "empresa": pieza.get("empresa", "Desconocido"),
                 "marco": pieza.get("marco", "Desconocido"),
-                "tramo": pieza.get("tramo", "Desconocido"),
-                "kilo_pieza": pieza.get("kilo_pieza", 0)
+                "tramo": pieza.get("tramo", "Desconocido")
             },
-            "estado": estado
+            "estado": estado,
+            "calidad_status": calidad_status,
+            "prod_id": prod_id
         }
     except Exception as e:
         print(f"Error picking scan: {e}")
         return {"success": False, "message": "Error interno"}, 500
+
+@app.route('/api/picking/validar', methods=['POST'])
+@login_required(['administrador', 'soporte', 'supervisor'])
+def api_picking_validar():
+    try:
+        data = request.json
+        codigo = data.get('codigo')
+        prod_id = data.get('prod_id')
+        decision = data.get('decision') # aprobado, rechazado
+        comentario = data.get('comentario')
+        pieza_data = data.get('pieza') # {empresa, marco, tramo...}
+        
+        # Actualizar Producción (Solo si es DB activa, histórica no se edita normalmente pero aquí asumimos activa)
+        # Nota: Si es histórica, prod_id no servirá igual en produccion collection. 
+        # Intentaremos update en produccion activa.
+        if prod_id:
+             db.produccion.update_one(
+                {"_id": ObjectId(prod_id)},
+                {"$set": {
+                    "calidad_status": decision,
+                    "comentario_supervisor": comentario,
+                    "fecha_validacion": datetime.now(timezone.utc)
+                }}
+            )
+
+        # Guardar en Picking
+        scan_entry = {
+            "codigo": codigo,
+            "empresa": pieza_data.get("empresa"),
+            "marco": pieza_data.get("marco"),
+            "tramo": pieza_data.get("tramo"),
+            "estado": "Rematado",
+            "calidad": decision,
+            "fecha": datetime.now(timezone.utc),
+            "usuario": session.get("nombre")
+        }
+        db.picking.insert_one(scan_entry)
+        
+        return {"success": True}
+    except Exception as e:
+        print(f"Error validar picking: {e}")
+        return {"success": False, "message": str(e)}, 500
 
 @app.route('/api/picking/reset', methods=['POST'])
 @login_required(['administrador', 'soporte', 'supervisor'])

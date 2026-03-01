@@ -1,0 +1,348 @@
+{% extends 'admin_layout.html' %}
+
+{% block title %}Eliminar Piezas Masivo{% endblock %}
+{% block header_title %}Eliminación Masiva de Piezas{% endblock %}
+{% block header_subtitle %}Filtra y elimina piezas del inventario{% endblock %}
+
+{% block content %}
+
+<!-- FILTROS -->
+<div class="admin-card mb-4">
+    <div class="card-body">
+        <form id="filterForm" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label text-secondary small">Cliente</label>
+                <select id="cliente" class="form-select bg-dark text-light border-secondary" onchange="cargarMarcos()">
+                    <option value="">Selecciona Cliente...</option>
+                    {% for e in empresas %}
+                    <option value="{{ e }}">{{ e }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-secondary small">Marco</label>
+                <select id="marco" class="form-select bg-dark text-light border-secondary" disabled onchange="cargarTramos()">
+                    <option value="">Selecciona Marco...</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-secondary small">Tramo</label>
+                <select id="tramo" class="form-select bg-dark text-light border-secondary" disabled>
+                    <option value="">Selecciona Tramo...</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-secondary small">Estado Actual</label>
+                <select id="estado" class="form-select bg-dark text-light border-secondary">
+                    <option value="todos">Todos</option>
+                    <option value="sin_produccion">⚪ Sin Producción</option>
+                    <option value="armado">🟡 En Armado</option>
+                    <option value="rematado">🟢 Rematado (Finalizado)</option>
+                </select>
+            </div>
+            <div class="col-12 text-end mt-3">
+                <button type="button" class="btn btn-accent px-4" onclick="aplicarFiltros()">
+                    <i class='bx bx-search'></i> Buscar Piezas
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- TABLA DE RESULTADOS -->
+<div class="admin-card">
+    <div class="d-flex justify-content-between align-items-center mb-3 p-3 border-bottom border-secondary">
+        <h5 class="mb-0 text-white">Resultados <span id="countResults" class="badge bg-secondary ms-2">0</span></h5>
+        <button class="btn btn-danger disabled" id="btnDelete" onclick="confirmarEliminacion()">
+            <i class='bx bx-trash'></i> Eliminar Seleccionados
+        </button>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table table-dark table-hover mb-0" id="resultsTable">
+            <thead>
+                <tr class="text-secondary small">
+                    <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="checkAll"></th>
+                    <th>Código</th>
+                    <th>Cliente</th>
+                    <th>Marco</th>
+                    <th>Tramo</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        Aplica filtros para buscar piezas...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal de Advertencia -->
+<div class="modal fade" id="warningModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-white border border-danger">
+      <div class="modal-header border-danger">
+        <h5 class="modal-title text-danger"><i class='bx bx-error'></i> ¡Advertencia Crítica!</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Estás a punto de eliminar piezas que ya están <strong>REMATADAS</strong> o en proceso. Esto podría afectar el historial.</p>
+        <div class="alert alert-warning bg-opacity-10 text-warning border-warning">
+            <strong>Piezas críticas detectadas:</strong>
+            <ul id="criticalList" class="mb-0 mt-2 small" style="max-height: 150px; overflow-y: auto;"></ul>
+        </div>
+        <p class="small text-muted mt-3">Escribe "ELIMINAR" para confirmar la acción.</p>
+        <input type="text" id="confirmInput" class="form-control bg-black text-white border-secondary mb-3" placeholder="ELIMINAR">
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger disabled" id="btnConfirmDelete" onclick="ejecutarBorrado()">Confirmar Borrado</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+let currentPiezas = [];
+
+// Cargar Marcos dinámicamente
+async function cargarMarcos() {
+    const cliente = document.getElementById('cliente').value;
+    const marcoSelect = document.getElementById('marco');
+    const tramoSelect = document.getElementById('tramo');
+    
+    // Reset
+    marcoSelect.innerHTML = '<option value="">Cargando...</option>';
+    marcoSelect.disabled = true;
+    tramoSelect.innerHTML = '<option value="">Selecciona Tramo...</option>';
+    tramoSelect.disabled = true;
+
+    if (!cliente) {
+        marcoSelect.innerHTML = '<option value="">Selecciona Marco...</option>';
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/piezas/filtros-dinamicos?cliente=${encodeURIComponent(cliente)}`);
+        const data = await res.json();
+        
+        let options = '<option value="">Todos</option>';
+        data.marcos.forEach(m => {
+            options += `<option value="${m}">${m}</option>`;
+        });
+        
+        marcoSelect.innerHTML = options;
+        marcoSelect.disabled = false;
+    } catch (e) {
+        console.error("Error cargando marcos", e);
+        marcoSelect.innerHTML = '<option value="">Error al cargar</option>';
+    }
+}
+
+// Cargar Tramos dinámicamente
+async function cargarTramos() {
+    const cliente = document.getElementById('cliente').value;
+    const marco = document.getElementById('marco').value;
+    const tramoSelect = document.getElementById('tramo');
+    
+    // Reset
+    tramoSelect.innerHTML = '<option value="">Cargando...</option>';
+    tramoSelect.disabled = true;
+
+    if (!marco) {
+        tramoSelect.innerHTML = '<option value="">Selecciona Tramo...</option>';
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/piezas/filtros-dinamicos?cliente=${encodeURIComponent(cliente)}&marco=${encodeURIComponent(marco)}`);
+        const data = await res.json();
+        
+        let options = '<option value="">Todos</option>';
+        data.tramos.forEach(t => {
+            options += `<option value="${t}">${t}</option>`;
+        });
+        
+        tramoSelect.innerHTML = options;
+        tramoSelect.disabled = false;
+    } catch (e) {
+        console.error("Error cargando tramos", e);
+        tramoSelect.innerHTML = '<option value="">Error al cargar</option>';
+    }
+}
+
+async function aplicarFiltros() {
+    const btn = document.querySelector('button[onclick="aplicarFiltros()"]');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Buscando...';
+    btn.disabled = true;
+
+    try {
+        const payload = {
+            cliente: document.getElementById('cliente').value,
+            marco: document.getElementById('marco').value,
+            tramo: document.getElementById('tramo').value,
+            estado: document.getElementById('estado').value
+        };
+
+        const res = await fetch('/api/piezas/filtrar-eliminar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await res.json();
+        currentPiezas = data.piezas;
+        renderTable(data.piezas);
+        
+    } catch (e) {
+        console.error(e);
+        Swal.fire('Error', 'No se pudieron cargar las piezas', 'error');
+    } finally {
+        btn.innerHTML = "<i class='bx bx-search'></i> Buscar Piezas";
+        btn.disabled = false;
+    }
+}
+
+function renderTable(piezas) {
+    const tbody = document.querySelector('#resultsTable tbody');
+    document.getElementById('countResults').textContent = piezas.length;
+    document.getElementById('btnDelete').classList.add('disabled');
+    document.getElementById('checkAll').checked = false;
+    
+    if (piezas.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted">No se encontraron piezas con esos criterios.</td></tr>`;
+        return;
+    }
+
+    let html = '';
+    piezas.forEach(p => {
+        let badgeClass = 'bg-secondary';
+        if (p.estado === 'Armado') badgeClass = 'bg-warning text-dark';
+        if (p.estado === 'Rematado') badgeClass = 'bg-success';
+
+        html += `
+        <tr>
+            <td><input type="checkbox" class="form-check-input row-check" value="${p.codigo}" data-estado="${p.estado}"></td>
+            <td class="fw-bold text-white">${p.codigo}</td>
+            <td>${p.empresa}</td>
+            <td>${p.marco}</td>
+            <td>${p.tramo}</td>
+            <td><span class="badge ${badgeClass}">${p.estado}</span></td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+
+    // Event listeners para checkboxes
+    document.querySelectorAll('.row-check').forEach(ch => {
+        ch.addEventListener('change', updateDeleteButton);
+    });
+}
+
+// Select All Logic
+document.getElementById('checkAll').addEventListener('change', function() {
+    const isChecked = this.checked;
+    document.querySelectorAll('.row-check').forEach(ch => {
+        ch.checked = isChecked;
+    });
+    updateDeleteButton();
+});
+
+function updateDeleteButton() {
+    const selected = document.querySelectorAll('.row-check:checked').length;
+    const btn = document.getElementById('btnDelete');
+    if (selected > 0) {
+        btn.classList.remove('disabled');
+        btn.textContent = `Eliminar Seleccionados (${selected})`;
+    } else {
+        btn.classList.add('disabled');
+        btn.textContent = 'Eliminar Seleccionados';
+    }
+}
+
+let modalInstance;
+
+function confirmarEliminacion() {
+    const checkboxes = document.querySelectorAll('.row-check:checked');
+    const selectedCodes = Array.from(checkboxes).map(c => c.value);
+    
+    // Verificar críticos (Rematados)
+    const criticos = [];
+    checkboxes.forEach(ch => {
+        if (ch.dataset.estado === 'Rematado') {
+            criticos.push(`${ch.value} (Rematado)`);
+        } else if (ch.dataset.estado === 'Armado') {
+            criticos.push(`${ch.value} (Armado)`);
+        }
+    });
+
+    if (criticos.length > 0) {
+        // Mostrar Modal de Advertencia Grave
+        const list = document.getElementById('criticalList');
+        list.innerHTML = criticos.map(c => `<li>${c}</li>`).join('');
+        
+        document.getElementById('confirmInput').value = '';
+        document.getElementById('btnConfirmDelete').classList.add('disabled');
+        
+        modalInstance = new bootstrap.Modal(document.getElementById('warningModal'));
+        modalInstance.show();
+    } else {
+        // Confirmación normal
+        Swal.fire({
+            title: '¿Estás seguro?',
+            text: `Se eliminarán ${selectedCodes.length} piezas permanentemente.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Sí, eliminar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                ejecutarBorrado();
+            }
+        });
+    }
+}
+
+// Lógica del input de confirmación en modal
+document.getElementById('confirmInput').addEventListener('input', function() {
+    const btn = document.getElementById('btnConfirmDelete');
+    if (this.value === 'ELIMINAR') {
+        btn.classList.remove('disabled');
+    } else {
+        btn.classList.add('disabled');
+    }
+});
+
+async function ejecutarBorrado() {
+    const checkboxes = document.querySelectorAll('.row-check:checked');
+    const selectedCodes = Array.from(checkboxes).map(c => c.value);
+
+    try {
+        const res = await fetch('/admin/piezas/eliminar-confirmar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({ codigos: selectedCodes })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            if (modalInstance) modalInstance.hide();
+            Swal.fire('Eliminado', `${data.deleted_count} piezas fueron eliminadas.`, 'success');
+            aplicarFiltros(); // Recargar tabla
+        } else {
+            Swal.fire('Error', data.message, 'error');
+        }
+    } catch (e) {
+        Swal.fire('Error', 'Fallo de conexión', 'error');
+    }
+}
+</script>
+{% endblock %}

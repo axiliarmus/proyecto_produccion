@@ -47,15 +47,78 @@
             <h5 class="text-white mb-0">📦 Resumen del Picking</h5>
             <span class="badge bg-primary fs-6" id="totalCount">0 Piezas</span>
         </div>
+        
+        <!-- Pestañas -->
+        <ul class="nav nav-tabs border-secondary mb-3" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active text-white" id="prod-tab" data-bs-toggle="tab" data-bs-target="#prod-tab-pane" type="button" role="tab">
+                    ✅ Producción Conforme
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link text-danger" id="rej-tab" data-bs-toggle="tab" data-bs-target="#rej-tab-pane" type="button" role="tab">
+                    ❌ Piezas Rechazadas <span class="badge bg-danger ms-1" id="rejectedCountBadge">0</span>
+                </button>
+            </li>
+        </ul>
 
-        <!-- Contenedor de Tarjetas -->
-        <div id="resultsContainer">
-            <div class="text-center py-5 text-secondary">
-                <i class='bx bx-barcode-reader fs-1 mb-3'></i>
-                <p>Escanea piezas para comenzar el conteo.</p>
+        <div class="tab-content" id="myTabContent">
+            <!-- PANEL PRODUCCIÓN NORMAL -->
+            <div class="tab-pane fade show active" id="prod-tab-pane" role="tabpanel">
+                <div id="resultsContainer">
+                    <div class="text-center py-5 text-secondary">
+                        <i class='bx bx-barcode-reader fs-1 mb-3'></i>
+                        <p>Escanea piezas para comenzar el conteo.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PANEL RECHAZOS -->
+            <div class="tab-pane fade" id="rej-tab-pane" role="tabpanel">
+                <div id="rejectedContainer">
+                    <div class="text-center py-5 text-secondary">
+                        <i class='bx bx-check-circle fs-1 mb-3'></i>
+                        <p>No hay piezas rechazadas.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+</div>
+
+<!-- Modal de Validación -->
+<div class="modal fade" id="validationModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-white border-warning">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title"><i class='bx bx-check-shield text-warning'></i> Validar Pieza</h5>
+      </div>
+      <div class="modal-body">
+        <div class="text-center mb-4">
+            <h2 class="display-6 fw-bold text-white" id="valCode"></h2>
+            <p class="text-secondary mb-0" id="valDetails"></p>
+        </div>
+        
+        <div class="mb-3">
+            <label class="form-label small text-secondary">Comentario (Opcional)</label>
+            <textarea class="form-control bg-black text-white border-secondary" id="valComment" rows="2" placeholder="Observaciones..."></textarea>
+        </div>
+        
+        <div class="row g-2">
+            <div class="col-6">
+                <button onclick="submitValidation('rechazado')" class="btn btn-danger w-100 py-3">
+                    <i class='bx bx-x fs-3 d-block'></i> RECHAZAR
+                </button>
+            </div>
+            <div class="col-6">
+                <button onclick="submitValidation('aprobado')" class="btn btn-success w-100 py-3">
+                    <i class='bx bx-check fs-3 d-block'></i> VALIDAR
+                </button>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Modal para Escáner QR (Igual que Operador) -->
@@ -87,13 +150,16 @@
 // ESTADO DE LA APLICACIÓN
 const state = {
     scannedCodes: new Set({{ scanned_codes|tojson }}),
-    data: {{ initial_data|tojson }}
+    data: {{ initial_data|tojson }},
+    rejectedDetails: {{ initial_rejected|tojson }} // Cargar lista desde servidor
 };
 
 // ELEMENTOS DOM
 const manualInput = document.getElementById('manualInput');
 const manualBtn = document.getElementById('manualBtn');
 const resultsContainer = document.getElementById('resultsContainer');
+const rejectedContainer = document.getElementById('rejectedContainer');
+const rejectedCountBadge = document.getElementById('rejectedCountBadge');
 const totalCountBadge = document.getElementById('totalCount');
 const lastScannedCard = document.getElementById('lastScannedCard');
 const lastCodeSpan = document.getElementById('lastCode');
@@ -101,10 +167,16 @@ const lastStatusSpan = document.getElementById('lastStatus');
 const lastInfoSpan = document.getElementById('lastInfo');
 const tunnelUrl = "{{ tunnel_url if tunnel_url else '' }}";
 
+let validationModal;
+let pendingValidationPiece = null;
+
 // Inicializar UI con datos del servidor
 document.addEventListener('DOMContentLoaded', () => {
     updateUI();
     checkSecureConnection();
+    if (typeof bootstrap !== 'undefined') {
+        validationModal = new bootstrap.Modal(document.getElementById('validationModal'));
+    }
 });
 
 // AUDIO
@@ -150,20 +222,100 @@ async function processCode(code) {
             return;
         }
 
-        // 3. Agregar a estado (Usar el código CANÓNICO devuelto por el servidor)
         const canonicalCode = data.pieza.codigo;
-        state.scannedCodes.add(canonicalCode);
-        addToData(data.pieza, data.estado);
-        
-        // 4. Actualizar UI
-        updateUI();
-        showLastScanned(data.pieza, data.estado);
-        playSound('success');
+
+        // 3. Lógica de validación
+        // Si está Rematado
+        if (data.estado === 'Rematado') {
+            
+            // Caso 1: Ya tiene una decisión tomada (Aprobado o Rechazado) -> Solo contar
+            if (data.calidad_status === 'aprobado' || data.calidad_status === 'rechazado') {
+                state.scannedCodes.add(canonicalCode);
+                const statusToCount = data.calidad_status === 'aprobado' ? 'validado' : 'rechazado';
+                
+                addToData(data.pieza, statusToCount);
+                if (statusToCount === 'rechazado') state.rejectedDetails.push(data.pieza);
+                
+                updateUI();
+                showLastScanned(data.pieza, statusToCount);
+                playSound('success');
+                return;
+            }
+            
+            // Caso 2: NO tiene decisión (Pendiente/Null) -> ABRIR MODAL OBLIGATORIAMENTE
+            pendingValidationPiece = data;
+            
+            // Preparar modal
+            document.getElementById('valCode').textContent = canonicalCode;
+            document.getElementById('valDetails').textContent = `${data.pieza.empresa} - ${data.pieza.marco}`;
+            document.getElementById('valComment').value = '';
+            
+            // Mostrar modal
+            if (validationModal) {
+                validationModal.show();
+            } else {
+                alert("Error: Modal no cargado. Recarga la página.");
+            }
+            
+        } else {
+            // Guardado automático (Armado, Sin Prod)
+            state.scannedCodes.add(canonicalCode);
+            addToData(data.pieza, data.estado);
+            updateUI();
+            showLastScanned(data.pieza, data.estado);
+            playSound('success');
+        }
 
     } catch (e) {
         console.error(e);
         playSound('error');
         alert("Error de conexión con el servidor.");
+    }
+}
+
+async function submitValidation(decision) {
+    if (!pendingValidationPiece) return;
+    
+    const comment = document.getElementById('valComment').value;
+    const p = pendingValidationPiece;
+    
+    try {
+        const res = await fetch('/api/picking/validar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({
+                codigo: p.pieza.codigo,
+                prod_id: p.prod_id,
+                decision: decision,
+                comentario: comment,
+                pieza: p.pieza
+            })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            validationModal.hide();
+            
+            state.scannedCodes.add(p.pieza.codigo);
+            
+            const statusLabel = decision === 'aprobado' ? 'validado' : 'rechazado';
+            addToData(p.pieza, statusLabel);
+            
+            if (decision === 'rechazado') {
+                state.rejectedDetails.push(p.pieza);
+            }
+            
+            updateUI();
+            showLastScanned(p.pieza, statusLabel);
+            playSound('success');
+            
+            pendingValidationPiece = null;
+        } else {
+            alert("Error al validar: " + data.message);
+        }
+    } catch (e) {
+        alert("Error de conexión");
     }
 }
 
@@ -173,78 +325,172 @@ function addToData(pieza, estado) {
     if (!state.data[empresa]) state.data[empresa] = {};
     if (!state.data[empresa][marco]) state.data[empresa][marco] = {};
     if (!state.data[empresa][marco][tramo]) {
-        state.data[empresa][marco][tramo] = { armado: 0, rematado: 0, sin_prod: 0, total: 0 };
+        state.data[empresa][marco][tramo] = { armado: 0, validado: 0, rechazado: 0, sin_prod: 0, total: 0 };
     }
 
     const counter = state.data[empresa][marco][tramo];
     counter.total++;
     
     if (estado === 'Armado') counter.armado++;
-    else if (estado === 'Rematado') counter.rematado++;
+    else if (estado === 'validado') counter.validado++;
+    else if (estado === 'rechazado') counter.rechazado++;
     else counter.sin_prod++;
 }
 
 function updateUI() {
     totalCountBadge.textContent = `${state.scannedCodes.size} Piezas`;
     
-    if (state.scannedCodes.size === 0) {
+    // Contar total de rechazadas para el badge
+    let totalRejected = 0;
+    
+    // HTML Strings
+    let htmlProd = '';
+    let htmlRej = '';
+
+    // Iterar Clientes
+    for (const [cliente, marcos] of Object.entries(state.data)) {
+        
+        let clientHasProd = false;
+        let clientHasRej = false;
+        
+        let htmlProdClient = `<h5 class="text-accent mt-4 mb-3"><i class='bx bxs-business'></i> ${cliente}</h5>
+                              <div class="row row-cols-1 row-cols-md-2 g-3">`;
+        
+        let htmlRejClient = `<h5 class="text-danger mt-4 mb-3"><i class='bx bxs-business'></i> ${cliente}</h5>
+                             <div class="row row-cols-1 g-3">`;
+
+        // Iterar Marcos
+        for (const [marco, tramos] of Object.entries(marcos)) {
+            
+            // Construir filas para Producción Conforme
+            let rowsProd = '';
+            
+            for (const [tramo, counts] of Object.entries(tramos)) {
+                // Fila Producción (Armado + Validado + Sin Prod)
+                const totalBueno = counts.armado + counts.validado + counts.sin_prod;
+                if (totalBueno > 0) {
+                    rowsProd += `
+                    <tr>
+                        <td>${tramo}</td>
+                        <td class="text-center text-warning">${counts.armado || '-'}</td>
+                        <td class="text-center text-success fw-bold">${counts.validado || '-'}</td>
+                        <td class="text-center text-secondary">${counts.sin_prod || '-'}</td>
+                        <td class="text-end fw-bold text-white">${totalBueno}</td>
+                    </tr>`;
+                }
+
+                // Acumular rechazados para el panel de rechazados
+                if (counts.rechazado > 0) {
+                    totalRejected += counts.rechazado;
+                    clientHasRej = true;
+                    // Buscar piezas específicas rechazadas en el array de detalles
+                    const piezasRechazadas = state.rejectedDetails.filter(p => 
+                        p.empresa === cliente && p.marco === marco && p.tramo === tramo
+                    );
+                    
+                    if (piezasRechazadas.length > 0) {
+                         htmlRejClient += `
+                        <div class="col">
+                            <div class="admin-card h-100 p-3 border border-danger">
+                                <h6 class="text-danger border-bottom border-danger pb-2 mb-3">${marco} - ${tramo}</h6>
+                                <table class="table table-dark table-sm mb-0">
+                                    <thead>
+                                        <tr class="text-secondary small">
+                                            <th>Código</th>
+                                            <th class="text-end">Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+                        
+                        piezasRechazadas.forEach(p => {
+                            htmlRejClient += `
+                            <tr>
+                                <td class="fw-bold text-white">${p.codigo}</td>
+                                <td class="text-end"><span class="badge bg-danger">RECHAZADO</span></td>
+                            </tr>`;
+                        });
+                        
+                        htmlRejClient += `</tbody></table></div></div>`;
+                    }
+                }
+            }
+            
+            // Agregar tarjeta a Producción si tiene datos
+            if (rowsProd) {
+                clientHasProd = true;
+                htmlProdClient += `
+                <div class="col">
+                    <div class="admin-card h-100 p-3">
+                        <h6 class="text-white border-bottom border-secondary pb-2 mb-3">${marco}</h6>
+                        <table class="table table-dark table-sm mb-0">
+                            <thead>
+                                <tr class="text-secondary small">
+                                    <th>Tramo</th>
+                                    <th class="text-center text-warning">Arm</th>
+                                    <th class="text-center text-success" title="Rematadas Validadas">Rem (Val)</th>
+                                    <th class="text-center text-secondary">Sin</th>
+                                    <th class="text-end text-white">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rowsProd}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            }
+        }
+        
+        htmlProdClient += `</div>`;
+        htmlRejClient += `</div>`;
+        
+        if (clientHasProd) htmlProd += htmlProdClient;
+        if (clientHasRej) htmlRej += htmlRejClient;
+    }
+    
+    // Renderizar Producción
+    if (htmlProd) {
+        resultsContainer.innerHTML = htmlProd;
+    } else {
         resultsContainer.innerHTML = `
             <div class="text-center py-5 text-secondary">
                 <i class='bx bx-barcode-reader fs-1 mb-3'></i>
-                <p>Escanea piezas para comenzar el conteo.</p>
+                <p>Escanea piezas para comenzar.</p>
             </div>`;
-        return;
     }
 
-    let html = '';
-    
-    for (const [cliente, marcos] of Object.entries(state.data)) {
-        html += `<h5 class="text-accent mt-4 mb-3"><i class='bx bxs-business'></i> ${cliente}</h5>`;
-        html += `<div class="row row-cols-1 row-cols-md-2 g-3">`;
-        
-        for (const [marco, tramos] of Object.entries(marcos)) {
-            html += `
-            <div class="col">
-                <div class="admin-card h-100 p-3">
-                    <h6 class="text-white border-bottom border-secondary pb-2 mb-3">${marco}</h6>
-                    <table class="table table-dark table-sm mb-0">
-                        <thead>
-                            <tr class="text-secondary small">
-                                <th>Tramo</th>
-                                <th class="text-center text-warning">Arm</th>
-                                <th class="text-center text-success">Rem</th>
-                                <th class="text-center text-secondary">Sin</th>
-                                <th class="text-end text-white">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-            
-            for (const [tramo, counts] of Object.entries(tramos)) {
-                html += `
-                <tr>
-                    <td>${tramo}</td>
-                    <td class="text-center text-warning">${counts.armado || '-'}</td>
-                    <td class="text-center text-success">${counts.rematado || '-'}</td>
-                    <td class="text-center text-secondary">${counts.sin_prod || '-'}</td>
-                    <td class="text-end fw-bold text-white">${counts.total}</td>
-                </tr>`;
-            }
-            
-            html += `</tbody></table></div></div>`;
-        }
-        html += `</div>`;
+    // Renderizar Rechazos
+    if (htmlRej) {
+        rejectedContainer.innerHTML = htmlRej;
+    } else {
+        rejectedContainer.innerHTML = `
+            <div class="text-center py-5 text-secondary">
+                <i class='bx bx-check-circle fs-1 mb-3'></i>
+                <p>No hay piezas rechazadas.</p>
+            </div>`;
     }
     
-    resultsContainer.innerHTML = html;
+    // Actualizar badge de rechazos
+    rejectedCountBadge.textContent = totalRejected;
+    if (totalRejected > 0) {
+        document.getElementById('rej-tab').classList.add('pulse-text');
+    } else {
+        document.getElementById('rej-tab').classList.remove('pulse-text');
+    }
 }
 
 function showLastScanned(pieza, estado) {
     lastScannedCard.classList.remove('d-none');
-    lastScannedCard.className = `alert mt-3 ${estado === 'Rematado' ? 'alert-success' : (estado === 'Armado' ? 'alert-warning' : 'alert-secondary')}`;
     
+    let alertClass = 'alert-secondary';
+    let badgeClass = 'bg-secondary';
+    
+    if (estado === 'validado') { alertClass = 'alert-success'; badgeClass = 'bg-success'; }
+    else if (estado === 'rechazado') { alertClass = 'alert-danger'; badgeClass = 'bg-danger'; }
+    else if (estado === 'Armado') { alertClass = 'alert-warning'; badgeClass = 'bg-warning text-dark'; }
+
+    lastScannedCard.className = `alert mt-3 ${alertClass}`;
     lastCodeSpan.textContent = pieza.codigo;
-    lastStatusSpan.textContent = estado;
-    lastStatusSpan.className = `badge ${estado === 'Rematado' ? 'bg-success' : (estado === 'Armado' ? 'bg-warning text-dark' : 'bg-secondary')}`;
+    lastStatusSpan.textContent = estado.toUpperCase();
+    lastStatusSpan.className = `badge ${badgeClass}`;
     
     lastInfoSpan.textContent = `${pieza.empresa} - ${pieza.marco} - ${pieza.tramo}`;
 }
