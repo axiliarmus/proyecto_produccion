@@ -3319,7 +3319,16 @@ def supervisor_home():
         filtro["calidad_status"] = estado_sel
 
     # ------------ CONSULTA ------------
-    piezas = list(db.produccion.find(filtro).sort("fecha", -1))
+    piezas_activas = list(db.produccion.find(filtro).sort("fecha", -1))
+    piezas_historicas = list(db.produccion_historica.find(filtro).sort("fecha", -1))
+    
+    for p in piezas_activas:
+        p["is_historico"] = False
+    for p in piezas_historicas:
+        p["is_historico"] = True
+        
+    piezas = piezas_activas + piezas_historicas
+    piezas.sort(key=lambda x: x.get("fecha"), reverse=True)
 
     return render_template(
         "supervisor.html",
@@ -3344,6 +3353,11 @@ def supervisor_informes():
 @login_required('supervisor')
 def supervisor_validar_pieza(id):
     decision = request.form.get("decision")  # 'aprobado' o 'rechazado'
+    
+    # Si no hay decisión (por ejemplo, al dar Enter), por defecto aprobado
+    if not decision:
+        decision = "aprobado"
+        
     cuerda_interna = request.form.get("cuerda_interna")
     cuerda_externa = request.form.get("cuerda_externa")
     comentario = request.form.get("comentario")
@@ -3359,10 +3373,18 @@ def supervisor_validar_pieza(id):
         "comentario_supervisor": comentario
     }
 
-    db.produccion.update_one(
+    # Intentar actualizar en activa
+    res = db.produccion.update_one(
         {"_id": ObjectId(id)},
         {"$set": update}
     )
+    
+    # Si no se modificó activa, intentar en histórica
+    if res.matched_count == 0:
+        db.produccion_historica.update_one(
+            {"_id": ObjectId(id)},
+            {"$set": update}
+        )
 
     flash(f"Pieza actualizada como {decision}", "success")
     return redirect(url_for(
@@ -3536,11 +3558,9 @@ def api_picking_validar():
         comentario = data.get('comentario')
         pieza_data = data.get('pieza') # {empresa, marco, tramo...}
         
-        # Actualizar Producción (Solo si es DB activa, histórica no se edita normalmente pero aquí asumimos activa)
-        # Nota: Si es histórica, prod_id no servirá igual en produccion collection. 
-        # Intentaremos update en produccion activa.
+        # Actualizar Producción
         if prod_id:
-             db.produccion.update_one(
+            res = db.produccion.update_one(
                 {"_id": ObjectId(prod_id)},
                 {"$set": {
                     "calidad_status": decision,
@@ -3548,6 +3568,15 @@ def api_picking_validar():
                     "fecha_validacion": datetime.now(timezone.utc)
                 }}
             )
+            if res.matched_count == 0:
+                db.produccion_historica.update_one(
+                    {"_id": ObjectId(prod_id)},
+                    {"$set": {
+                        "calidad_status": decision,
+                        "comentario_supervisor": comentario,
+                        "fecha_validacion": datetime.now(timezone.utc)
+                    }}
+                )
 
         # Guardar en Picking
         scan_entry = {

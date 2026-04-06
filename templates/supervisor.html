@@ -68,7 +68,12 @@
         <tbody>
         {% for p in piezas %}
             <tr>
-            <td class="text-white">{{ p.fecha.strftime('%d-%m %H:%M') }}</td>
+            <td class="text-white">
+                {{ p.fecha.strftime('%d-%m %H:%M') }}
+                {% if p.is_historico %}
+                <span class="badge bg-warning text-dark border border-warning ms-1" style="font-size: 0.65rem;">Archivada</span>
+                {% endif %}
+            </td>
             <td class="fw-bold text-accent">{{ p.usuario }}</td>
             <td><span class="badge bg-dark border border-secondary">{{ p.codigo_pieza }}</span></td>
             <td>{{ p.box }}</td>
@@ -88,6 +93,7 @@
 
             <td>
                 <form method="POST" action="{{ url_for('supervisor_validar_pieza', id=p._id) }}" class="row g-2">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="codigo" value="{{ codigo or '' }}">
                 <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
                 <input type="hidden" name="fecha_fin" value="{{ fecha_fin or '' }}">
