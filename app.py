@@ -3288,10 +3288,10 @@ def supervisor_home():
         fecha_fin = request.form.get("fecha_fin") or ""
         estado_sel = request.form.get("estado") or "todos"
     else:
-        codigo = ""
-        fecha_inicio = ""
-        fecha_fin = ""
-        estado_sel = "todos"
+        codigo = (request.args.get("codigo") or "").strip()
+        fecha_inicio = request.args.get("fecha_inicio") or ""
+        fecha_fin = request.args.get("fecha_fin") or ""
+        estado_sel = request.args.get("estado") or "todos"
 
     # Base: solo piezas rematadas
     filtro = {"modo": "rematador"}
@@ -3347,6 +3347,10 @@ def supervisor_validar_pieza(id):
     cuerda_interna = request.form.get("cuerda_interna")
     cuerda_externa = request.form.get("cuerda_externa")
     comentario = request.form.get("comentario")
+    codigo = (request.form.get("codigo") or "").strip()
+    fecha_inicio = request.form.get("fecha_inicio") or ""
+    fecha_fin = request.form.get("fecha_fin") or ""
+    estado_sel = request.form.get("estado") or "todos"
 
     update = {
         "calidad_status": decision,
@@ -3361,7 +3365,13 @@ def supervisor_validar_pieza(id):
     )
 
     flash(f"Pieza actualizada como {decision}", "success")
-    return redirect(url_for("supervisor_home"))
+    return redirect(url_for(
+        "supervisor_home",
+        codigo=codigo,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        estado=estado_sel
+    ))
 
 
 # ============================================================

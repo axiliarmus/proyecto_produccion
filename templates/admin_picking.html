@@ -339,34 +339,17 @@ function addToData(pieza, estado) {
 
 function updateUI() {
     totalCountBadge.textContent = `${state.scannedCodes.size} Piezas`;
-    
-    // Contar total de rechazadas para el badge
-    let totalRejected = 0;
-    
-    // HTML Strings
     let htmlProd = '';
-    let htmlRej = '';
 
-    // Iterar Clientes
     for (const [cliente, marcos] of Object.entries(state.data)) {
-        
         let clientHasProd = false;
-        let clientHasRej = false;
-        
         let htmlProdClient = `<h5 class="text-accent mt-4 mb-3"><i class='bx bxs-business'></i> ${cliente}</h5>
                               <div class="row row-cols-1 row-cols-md-2 g-3">`;
-        
-        let htmlRejClient = `<h5 class="text-danger mt-4 mb-3"><i class='bx bxs-business'></i> ${cliente}</h5>
-                             <div class="row row-cols-1 g-3">`;
 
-        // Iterar Marcos
         for (const [marco, tramos] of Object.entries(marcos)) {
-            
-            // Construir filas para Producción Conforme
             let rowsProd = '';
-            
+
             for (const [tramo, counts] of Object.entries(tramos)) {
-                // Fila Producción (Armado + Validado + Sin Prod)
                 const totalBueno = counts.armado + counts.validado + counts.sin_prod;
                 if (totalBueno > 0) {
                     rowsProd += `
@@ -378,44 +361,8 @@ function updateUI() {
                         <td class="text-end fw-bold text-white">${totalBueno}</td>
                     </tr>`;
                 }
-
-                // Acumular rechazados para el panel de rechazados
-                if (counts.rechazado > 0) {
-                    totalRejected += counts.rechazado;
-                    clientHasRej = true;
-                    // Buscar piezas específicas rechazadas en el array de detalles
-                    const piezasRechazadas = state.rejectedDetails.filter(p => 
-                        p.empresa === cliente && p.marco === marco && p.tramo === tramo
-                    );
-                    
-                    if (piezasRechazadas.length > 0) {
-                         htmlRejClient += `
-                        <div class="col">
-                            <div class="admin-card h-100 p-3 border border-danger">
-                                <h6 class="text-danger border-bottom border-danger pb-2 mb-3">${marco} - ${tramo}</h6>
-                                <table class="table table-dark table-sm mb-0">
-                                    <thead>
-                                        <tr class="text-secondary small">
-                                            <th>Código</th>
-                                            <th class="text-end">Estado</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>`;
-                        
-                        piezasRechazadas.forEach(p => {
-                            htmlRejClient += `
-                            <tr>
-                                <td class="fw-bold text-white">${p.codigo}</td>
-                                <td class="text-end"><span class="badge bg-danger">RECHAZADO</span></td>
-                            </tr>`;
-                        });
-                        
-                        htmlRejClient += `</tbody></table></div></div>`;
-                    }
-                }
             }
-            
-            // Agregar tarjeta a Producción si tiene datos
+
             if (rowsProd) {
                 clientHasProd = true;
                 htmlProdClient += `
@@ -427,7 +374,7 @@ function updateUI() {
                                 <tr class="text-secondary small">
                                     <th>Tramo</th>
                                     <th class="text-center text-warning">Arm</th>
-                                    <th class="text-center text-success" title="Rematadas Validadas">Rem (Val)</th>
+                                    <th class="text-center text-success" title="Rematadas Validadas">Rem</th>
                                     <th class="text-center text-secondary">Sin</th>
                                     <th class="text-end text-white">Total</th>
                                 </tr>
@@ -438,15 +385,11 @@ function updateUI() {
                 </div>`;
             }
         }
-        
+
         htmlProdClient += `</div>`;
-        htmlRejClient += `</div>`;
-        
         if (clientHasProd) htmlProd += htmlProdClient;
-        if (clientHasRej) htmlRej += htmlRejClient;
     }
-    
-    // Renderizar Producción
+
     if (htmlProd) {
         resultsContainer.innerHTML = htmlProd;
     } else {
@@ -457,7 +400,62 @@ function updateUI() {
             </div>`;
     }
 
-    // Renderizar Rechazos
+    const totalRejected = state.rejectedDetails.length;
+    const groupedRejected = {};
+
+    state.rejectedDetails.forEach(p => {
+        const cliente = p.empresa || 'Desconocido';
+        const marco = p.marco || 'Sin marco';
+        const tramo = p.tramo || 'Sin tramo';
+
+        if (!groupedRejected[cliente]) groupedRejected[cliente] = {};
+        if (!groupedRejected[cliente][marco]) groupedRejected[cliente][marco] = {};
+        if (!groupedRejected[cliente][marco][tramo]) groupedRejected[cliente][marco][tramo] = [];
+
+        groupedRejected[cliente][marco][tramo].push(p);
+    });
+
+    let htmlRej = '';
+
+    for (const [cliente, marcos] of Object.entries(groupedRejected)) {
+        htmlRej += `<h5 class="text-danger mt-4 mb-3"><i class='bx bxs-business'></i> ${cliente}</h5>
+                    <div class="row row-cols-1 g-3">`;
+
+        for (const [marco, tramos] of Object.entries(marcos)) {
+            for (const [tramo, piezas] of Object.entries(tramos)) {
+                htmlRej += `
+                <div class="col">
+                    <div class="admin-card h-100 p-3 border border-danger">
+                        <h6 class="text-danger border-bottom border-danger pb-2 mb-3">${marco} - ${tramo}</h6>
+                        <div class="small text-secondary mb-2">Cliente: ${cliente}</div>
+                        <table class="table table-dark table-sm mb-0">
+                            <thead>
+                                <tr class="text-secondary small">
+                                    <th>Código</th>
+                                    <th class="text-end">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+
+                piezas.forEach(pieza => {
+                    htmlRej += `
+                    <tr>
+                        <td class="fw-bold text-white">${pieza.codigo}</td>
+                        <td class="text-end"><span class="badge bg-danger">RECHAZADO</span></td>
+                    </tr>`;
+                });
+
+                htmlRej += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>`;
+            }
+        }
+
+        htmlRej += `</div>`;
+    }
+
     if (htmlRej) {
         rejectedContainer.innerHTML = htmlRej;
     } else {
@@ -506,6 +504,7 @@ function resetPicking() {
             if(data.success) {
                 state.scannedCodes.clear();
                 state.data = {};
+                state.rejectedDetails = [];
                 updateUI();
                 lastScannedCard.classList.add('d-none');
             } else {

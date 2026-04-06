@@ -9,7 +9,7 @@
 <!-- ================= FILTROS ================= -->
 <div class="admin-card mb-4">
   <div class="card-body">
-    <form method="POST" class="row g-3 align-items-end">
+    <form method="GET" class="row g-3 align-items-end">
 
       <div class="col-md-3">
         <label class="form-label text-secondary small">Fecha inicio</label>
@@ -88,6 +88,10 @@
 
             <td>
                 <form method="POST" action="{{ url_for('supervisor_validar_pieza', id=p._id) }}" class="row g-2">
+                <input type="hidden" name="codigo" value="{{ codigo or '' }}">
+                <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
+                <input type="hidden" name="fecha_fin" value="{{ fecha_fin or '' }}">
+                <input type="hidden" name="estado" value="{{ estado_sel or 'todos' }}">
 
                 <div class="col-md-6">
                     <input 
