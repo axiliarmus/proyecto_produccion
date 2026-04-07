@@ -205,19 +205,19 @@ function imprimirSeleccionados() {
 
         content += `
         <div class="etiqueta">
-            <div class="detalle" style="font-size: 26px; margin-bottom: 5px;"><strong>Marco:</strong> ${marco} | <strong>Tramo:</strong> ${tramo}</div>
-            <div class="detalle" style="font-size: 22px; margin-bottom: 10px;"><strong>C. Int:</strong> ${cuerdaInterna} | <strong>C. Ext:</strong> ${cuerdaExterna}</div>
+            <div class="detalle" style="font-size: 14px; margin-bottom: 2px;"><strong>Marco:</strong> ${marco} | <strong>Tramo:</strong> ${tramo}</div>
+            <div class="detalle" style="font-size: 26px; margin-bottom: 5px;"><strong>C. Int:</strong> ${cuerdaInterna} | <strong>C. Ext:</strong> ${cuerdaExterna}</div>
             <svg id="barcode-${index}"></svg>
         </div>
         <script>
             JsBarcode("#barcode-${index}", "${codigo}", {
                 format: "CODE128",
                 width: 3,
-                height: 90,
+                height: 70,
                 displayValue: true,
-                fontSize: 32,
+                fontSize: 24,
                 margin: 5,
-                textMargin: 5
+                textMargin: 2
             });
         <\/script>
         `;
