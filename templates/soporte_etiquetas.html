@@ -86,7 +86,9 @@
                                data-codigo="{{ p.codigo }}" 
                                data-cliente="{{ p.empresa }}" 
                                data-marco="{{ p.marco }}"
-                               data-tramo="{{ p.tramo }}">
+                               data-tramo="{{ p.tramo }}"
+                               data-cinterna="{{ p.cuerda_interna if p.cuerda_interna is not none else 'N/A' }}"
+                               data-cexterna="{{ p.cuerda_externa if p.cuerda_externa is not none else 'N/A' }}">
                     </td>
                     <td class="fw-bold text-white">{{ p.codigo }}</td>
                     <td>{{ p.empresa }}</td>
@@ -194,10 +196,13 @@ function imprimirSeleccionados() {
         const codigo = cb.dataset.codigo;
         const marco = cb.dataset.marco;
         const tramo = cb.dataset.tramo;
+        const cuerdaInterna = cb.dataset.cinterna || 'N/A';
+        const cuerdaExterna = cb.dataset.cexterna || 'N/A';
 
         content += `
         <div class="etiqueta">
-            <div class="detalle"><strong>Marco:</strong> ${marco} | <strong>Tramo:</strong> ${tramo}</div>
+            <div class="detalle" style="font-size: 14px;"><strong>Marco:</strong> ${marco} | <strong>Tramo:</strong> ${tramo}</div>
+            <div class="detalle" style="font-size: 12px; margin-bottom: 2px;"><strong>C. Int:</strong> ${cuerdaInterna} | <strong>C. Ext:</strong> ${cuerdaExterna}</div>
             <svg id="barcode-${index}"></svg>
         </div>
         <script>
