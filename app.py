@@ -1231,26 +1231,8 @@ def soporte_piezas_masivas():
                 estado = "Armado"
             p["estado_prod"] = estado
             
-            # Obtener datos de la colección producción histórica para las cuerdas
-            prod_info = db.produccion_historica.find_one({"codigo_pieza": str(codigo), "corte_id": corte_id}, sort=[("fecha", -1)])
-            if prod_info:
-                p["cuerda_interna"] = prod_info.get("cuerda_interna")
-                p["cuerda_externa"] = prod_info.get("cuerda_externa")
-            else:
-                p["cuerda_interna"] = None
-                p["cuerda_externa"] = None
-            
-            # Obtener datos de la colección producción histórica para las cuerdas
-            prod_info = db.produccion_historica.find_one({"codigo_pieza": str(codigo), "corte_id": corte_id}, sort=[("fecha", -1)])
-            if prod_info:
-                p["cuerda_interna"] = prod_info.get("cuerda_interna")
-                p["cuerda_externa"] = prod_info.get("cuerda_externa")
-            else:
-                p["cuerda_interna"] = None
-                p["cuerda_externa"] = None
-            
-            # Obtener datos de la colección producción histórica para las cuerdas
-            prod_info = db.produccion_historica.find_one({"codigo_pieza": str(codigo), "corte_id": corte_id}, sort=[("fecha", -1)])
+            # Obtener datos de la colección producción para las cuerdas
+            prod_info = db.produccion.find_one({"codigo_pieza": str(codigo)}, sort=[("fecha", -1)])
             if prod_info:
                 p["cuerda_interna"] = prod_info.get("cuerda_interna")
                 p["cuerda_externa"] = prod_info.get("cuerda_externa")
