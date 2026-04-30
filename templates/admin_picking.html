@@ -149,9 +149,9 @@
 <script>
 // ESTADO DE LA APLICACIÓN
 const state = {
-    scannedCodes: new Set({{ scanned_codes|tojson }}),
-    data: {{ initial_data|tojson }},
-    rejectedDetails: {{ initial_rejected|tojson }} // Cargar lista desde servidor
+    scannedCodes: new Set({{ scanned_codes|tojson|safe }}),
+    data: {{ initial_data|tojson|safe }},
+    rejectedDetails: {{ initial_rejected|tojson|safe }} // Cargar lista desde servidor
 };
 
 // ELEMENTOS DOM

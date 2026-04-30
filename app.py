@@ -107,7 +107,8 @@ def csrf_protect():
 # ==============================================================================
 # 7. CONFIGURACIÓN REGIONAL (HORA CHILE)
 # ==============================================================================
-CL = timezone(timedelta(hours=-3))
+import zoneinfo
+CL = zoneinfo.ZoneInfo('America/Santiago')
 
 # ==============================================================================
 # 8. CONEXIÓN A BASE DE DATOS (MONGODB)
