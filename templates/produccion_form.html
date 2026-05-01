@@ -71,7 +71,22 @@
         </select>
       </div>
 
-      <div class="col-12 d-flex justify-content-between">
+      <div class="col-md-12 mt-4">
+        <div class="card bg-dark border-warning">
+          <div class="card-body">
+            <h5 class="card-title text-warning">Asignar a Corte (Opcional)</h5>
+            <p class="card-text text-light" style="font-size: 0.9em;">Si este registro quedó fuera de un corte mensual y deseas agregarlo a uno pasado de forma manual, selecciónalo aquí. <strong>Atención:</strong> Al guardarlo con un corte asignado, el registro se moverá al historial (piezas archivadas).</p>
+            <select name="asignar_corte_id" class="form-select bg-secondary text-light">
+              <option value="">-- No asignar a ningún corte --</option>
+              {% for c in cortes %}
+              <option value="{{ c._id }}">{{ c.nombre }} ({{ c.inicio.strftime('%d-%m-%Y') }} al {{ c.fin.strftime('%d-%m-%Y') }})</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 d-flex justify-content-between mt-4">
         <a href="{{ url_for('soporte_produccion_list') }}" class="btn btn-secondary">← Volver</a>
         <button type="submit" class="btn btn-accent">Guardar cambios</button>
       </div>

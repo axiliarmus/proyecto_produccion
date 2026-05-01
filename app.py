@@ -2262,7 +2262,8 @@ def soporte_produccion_editar_form(id):
     if not reg:
         flash('Registro no encontrado', 'warning')
         return redirect(url_for('soporte_produccion_list'))
-    return render_template('produccion_form.html', modo='editar', reg=reg)
+    cortes = list(db.cortes.find().sort("creado_en", -1))
+    return render_template('produccion_form.html', modo='editar', reg=reg, cortes=cortes)
 
 @app.route('/soporte/produccion/<id>/editar', methods=['POST'])
 @login_required('soporte')
@@ -2303,6 +2304,50 @@ def soporte_produccion_editar_post(id):
         update['fecha'] = fecha_dt
 
     db.produccion.update_one({'_id': ObjectId(id)}, {'$set': update})
+    
+    asignar_corte_id = request.form.get('asignar_corte_id')
+    if asignar_corte_id:
+        try:
+            corte = db.cortes.find_one({'_id': ObjectId(asignar_corte_id)})
+            if corte:
+                reg_actualizado = db.produccion.find_one({'_id': ObjectId(id)})
+                if reg_actualizado:
+                    reg_historico = dict(reg_actualizado)
+                    reg_historico.pop('_id', None)
+                    reg_historico['corte_id'] = corte['_id']
+                    db.produccion_historica.insert_one(reg_historico)
+                    
+                    # Verificar si la pieza existe en piezas_historicas para este corte
+                    cod_pieza = reg_actualizado.get('codigo_pieza')
+                    pieza_hist = None
+                    if cod_pieza:
+                        pieza_hist = db.piezas_historicas.find_one({
+                            "corte_id": corte['_id'], 
+                            "$or": [{"codigo": cod_pieza}, {"codigo": str(cod_pieza)}]
+                        })
+                        if not pieza_hist:
+                            # Intentar buscar la pieza activa
+                            try:
+                                cod_int = int(cod_pieza)
+                            except:
+                                cod_int = cod_pieza
+                            
+                            pieza_activa = db.piezas.find_one({"$or": [{"codigo": cod_pieza}, {"codigo": str(cod_pieza)}, {"codigo": cod_int}]})
+                            if not pieza_activa:
+                                pieza_activa = db.piezas_historicas.find_one({"$or": [{"codigo": cod_pieza}, {"codigo": str(cod_pieza)}, {"codigo": cod_int}]}, sort=[("_id", -1)])
+
+                            if pieza_activa:
+                                p_copy = dict(pieza_activa)
+                                p_copy.pop('_id', None)
+                                p_copy['corte_id'] = corte['_id']
+                                db.piezas_historicas.insert_one(p_copy)
+
+                    db.produccion.delete_one({'_id': ObjectId(id)})
+                    flash(f'Registro actualizado y asignado al corte: {corte["nombre"]} ✔', 'success')
+                    return redirect(url_for('soporte_produccion_list'))
+        except Exception as e:
+            flash(f'Error al asignar el corte: {str(e)}', 'danger')
+
     flash('Registro actualizado ✔', 'success')
     return redirect(url_for('soporte_produccion_list'))
 
