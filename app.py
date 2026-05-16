@@ -1280,7 +1280,7 @@ def soporte_eliminar_masivo():
     return redirect(url_for('soporte_piezas_masivas'))
 
 @app.route('/soporte/etiquetas', methods=['GET', 'POST'])
-@login_required(['soporte', 'administrador'])
+@login_required(['soporte', 'administrador', 'supervisor'])
 def soporte_etiquetas():
     filtro = {}
     
