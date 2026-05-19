@@ -1600,7 +1600,7 @@ def admin_produccion_list():
 
 
 @app.route('/admin/produccion/export', methods=['POST'])
-@login_required(['administrador', 'soporte'])
+@login_required(['administrador', 'soporte', 'supervisor'])
 def exportar_produccion_excel():
     filtro = {}
     operador_sel = request.form.get('operador')
@@ -1858,7 +1858,7 @@ def admin_piezas_archivadas():
                            estado_sel=estado_filter)
 
 @app.route('/admin/produccion/archivada/export', methods=['POST'])
-@login_required(['administrador', 'soporte'])
+@login_required(['administrador', 'soporte', 'supervisor'])
 def exportar_produccion_archivada_excel():
     filtro = {}
     operador_sel = request.form.get('operador')
@@ -3042,7 +3042,7 @@ def admin_buscador_piezas():
 
 
 @app.route('/admin/piezas/archivadas/export', methods=['POST'])
-@login_required(['administrador', 'soporte'])
+@login_required(['administrador', 'soporte', 'supervisor'])
 def exportar_piezas_archivadas_excel():
     corte_nombre = request.form.get('corte_nombre')
     cliente_sel = request.form.get('cliente')
