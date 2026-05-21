@@ -3153,9 +3153,9 @@ def operador_registrar():
                     ahora_utc = datetime.now(timezone.utc)
                     diferencia = ahora_utc - ultima_fecha
                     
-                    # 5 minutos = 300 segundos
-                    if diferencia.total_seconds() < 300:
-                        tiempo_restante = int(300 - diferencia.total_seconds())
+                    # 2 minutos = 120 segundos
+                    if diferencia.total_seconds() < 120:
+                        tiempo_restante = int(120 - diferencia.total_seconds())
                         min_rest = tiempo_restante // 60
                         seg_rest = tiempo_restante % 60
                         flash(f"⏳ Debes esperar {min_rest}m {seg_rest}s para registrar otra pieza.", "warning")
