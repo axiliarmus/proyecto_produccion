@@ -7,6 +7,33 @@ from bson import ObjectId
 from flask import flash, redirect, render_template, request, url_for
 
 
+# #region debug-point helpers:piece-master-measures
+def _build_piece_master_measure_map(db, codigos, build_codigo_lookup_keys, build_codigo_query_values):
+    lookup_values = build_codigo_query_values(codigos)
+    if not lookup_values:
+        return {}
+
+    projection = {
+        "_id": 0,
+        "codigo": 1,
+        "cuerda_interna": 1,
+        "cuerda_externa": 1,
+        "flecha": 1,
+    }
+    master_map = {}
+    for pieza in db.piezas.find({"codigo": {"$in": lookup_values}}, projection):
+        for key in build_codigo_lookup_keys(pieza.get("codigo")):
+            master_map[key] = {
+                "cuerda_interna": pieza.get("cuerda_interna"),
+                "cuerda_externa": pieza.get("cuerda_externa"),
+                "flecha": pieza.get("flecha"),
+            }
+    return master_map
+
+
+# #endregion
+
+
 # #region debug-point helpers:vps-flecha-label
 def _debug_report_vps_flecha_label(hypothesis_id, location, msg, data=None, run_id="pre"):
     try:
@@ -146,7 +173,9 @@ def register_soporte_basic_routes(
         if piezas:
             codigos_en_pantalla = [pieza.get("codigo") for pieza in piezas if pieza.get("codigo")]
             set_armado, set_remate = get_piece_status_sets(db, codigos_en_pantalla)
-            latest_prod_map = get_latest_production_map(db, codigos_en_pantalla)
+            master_measure_map = _build_piece_master_measure_map(
+                db, codigos_en_pantalla, build_codigo_lookup_keys, build_codigo_query_values
+            )
 
             piezas_finales = []
             for pieza in piezas:
@@ -159,28 +188,13 @@ def register_soporte_basic_routes(
                     estado = "Armado"
                 pieza["estado_prod"] = estado
 
-                prod_info = None
                 for key in codigo_keys:
-                    prod_info = latest_prod_map.get(key)
-                    if prod_info:
+                    master_info = master_measure_map.get(key)
+                    if master_info:
+                        pieza["cuerda_interna"] = master_info.get("cuerda_interna")
+                        pieza["cuerda_externa"] = master_info.get("cuerda_externa")
+                        pieza["flecha"] = master_info.get("flecha")
                         break
-
-                if prod_info:
-                    pieza["cuerda_interna"] = (
-                        prod_info.get("cuerda_interna")
-                        if prod_info.get("cuerda_interna") is not None
-                        else pieza.get("cuerda_interna")
-                    )
-                    pieza["cuerda_externa"] = (
-                        prod_info.get("cuerda_externa")
-                        if prod_info.get("cuerda_externa") is not None
-                        else pieza.get("cuerda_externa")
-                    )
-                    pieza["flecha"] = (
-                        prod_info.get("flecha")
-                        if prod_info.get("flecha") is not None
-                        else pieza.get("flecha")
-                    )
 
                 if estado_filter == "Sin producción" and estado != "Sin producción":
                     continue
@@ -282,6 +296,9 @@ def register_soporte_basic_routes(
         if piezas:
             codigos_en_pantalla = [pieza.get("codigo") for pieza in piezas if pieza.get("codigo")]
             set_armado, set_remate = get_piece_status_sets(db, codigos_en_pantalla)
+            master_measure_map = _build_piece_master_measure_map(
+                db, codigos_en_pantalla, build_codigo_lookup_keys, build_codigo_query_values
+            )
 
             for pieza in piezas:
                 codigo = pieza.get("codigo")
@@ -292,6 +309,14 @@ def register_soporte_basic_routes(
                 elif codigo_keys & set_armado:
                     estado = "Armado"
                 pieza["estado_prod"] = estado
+
+                for key in codigo_keys:
+                    master_info = master_measure_map.get(key)
+                    if master_info:
+                        pieza["cuerda_interna"] = master_info.get("cuerda_interna")
+                        pieza["cuerda_externa"] = master_info.get("cuerda_externa")
+                        pieza["flecha"] = master_info.get("flecha")
+                        break
 
                 if estado_filter == "Sin producción" and estado != "Sin producción":
                     continue
