@@ -124,13 +124,21 @@ def register_soporte_basic_routes(
                         break
 
                 if prod_info:
-                    pieza["cuerda_interna"] = prod_info.get("cuerda_interna")
-                    pieza["cuerda_externa"] = prod_info.get("cuerda_externa")
-                    pieza["flecha"] = prod_info.get("flecha")
-                else:
-                    pieza["cuerda_interna"] = None
-                    pieza["cuerda_externa"] = None
-                    pieza["flecha"] = None
+                    pieza["cuerda_interna"] = (
+                        prod_info.get("cuerda_interna")
+                        if prod_info.get("cuerda_interna") is not None
+                        else pieza.get("cuerda_interna")
+                    )
+                    pieza["cuerda_externa"] = (
+                        prod_info.get("cuerda_externa")
+                        if prod_info.get("cuerda_externa") is not None
+                        else pieza.get("cuerda_externa")
+                    )
+                    pieza["flecha"] = (
+                        prod_info.get("flecha")
+                        if prod_info.get("flecha") is not None
+                        else pieza.get("flecha")
+                    )
 
                 if estado_filter == "Sin producción" and estado != "Sin producción":
                     continue
@@ -232,7 +240,6 @@ def register_soporte_basic_routes(
         if piezas:
             codigos_en_pantalla = [pieza.get("codigo") for pieza in piezas if pieza.get("codigo")]
             set_armado, set_remate = get_piece_status_sets(db, codigos_en_pantalla)
-            latest_prod_map = get_latest_production_map(db, codigos_en_pantalla)
 
             for pieza in piezas:
                 codigo = pieza.get("codigo")
@@ -243,21 +250,6 @@ def register_soporte_basic_routes(
                 elif codigo_keys & set_armado:
                     estado = "Armado"
                 pieza["estado_prod"] = estado
-
-                prod_info = None
-                for key in codigo_keys:
-                    prod_info = latest_prod_map.get(key)
-                    if prod_info:
-                        break
-
-                if prod_info:
-                    pieza["cuerda_interna"] = prod_info.get("cuerda_interna")
-                    pieza["cuerda_externa"] = prod_info.get("cuerda_externa")
-                    pieza["flecha"] = prod_info.get("flecha")
-                else:
-                    pieza["cuerda_interna"] = None
-                    pieza["cuerda_externa"] = None
-                    pieza["flecha"] = None
 
                 if estado_filter == "Sin producción" and estado != "Sin producción":
                     continue
