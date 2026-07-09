@@ -63,6 +63,11 @@
       </div>
 
       <div class="col-md-3">
+        <label class="form-label text-light">Flecha</label>
+        <input type="text" name="flecha" value="{{ reg.flecha if reg.flecha is defined else '' }}" class="form-control bg-secondary text-light">
+      </div>
+
+      <div class="col-md-3">
         <label class="form-label text-light">Estado calidad</label>
         <select name="calidad_status" class="form-select bg-secondary text-light">
           <option value="pendiente" {% if reg.calidad_status=='pendiente' %}selected{% endif %}>Pendiente</option>

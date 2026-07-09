@@ -12,3 +12,321 @@ body { background: linear-gradient(120deg, var(--bg), #1c2235); color: var(--tex
 .btn-accent { background: var(--accent); border: none; color:#0b0f1a; }
 .btn-accent-2 { background: var(--accent-2); border: none; color:#0b0f1a; }
 .badge-soft { background: rgba(96,165,250,.15); color:#93c5fd; }
+
+.login-page {
+  background:
+    radial-gradient(circle at top, rgba(45, 212, 191, 0.1), transparent 28%),
+    linear-gradient(135deg, #07111d 0%, #0b0f1a 42%, #172033 100%);
+}
+
+.login-page main.container {
+  max-width: 1320px;
+}
+
+.login-page .card {
+  --bs-card-bg: #121828;
+  --bs-card-color: #e8eef9;
+  background: linear-gradient(180deg, rgba(18, 24, 40, 0.96), rgba(10, 15, 26, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e8eef9;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+}
+
+.login-page .card,
+.login-page .card .card-body {
+  background-color: #121828 !important;
+  background-image: linear-gradient(180deg, rgba(18, 24, 40, 0.96), rgba(10, 15, 26, 0.98)) !important;
+  color: #e8eef9 !important;
+}
+
+.login-page .card h1,
+.login-page .card h2,
+.login-page .card h3,
+.login-page .card h4,
+.login-page .card h5,
+.login-page .card h6,
+.login-page .card label {
+  color: #f8fafc;
+}
+
+.login-page .card p,
+.login-page .card .text-muted {
+  color: #9fb0c7 !important;
+}
+
+.login-page .form-control {
+  --bs-body-bg: rgba(255, 255, 255, 0.04);
+  --bs-body-color: #f8fafc;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+}
+
+.login-page .form-control::placeholder {
+  color: #7d8aa0;
+}
+
+.login-page .form-control:focus {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(45, 212, 191, 0.45);
+  color: #fff;
+  box-shadow: 0 0 0 0.2rem rgba(45, 212, 191, 0.12);
+}
+
+.login-page .input-group .btn,
+.login-page .btn-outline-secondary {
+  background: rgba(96, 165, 250, 0.1);
+  border-color: rgba(96, 165, 250, 0.22);
+  color: #dbeafe;
+}
+
+.login-page .form-control,
+.login-page .input-group .btn,
+.login-page .btn-outline-secondary {
+  background-color: inherit;
+}
+
+.login-page .form-control {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  color: #f8fafc !important;
+}
+
+.login-page .input-group .btn,
+.login-page .btn-outline-secondary {
+  background-color: rgba(96, 165, 250, 0.1) !important;
+  color: #dbeafe !important;
+}
+
+.login-page .input-group .btn:hover,
+.login-page .input-group .btn:focus,
+.login-page .btn-outline-secondary:hover,
+.login-page .btn-outline-secondary:focus {
+  background: rgba(96, 165, 250, 0.18);
+  border-color: rgba(96, 165, 250, 0.28);
+  color: #fff;
+}
+
+.login-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  padding: 2rem 0;
+}
+
+.login-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top left, rgba(45, 212, 191, 0.16), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(96, 165, 250, 0.16), transparent 30%);
+  pointer-events: none;
+}
+
+.login-row {
+  position: relative;
+  z-index: 1;
+  min-height: calc(100vh - 180px);
+}
+
+.login-brand-panel {
+  padding: 2rem 1rem 2rem 0;
+}
+
+.login-badge {
+  display: inline-block;
+  margin-bottom: 1rem;
+  padding: 0.55rem 0.9rem;
+  background: rgba(45, 212, 191, 0.14);
+  color: #7ef0df;
+  border: 1px solid rgba(45, 212, 191, 0.18);
+  font-weight: 600;
+}
+
+.login-title {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1.05;
+  margin-bottom: 1rem;
+  color: #f8fafc;
+}
+
+.login-subtitle {
+  color: #aeb8ca;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  max-width: 42rem;
+  margin-bottom: 1.75rem;
+}
+
+.login-feature-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.login-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: #dbe4f3;
+  font-weight: 500;
+}
+
+.login-feature-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 0 6px rgba(45, 212, 191, 0.08);
+}
+
+.login-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(18, 24, 40, 0.94), rgba(10, 15, 26, 0.97));
+  backdrop-filter: blur(12px);
+  border-radius: 24px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+
+.login-card-header {
+  margin-bottom: 1.75rem;
+}
+
+.login-kicker {
+  display: inline-block;
+  margin-bottom: 0.65rem;
+  color: #7dd3fc;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.login-card-text {
+  color: #96a3b8;
+  line-height: 1.6;
+}
+
+.login-label {
+  color: #cfd8e6;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.login-input,
+.login-toggle-btn {
+  min-height: 52px;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.login-input {
+  background: rgba(255, 255, 255, 0.03);
+  color: #f8fafc;
+}
+
+.login-input::placeholder {
+  color: #76839a;
+}
+
+.login-input:focus {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border-color: rgba(45, 212, 191, 0.5);
+  box-shadow: 0 0 0 0.2rem rgba(45, 212, 191, 0.12);
+}
+
+.login-password-group {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.login-toggle-btn {
+  background: rgba(96, 165, 250, 0.08);
+  color: #dbeafe;
+  border-left: 0;
+  font-weight: 600;
+}
+
+.login-toggle-btn:hover,
+.login-toggle-btn:focus {
+  background: rgba(96, 165, 250, 0.16);
+  color: #fff;
+}
+
+.login-submit-btn {
+  min-height: 54px;
+  border-radius: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 18px 40px rgba(45, 212, 191, 0.18);
+}
+
+.login-submit-btn:hover,
+.login-submit-btn:focus {
+  background: #3ce3cd;
+  color: #071019;
+}
+
+@media (max-width: 991.98px) {
+  .login-shell {
+    padding: 1rem 0 2rem;
+  }
+
+  .login-row {
+    min-height: auto;
+  }
+}
+
+/* Fallback visual para el login clasico que aun pueda estar siendo servido */
+body .card.shadow.card-lift:has(input[name="usuario"]):has(input[name="password"]) {
+  background-color: #121828 !important;
+  background-image: linear-gradient(180deg, rgba(18, 24, 40, 0.96), rgba(10, 15, 26, 0.98)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #e8eef9 !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35) !important;
+  border-radius: 24px;
+}
+
+body .card.shadow.card-lift:has(input[name="usuario"]):has(input[name="password"]) .card-body {
+  background: transparent !important;
+  color: #e8eef9 !important;
+}
+
+body .card.shadow.card-lift:has(input[name="usuario"]):has(input[name="password"]) h3,
+body .card.shadow.card-lift:has(input[name="usuario"]):has(input[name="password"]) label {
+  color: #f8fafc !important;
+}
+
+body .card.shadow.card-lift:has(input[name="usuario"]):has(input[name="password"]) .form-control {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+}
+
+body .card.shadow.card-lift:has(input[name="usuario"]):has(input[name="password"]) .form-control::placeholder {
+  color: #7d8aa0;
+}
+
+body .card.shadow.card-lift:has(input[name="usuario"]):has(input[name="password"]) .form-control:focus {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(45, 212, 191, 0.45) !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 0.2rem rgba(45, 212, 191, 0.12) !important;
+}
+
+body .card.shadow.card-lift:has(input[name="usuario"]):has(input[name="password"]) .btn-outline-secondary {
+  background-color: rgba(96, 165, 250, 0.1) !important;
+  border-color: rgba(96, 165, 250, 0.22) !important;
+  color: #dbeafe !important;
+}
+
+body .card.shadow.card-lift:has(input[name="usuario"]):has(input[name="password"]) .btn-outline-secondary:hover,
+body .card.shadow.card-lift:has(input[name="usuario"]):has(input[name="password"]) .btn-outline-secondary:focus {
+  background-color: rgba(96, 165, 250, 0.18) !important;
+  border-color: rgba(96, 165, 250, 0.28) !important;
+  color: #fff !important;
+}
+
+body .card.shadow.card-lift:has(input[name="usuario"]):has(input[name="password"]) .btn-accent {
+  box-shadow: 0 18px 40px rgba(45, 212, 191, 0.18);
+}

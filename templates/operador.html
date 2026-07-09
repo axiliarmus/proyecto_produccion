@@ -18,7 +18,7 @@
 
     <h5 class="mb-3">Registrar nueva pieza</h5>
 
-    <form class="row g-3" method="post" action="{{ url_for('operador_registrar') }}">
+    <form class="row g-3" method="post" action="{{ url_for('operador_registrar') }}" id="operador_registrar_form">
 
       <!-- MODO -->
       <div class="col-md-3">
@@ -64,10 +64,15 @@
           <input class="form-control" name="cuerda_externa" step="0.01" type="number">
         </div>
 
+        <div class="col-md-3">
+          <label class="form-label">Flecha</label>
+          <input class="form-control" name="flecha" step="0.01" type="number">
+        </div>
+
       </div>
 
       <div class="col-12 mt-4">
-        <button class="btn btn-accent w-100 py-2 fw-bold">Registrar pieza</button>
+        <button class="btn btn-accent w-100 py-2 fw-bold" id="operador_registrar_btn">Registrar pieza</button>
       </div>
 
     </form>
@@ -155,6 +160,7 @@
       </tfoot>
     </table>
   </div>
+  {% include '_pagination.html' %}
 {% else %}
   <div class="alert alert-secondary">No se encontraron registros en el rango seleccionado.</div>
 {% endif %}
@@ -183,6 +189,22 @@ document.getElementById("modo").addEventListener("change", function () {
 
 // Inicializar estado de cuerdas
 document.getElementById("modo").dispatchEvent(new Event('change'));
+
+// Evitar doble submit del registro principal
+const operadorRegistrarForm = document.getElementById("operador_registrar_form");
+const operadorRegistrarBtn = document.getElementById("operador_registrar_btn");
+if (operadorRegistrarForm && operadorRegistrarBtn) {
+    operadorRegistrarForm.addEventListener("submit", function (event) {
+        if (operadorRegistrarForm.dataset.submitting === "1") {
+            event.preventDefault();
+            return;
+        }
+
+        operadorRegistrarForm.dataset.submitting = "1";
+        operadorRegistrarBtn.disabled = true;
+        operadorRegistrarBtn.textContent = "Registrando...";
+    });
+}
 
 // Lógica de Escáner QR
 let configHtml5QrCode = {};

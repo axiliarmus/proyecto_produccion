@@ -70,6 +70,7 @@
                 <th>Peso</th>
                 <th>C. Int</th>
                 <th>C. Ext</th>
+                <th>Flecha</th>
                 <th>Tipo</th>
               </tr>
             </thead>
@@ -83,6 +84,7 @@
                 <td>{{ p.kilo_pieza }}</td>
                 <td>{{ p.cuerda_interna }}</td>
                 <td>{{ p.cuerda_externa }}</td>
+                <td>{{ p.flecha }}</td>
                 <td>{{ p.tipo_precio|default('metro') }}</td>
               </tr>
               {% endfor %}
@@ -108,13 +110,14 @@
                             <option value="kilo_pieza">Kilo por pieza</option>
                             <option value="cuerda_interna">Cuerda Interna</option>
                             <option value="cuerda_externa">Cuerda Externa</option>
+                            <option value="flecha">Flecha</option>
                             <option value="tipo_precio">Tipo de Precio (metro/avo)</option>
                         </select>
                     </div>
             
                     <div class="col-md-5">
                         <label class="form-label text-secondary small">Nuevo valor</label>
-                        <input name="valor" class="form-control bg-dark text-light border-secondary" required placeholder="Escribe el nuevo valor...">
+                        <input name="valor" id="valorMasivo" class="form-control bg-dark text-light border-secondary" required placeholder="Escribe el nuevo valor...">
                     </div>
             
                     <div class="col-md-3">
@@ -185,6 +188,17 @@ document.getElementById("marco").addEventListener("change", async function () {
         selTramo.innerHTML = "<option>Error al cargar</option>";
     }
 });
+
+const formMasivo = document.querySelector('form[action="{{ url_for("piezas_masivo_confirmar") }}"]');
+if (formMasivo) {
+    formMasivo.addEventListener("submit", function () {
+        const campo = (this.querySelector('[name="campo"]')?.value || "").trim().toLowerCase();
+        const valorInput = this.querySelector("#valorMasivo");
+        if (valorInput && ["kilo_pieza", "cuerda_interna", "cuerda_externa", "flecha"].includes(campo)) {
+            valorInput.value = (valorInput.value || "").trim().replace(",", ".");
+        }
+    });
+}
 </script>
 
 {% endblock %}

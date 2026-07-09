@@ -126,6 +126,7 @@
         <th>Tramo</th>
         <th>C. Interna</th>
         <th>C. Externa</th>
+        <th>Flecha</th>
         <th>Estado</th>
       </tr>
     </thead>
@@ -138,6 +139,7 @@
         <td>{{ p.tramo }}</td>
         <td>{{ p.cuerda_interna }}</td>
         <td>{{ p.cuerda_externa }}</td>
+        <td>{{ p.flecha }}</td>
         <td>
             {{ p.estado }}
             {% if p.estado == 'Rematado' %}
@@ -148,6 +150,7 @@
       {% endfor %}
     </tbody>
   </table>
+  {% include '_pagination.html' %}
 </div>
 {% else %}
 <div class="alert alert-secondary text-center">No se encontraron resultados.</div>

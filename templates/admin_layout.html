@@ -74,6 +74,14 @@
                 </a>
             </li>
             {% endif %}
+
+            {% if session.get('role') == 'administrador' %}
+            <li>
+                <a href="{{ url_for('admin_configuracion') }}" class="nav-link {% if request.endpoint == 'admin_configuracion' %}active{% endif %}">
+                    <i class='bx bxs-cog'></i> Configuración
+                </a>
+            </li>
+            {% endif %}
             
             {% if session.get('role') == 'supervisor' %}
             <li>
@@ -163,6 +171,24 @@
             }
           });
         })();
+
+        document.addEventListener('click', function(event) {
+            const button = event.target.closest('[data-toggle-password]');
+            if (!button) {
+                return;
+            }
+
+            const targetId = button.getAttribute('data-toggle-password');
+            const input = document.getElementById(targetId);
+            if (!input) {
+                return;
+            }
+
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            button.textContent = isPassword ? 'Ocultar' : 'Mostrar';
+            button.setAttribute('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+        });
 
         // Mobile Sidebar Logic
         document.addEventListener('DOMContentLoaded', function() {

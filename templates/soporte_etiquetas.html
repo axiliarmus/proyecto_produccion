@@ -56,7 +56,10 @@
 </div>
 
 {% if piezas %}
-<div class="d-flex justify-content-end mb-3">
+<div class="d-flex justify-content-end flex-wrap gap-2 mb-3">
+    <button class="btn btn-secondary d-flex align-items-center gap-2" onclick="imprimirFiltradas()">
+        <i class='bx bxs-printer'></i> Imprimir Todas Las Filtradas
+    </button>
     <button class="btn btn-info d-flex align-items-center gap-2" onclick="imprimirSeleccionados()">
         <i class='bx bxs-printer'></i> Imprimir Seleccionadas
     </button>
@@ -88,7 +91,8 @@
                                data-marco="{{ p.marco }}"
                                data-tramo="{{ p.tramo }}"
                                data-cinterna="{{ p.cuerda_interna if p.cuerda_interna is not none else 'N/A' }}"
-                               data-cexterna="{{ p.cuerda_externa if p.cuerda_externa is not none else 'N/A' }}">
+                               data-cexterna="{{ p.cuerda_externa if p.cuerda_externa is not none else 'N/A' }}"
+                               data-flecha="{{ p.flecha if p.flecha is not none else 'N/A' }}">
                     </td>
                     <td class="fw-bold text-white">{{ p.codigo }}</td>
                     <td>{{ p.empresa }}</td>
@@ -120,6 +124,7 @@
             </tbody>
         </table>
     </div>
+    {% include '_pagination.html' %}
 </div>
 {% else %}
 <div class="alert alert-secondary text-center">
@@ -132,6 +137,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
 <script>
+const piezasImpresion = {{ piezas_impresion|tojson }};
+const LIMITE_CONFIRMACION_IMPRESION = {{ print_confirm_limit|default(100) }};
+
 document.addEventListener('DOMContentLoaded', function() {
     JsBarcode(".barcode").init();
 
@@ -146,10 +154,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function imprimirSeleccionados() {
-    const seleccionados = document.querySelectorAll('.item-check:checked');
-    if (seleccionados.length === 0) {
-        alert("Selecciona al menos una etiqueta para imprimir.");
+function confirmarImpresionMasiva(cantidad, origen) {
+    if (cantidad < LIMITE_CONFIRMACION_IMPRESION) {
+        return true;
+    }
+
+    return window.confirm(
+        `Vas a imprimir ${cantidad} etiquetas ${origen}. Esta accion puede tardar varios segundos y abrir el dialogo de impresion con muchas paginas. ¿Deseas continuar?`
+    );
+}
+
+function abrirVentanaImpresion(etiquetas) {
+    if (!etiquetas || etiquetas.length === 0) {
+        alert("No hay etiquetas para imprimir.");
         return;
     }
 
@@ -192,22 +209,17 @@ function imprimirSeleccionados() {
     <body>
     `;
 
-    seleccionados.forEach((cb, index) => {
-        const codigo = cb.dataset.codigo;
-        const marco = cb.dataset.marco;
-        const tramo = cb.dataset.tramo;
-        const cuerdaInterna = cb.dataset.cinterna || 'N/A';
-        const cuerdaExterna = cb.dataset.cexterna || 'N/A';
-
+    etiquetas.forEach((item, index) => {
         content += `
         <div class="etiqueta">
-            <div class="detalle" style="font-size: 14px; margin-bottom: 0px; width: 100%;"><strong>Marco:</strong> ${marco}</div>
-            <div class="detalle" style="font-size: 14px; margin-bottom: 4px; width: 100%;"><strong>Tramo:</strong> ${tramo}</div>
-            <div class="detalle" style="font-size: 26px; margin-bottom: 5px;"><strong>C. Int:</strong> ${cuerdaInterna} | <strong>C. Ext:</strong> ${cuerdaExterna}</div>
+            <div class="detalle" style="font-size: 14px; margin-bottom: 0px; width: 100%;"><strong>Marco:</strong> ${item.marco}</div>
+            <div class="detalle" style="font-size: 14px; margin-bottom: 4px; width: 100%;"><strong>Tramo:</strong> ${item.tramo}</div>
+            <div class="detalle" style="font-size: 22px; margin-bottom: 5px;"><strong>C. Int:</strong> ${item.cuerda_interna} | <strong>C. Ext:</strong> ${item.cuerda_externa}</div>
+            <div class="detalle" style="font-size: 22px; margin-bottom: 5px;"><strong>Flecha:</strong> ${item.flecha}</div>
             <svg id="barcode-${index}"></svg>
         </div>
         <script>
-            JsBarcode("#barcode-${index}", "${codigo}", {
+            JsBarcode("#barcode-${index}", "${item.codigo}", {
                 format: "CODE128",
                 width: 3,
                 height: 50,
@@ -233,6 +245,37 @@ function imprimirSeleccionados() {
 
     printWindow.document.write(content);
     printWindow.document.close();
+}
+
+function imprimirSeleccionados() {
+    const seleccionados = document.querySelectorAll('.item-check:checked');
+    if (seleccionados.length === 0) {
+        alert("Selecciona al menos una etiqueta para imprimir.");
+        return;
+    }
+
+    if (!confirmarImpresionMasiva(seleccionados.length, "seleccionadas")) {
+        return;
+    }
+
+    const etiquetas = Array.from(seleccionados).map((cb) => ({
+        codigo: cb.dataset.codigo,
+        marco: cb.dataset.marco,
+        tramo: cb.dataset.tramo,
+        cuerda_interna: cb.dataset.cinterna || 'N/A',
+        cuerda_externa: cb.dataset.cexterna || 'N/A',
+        flecha: cb.dataset.flecha || 'N/A'
+    }));
+
+    abrirVentanaImpresion(etiquetas);
+}
+
+function imprimirFiltradas() {
+    if (!confirmarImpresionMasiva(piezasImpresion.length, "filtradas")) {
+        return;
+    }
+
+    abrirVentanaImpresion(piezasImpresion);
 }
 </script>
 

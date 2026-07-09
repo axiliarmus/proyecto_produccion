@@ -40,7 +40,10 @@
 
           <div class="col-md-6">
             <label class="form-label text-secondary small">{{ 'Contraseña' if modo == 'nuevo' else 'Nueva Contraseña (opcional)' }}</label>
-            <input type="password" class="form-control bg-dark text-light border-secondary" name="password" {% if modo == 'nuevo' %}required{% endif %}>
+            <div class="input-group">
+              <input type="password" class="form-control bg-dark text-light border-secondary" name="password" id="usuario_password" {% if modo == 'nuevo' %}required{% endif %}>
+              <button type="button" class="btn btn-outline-secondary" data-toggle-password="usuario_password" aria-label="Mostrar contraseña">Mostrar</button>
+            </div>
           </div>
         </div>
 

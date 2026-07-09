@@ -137,11 +137,6 @@
   </div>
 </div>
 
-<!-- SONIDOS -->
-<audio id="soundSuccess" src="https://cdn.freesound.org/previews/341/341695_5858296-lq.mp3"></audio>
-<audio id="soundError" src="https://cdn.freesound.org/previews/142/142608_1840739-lq.mp3"></audio>
-<audio id="soundDuplicate" src="https://cdn.freesound.org/previews/350/350861_6436536-lq.mp3"></audio>
-
 {% endblock %}
 
 {% block scripts %}
@@ -169,6 +164,7 @@ const tunnelUrl = "{{ tunnel_url if tunnel_url else '' }}";
 
 let validationModal;
 let pendingValidationPiece = null;
+let audioContext = null;
 
 // Inicializar UI con datos del servidor
 document.addEventListener('DOMContentLoaded', () => {
@@ -180,12 +176,59 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // AUDIO
-const playSound = (type) => {
-    const audio = document.getElementById(type === 'success' ? 'soundSuccess' : (type === 'duplicate' ? 'soundDuplicate' : 'soundError'));
-    if(audio) {
-        audio.currentTime = 0;
-        audio.play().catch(e => console.log("Audio play error", e));
+const getAudioContext = () => {
+    if (typeof window === 'undefined') return null;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+    if (!audioContext) {
+        audioContext = new AudioContextClass();
     }
+    return audioContext;
+};
+
+const playTone = (ctx, frequency, startAt, duration, volume, type = 'sine') => {
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, startAt);
+    gainNode.gain.setValueAtTime(0.0001, startAt);
+    gainNode.gain.exponentialRampToValueAtTime(volume, startAt + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.start(startAt);
+    oscillator.stop(startAt + duration);
+};
+
+const playSound = async (type) => {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    if (ctx.state === 'suspended') {
+        try {
+            await ctx.resume();
+        } catch (_) {
+            return;
+        }
+    }
+
+    const now = ctx.currentTime;
+    if (type === 'success') {
+        playTone(ctx, 740, now, 0.12, 0.06, 'triangle');
+        playTone(ctx, 988, now + 0.13, 0.18, 0.07, 'triangle');
+        return;
+    }
+
+    if (type === 'duplicate') {
+        playTone(ctx, 460, now, 0.12, 0.06, 'square');
+        playTone(ctx, 460, now + 0.16, 0.12, 0.06, 'square');
+        return;
+    }
+
+    playTone(ctx, 240, now, 0.22, 0.07, 'sawtooth');
 };
 
 // LÓGICA DE NEGOCIO (Picking)

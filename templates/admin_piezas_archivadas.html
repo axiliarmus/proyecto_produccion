@@ -93,7 +93,8 @@
                            data-marco="{{ p.marco }}"
                            data-tramo="{{ p.tramo }}"
                            data-cinterna="{{ p.cuerda_interna if p.cuerda_interna is not none else 'N/A' }}"
-                           data-cexterna="{{ p.cuerda_externa if p.cuerda_externa is not none else 'N/A' }}">
+                           data-cexterna="{{ p.cuerda_externa if p.cuerda_externa is not none else 'N/A' }}"
+                           data-flecha="{{ p.flecha if p.flecha is not none else 'N/A' }}">
                 </td>
                 <td class="fw-bold">{{ p.codigo }}</td>
                 <td>{{ p.empresa }}</td>
@@ -125,6 +126,7 @@
         </tbody>
     </table>
 </div>
+{% include '_pagination.html' %}
 {% else %}
 <div class="alert alert-secondary text-center">
     No se encontraron piezas en este corte con los filtros seleccionados.
@@ -202,12 +204,14 @@ function imprimirSeleccionados() {
         const tramo = cb.dataset.tramo;
         const cuerdaInterna = cb.dataset.cinterna || 'N/A';
         const cuerdaExterna = cb.dataset.cexterna || 'N/A';
+        const flecha = cb.dataset.flecha || 'N/A';
 
         content += `
         <div class="etiqueta">
             <div class="detalle" style="font-size: 14px; margin-bottom: 0px; width: 100%;"><strong>Marco:</strong> ${marco}</div>
             <div class="detalle" style="font-size: 14px; margin-bottom: 4px; width: 100%;"><strong>Tramo:</strong> ${tramo}</div>
-            <div class="detalle" style="font-size: 26px; margin-bottom: 5px;"><strong>C. Int:</strong> ${cuerdaInterna} | <strong>C. Ext:</strong> ${cuerdaExterna}</div>
+            <div class="detalle" style="font-size: 22px; margin-bottom: 5px;"><strong>C. Int:</strong> ${cuerdaInterna} | <strong>C. Ext:</strong> ${cuerdaExterna}</div>
+            <div class="detalle" style="font-size: 22px; margin-bottom: 5px;"><strong>Flecha:</strong> ${flecha}</div>
             <svg id="barcode-${index}"></svg>
         </div>
         <script>

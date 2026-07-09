@@ -55,6 +55,7 @@
         <th>Tramo</th>
         <th>C. Interna</th>
         <th>C. Externa</th>
+        <th>Flecha</th>
         <th>Estado</th>
         <th class="text-end">Acciones</th>
       </tr>
@@ -72,6 +73,7 @@
         <td>{{ r.tramo }}</td>
         <td>{{ r.cuerda_interna if r.cuerda_interna is defined else '—' }}</td>
         <td>{{ r.cuerda_externa if r.cuerda_externa is defined else '—' }}</td>
+        <td>{{ r.flecha if r.flecha is defined else '—' }}</td>
         <td>{{ r.calidad_status|capitalize }}</td>
         <td class="text-end">
           <a href="{{ url_for('soporte_produccion_editar_form', id=r._id) }}" class="btn btn-sm btn-warning">Editar</a>

@@ -47,21 +47,27 @@
 
         <div class="row g-3 mb-4">
           <!-- KILO POR PIEZA -->
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="form-label text-secondary small">Peso (Kg)</label>
-            <input type="number" step="0.01" min="0" class="form-control bg-dark text-light border-secondary" name="kilo_pieza" value="{{ pieza.kilo_pieza if pieza else '' }}" required>
+            <input type="text" inputmode="decimal" class="form-control bg-dark text-light border-secondary" name="kilo_pieza" data-decimal-input value="{{ pieza.kilo_pieza if pieza else '' }}" required>
           </div>
 
           <!-- CUERDA INTERNA -->
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="form-label text-secondary small">Cuerda Interna</label>
-            <input type="number" step="0.01" min="0" class="form-control bg-dark text-light border-secondary" name="cuerda_interna" value="{{ pieza.cuerda_interna if pieza and pieza.cuerda_interna is defined else '' }}">
+            <input type="text" inputmode="decimal" class="form-control bg-dark text-light border-secondary" name="cuerda_interna" data-decimal-input value="{{ pieza.cuerda_interna if pieza and pieza.cuerda_interna is defined else '' }}">
           </div>
 
           <!-- CUERDA EXTERNA -->
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="form-label text-secondary small">Cuerda Externa</label>
-            <input type="number" step="0.01" min="0" class="form-control bg-dark text-light border-secondary" name="cuerda_externa" value="{{ pieza.cuerda_externa if pieza and pieza.cuerda_externa is defined else '' }}">
+            <input type="text" inputmode="decimal" class="form-control bg-dark text-light border-secondary" name="cuerda_externa" data-decimal-input value="{{ pieza.cuerda_externa if pieza and pieza.cuerda_externa is defined else '' }}">
+          </div>
+
+          <!-- FLECHA -->
+          <div class="col-md-3">
+            <label class="form-label text-secondary small">Flecha</label>
+            <input type="text" inputmode="decimal" class="form-control bg-dark text-light border-secondary" name="flecha" data-decimal-input value="{{ pieza.flecha if pieza and pieza.flecha is defined else '' }}">
           </div>
         </div>
 
@@ -86,6 +92,9 @@
 
 <script>
   document.querySelector("form").addEventListener("submit", function(e) {
+      this.querySelectorAll("[data-decimal-input]").forEach((input) => {
+        input.value = (input.value || "").trim().replace(",", ".");
+      });
       const btn = document.getElementById("btnSubmit");
       // btn.disabled = true; // Comentado para evitar doble envío si el form es inválido y el navegador lo detiene
       // Pero si es válido, el navegador envía.

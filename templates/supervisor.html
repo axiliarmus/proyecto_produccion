@@ -67,7 +67,7 @@
             <th>Marco</th>
             <th>Tramo</th>
             <th>Estado</th>
-            <th style="width: 380px;">Supervisión</th>
+            <th style="width: 460px;">Supervisión</th>
             </tr>
         </thead>
         <tbody>
@@ -103,6 +103,7 @@
                 <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
                 <input type="hidden" name="fecha_fin" value="{{ fecha_fin or '' }}">
                 <input type="hidden" name="estado" value="{{ estado_sel or 'todos' }}">
+                <input type="hidden" name="page" value="{{ pagination.page if pagination else 1 }}">
 
                 <div class="col-md-6">
                     <input 
@@ -122,6 +123,16 @@
                     name="cuerda_externa" 
                     placeholder="C. Externa"
                     value="{{ p.cuerda_externa or '' }}">
+                </div>
+
+                <div class="col-md-12">
+                    <input 
+                    class="form-control form-control-sm bg-dark text-light border-secondary" 
+                    type="number" 
+                    step="0.01" 
+                    name="flecha" 
+                    placeholder="Flecha"
+                    value="{{ p.flecha or '' }}">
                 </div>
 
                 <div class="col-12">
@@ -151,6 +162,7 @@
         </tbody>
         </table>
     </div>
+    {% include '_pagination.html' %}
   </div>
 {% else %}
   <div class="alert alert-secondary text-center py-5">

@@ -65,8 +65,11 @@
                         <div class="modal-dialog">
                             <div class="modal-content bg-dark text-light">
                                 <form method="POST" action="{{ url_for('soporte_archivados_piezas_editar') }}">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                                     <input type="hidden" name="pieza_id" value="{{ p._id }}">
                                     <input type="hidden" name="corte_id" value="{{ corte_sel }}">
+                                    <input type="hidden" name="codigo" value="{{ codigo_sel or '' }}">
+                                    <input type="hidden" name="page" value="{{ pagination.page if pagination else 1 }}">
                                     
                                     <div class="modal-header">
                                         <h5 class="modal-title">Editar Pieza Histórica</h5>
@@ -109,6 +112,7 @@
         </tbody>
     </table>
 </div>
+{% include '_pagination.html' %}
 {% endif %}
 
 {% endblock %}

@@ -63,6 +63,7 @@
                         <th>Estado</th>
                         <th>Tipo</th>
                         <th>Peso</th>
+                        <th>Flecha</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -92,11 +93,13 @@
                             {% endif %}
                         </td>
                         <td>{{ p.kilo_pieza }} kg</td>
+                        <td>{{ p.flecha if p.flecha is defined and p.flecha is not none else '—' }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        {% include '_pagination.html' %}
     </div>
     {% else %}
     <div class="alert alert-secondary text-center">

@@ -230,6 +230,17 @@ document.addEventListener("DOMContentLoaded", function() {
                         </div>
                     </a>
                 </div>
+                {% if session.get('role') == 'administrador' %}
+                <div class="col-md-6">
+                    <a href="{{ url_for('admin_configuracion') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3">
+                        <i class='bx bx-cog fs-4 text-primary'></i>
+                        <div>
+                            <div class="fw-bold">Configuración</div>
+                            <small class="text-secondary">Ajustes globales del sistema</small>
+                        </div>
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

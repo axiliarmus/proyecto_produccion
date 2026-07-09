@@ -57,6 +57,7 @@
           <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
           <input type="hidden" name="fecha_fin" value="{{ fecha_fin or '' }}">
           {% if archived_view %}
+          <input type="hidden" name="mes" value="{{ mes_sel or '' }}">
           <input type="hidden" name="corte_nombre" value="{{ corte_nombre or '' }}">
           {% endif %}
           <button class="btn btn-success w-100 d-flex align-items-center gap-2">
@@ -90,6 +91,7 @@
           <th>Tramo</th>
           <th>C. Int</th>
           <th>C. Ext</th>
+          <th>Flecha</th>
           <th>Estado</th>
         </tr>
       </thead>
@@ -112,6 +114,7 @@
           <td>{{ r.tramo }}</td>
           <td>{{ r.cuerda_interna if r.cuerda_interna is defined else '—' }}</td>
           <td>{{ r.cuerda_externa if r.cuerda_externa is defined else '—' }}</td>
+          <td>{{ r.flecha if r.flecha is defined else '—' }}</td>
           <td>
             {% if r.calidad_status == 'aprobado' %}
               <i class='bx bxs-check-circle text-success'></i>
@@ -130,6 +133,7 @@
   {% if registros|length == 0 %}
     <div class="p-4 text-center text-secondary">No hay registros de producción.</div>
   {% endif %}
+  {% include '_pagination.html' %}
 </div>
 
 {% endblock %}

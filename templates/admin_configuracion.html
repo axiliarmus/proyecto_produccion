@@ -1,0 +1,75 @@
+{% extends 'admin_layout.html' %}
+
+{% block title %}Configuración{% endblock %}
+{% block header_title %}Configuración{% endblock %}
+{% block header_subtitle %}Ajustes globales del sistema{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="admin-card h-100">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4 class="text-white mb-1">Impresión de Etiquetas</h4>
+                    <p class="text-secondary mb-0">Controla desde cuántas etiquetas el sistema pide confirmación antes de imprimir.</p>
+                </div>
+                <span class="badge badge-soft text-info">Administrador</span>
+            </div>
+
+            <form method="POST">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+                <div class="mb-3">
+                    <label class="form-label text-light">Límite de confirmación</label>
+                    <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        name="label_print_confirm_limit"
+                        value="{{ label_print_confirm_limit }}"
+                        class="form-control bg-dark text-light border-secondary"
+                        required
+                    >
+                    <div class="form-text text-secondary">
+                        Si la impresión alcanza este número o más, el sistema mostrará una confirmación antes de abrir el diálogo de impresión.
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="submit" class="btn btn-accent">
+                        <i class='bx bx-save'></i> Guardar Configuración
+                    </button>
+                    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-light">
+                        Volver Al Dashboard
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="admin-card h-100">
+            <h5 class="text-white mb-3">Resumen Actual</h5>
+
+            <div class="mb-3 pb-3 border-bottom border-secondary">
+                <small class="text-secondary d-block">Valor activo</small>
+                <div class="fs-2 fw-bold text-accent">{{ label_print_confirm_limit }}</div>
+            </div>
+
+            <div class="mb-3 pb-3 border-bottom border-secondary">
+                <small class="text-secondary d-block">Origen</small>
+                <div class="fw-semibold text-light">{{ label_print_confirm_limit_source }}</div>
+            </div>
+
+            <div class="mb-3">
+                <small class="text-secondary d-block">Valor predeterminado</small>
+                <div class="fw-semibold text-light">{{ label_print_confirm_limit_default }}</div>
+            </div>
+
+            <div class="alert alert-secondary mt-4 mb-0">
+                Este ajuste se aplica en `Etiquetas Zebra` y queda guardado para futuras sesiones.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% if pagination %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mt-3 px-3 pb-3">
+  <div class="text-secondary small">
+    Mostrando {{ pagination.start_item }}-{{ pagination.end_item }} de {{ pagination.total_items }} registros
+  </div>
+
+  {% if pagination.total_pages > 1 %}
+  <nav aria-label="Paginación">
+    <ul class="pagination pagination-sm mb-0">
+      <li class="page-item {% if not pagination.prev_url %}disabled{% endif %}">
+        <a class="page-link bg-dark text-light border-secondary" href="{{ pagination.prev_url or '#' }}">Anterior</a>
+      </li>
+
+      {% if pagination.first_page_url %}
+      <li class="page-item">
+        <a class="page-link bg-dark text-light border-secondary" href="{{ pagination.first_page_url }}">1</a>
+      </li>
+      <li class="page-item disabled">
+        <span class="page-link bg-dark text-light border-secondary">...</span>
+      </li>
+      {% endif %}
+
+      {% for page_item in pagination.pages %}
+      <li class="page-item {% if page_item.active %}active{% endif %}">
+        <a class="page-link {% if page_item.active %}{% else %}bg-dark text-light border-secondary{% endif %}" href="{{ page_item.url }}">
+          {{ page_item.number }}
+        </a>
+      </li>
+      {% endfor %}
+
+      {% if pagination.last_page_url %}
+      <li class="page-item disabled">
+        <span class="page-link bg-dark text-light border-secondary">...</span>
+      </li>
+      <li class="page-item">
+        <a class="page-link bg-dark text-light border-secondary" href="{{ pagination.last_page_url }}">{{ pagination.total_pages }}</a>
+      </li>
+      {% endif %}
+
+      <li class="page-item {% if not pagination.next_url %}disabled{% endif %}">
+        <a class="page-link bg-dark text-light border-secondary" href="{{ pagination.next_url or '#' }}">Siguiente</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endif %}
