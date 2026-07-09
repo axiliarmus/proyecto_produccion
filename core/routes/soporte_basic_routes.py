@@ -1,5 +1,47 @@
+import json
+import os
+import time
+import urllib.request
+
 from bson import ObjectId
 from flask import flash, redirect, render_template, request, url_for
+
+
+# #region debug-point helpers:vps-flecha-label
+def _debug_report_vps_flecha_label(hypothesis_id, location, msg, data=None, run_id="pre"):
+    try:
+        debug_url = "http://127.0.0.1:7777/event"
+        debug_session_id = "vps-flecha-label"
+        env_path = os.path.join(".dbg", "vps-flecha-label.env")
+        if os.path.exists(env_path):
+            with open(env_path, encoding="utf-8") as env_file:
+                for raw_line in env_file:
+                    line = raw_line.strip()
+                    if line.startswith("DEBUG_SERVER_URL="):
+                        debug_url = line.split("=", 1)[1] or debug_url
+                    elif line.startswith("DEBUG_SESSION_ID="):
+                        debug_session_id = line.split("=", 1)[1] or debug_session_id
+
+        payload = {
+            "sessionId": debug_session_id,
+            "runId": run_id,
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "msg": f"[DEBUG] {msg}",
+            "data": data or {},
+            "ts": int(time.time() * 1000),
+        }
+        request_obj = urllib.request.Request(
+            debug_url,
+            data=json.dumps(payload, default=str).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(request_obj, timeout=1).read()
+    except Exception:
+        pass
+
+
+# #endregion
 
 
 def register_soporte_basic_routes(
@@ -282,6 +324,27 @@ def register_soporte_basic_routes(
             }
             for pieza in piezas_finales
         ]
+        # #region debug-point A:vps-piece-master-data
+        _debug_report_vps_flecha_label(
+            "A",
+            "soporte_basic_routes.py:soporte_etiquetas",
+            "Dataset etiquetas generado",
+            {
+                "total_piezas": len(piezas_finales),
+                "sample": [
+                    {
+                        "codigo": pieza.get("codigo"),
+                        "pieza_master_flecha": pieza.get("flecha"),
+                        "pieza_master_cuerda_interna": pieza.get("cuerda_interna"),
+                        "pieza_master_cuerda_externa": pieza.get("cuerda_externa"),
+                        "estado_prod": pieza.get("estado_prod"),
+                    }
+                    for pieza in piezas_finales[:5]
+                ],
+                "sample_impresion": piezas_impresion[:5],
+            },
+        )
+        # #endregion
 
         return render_template(
             "soporte_etiquetas.html",
