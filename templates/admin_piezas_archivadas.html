@@ -181,14 +181,18 @@ function imprimirSeleccionados() {
                     page-break-after: always;
                     display: flex;
                     flex-direction: column;
-                    justify-content: center;
+                    justify-content: flex-start;
                     align-items: center;
                     border: 1px solid #ddd; /* Borde solo para visualizar en pantalla, quitar si molesta */
                     text-align: center;
                     font-family: Arial, sans-serif;
+                    box-sizing: border-box;
+                    padding: 2mm 2mm 1mm;
                 }
                 .cliente { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
-                .detalle { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+                .detalle { font-size: 15px; font-weight: bold; margin-bottom: 2px; line-height: 1.15; width: 100%; }
+                .detalle-medidas { font-size: 18px; margin-bottom: 2px; }
+                .detalle-flecha { font-size: 18px; margin-bottom: 2px; }
                 .codigo-texto { font-size: 16px; font-weight: bold; margin-top: 2px; }
                 svg { max-width: 90%; height: auto; }
             }
@@ -208,21 +212,21 @@ function imprimirSeleccionados() {
 
         content += `
         <div class="etiqueta">
-            <div class="detalle" style="font-size: 14px; margin-bottom: 0px; width: 100%;"><strong>Marco:</strong> ${marco}</div>
-            <div class="detalle" style="font-size: 14px; margin-bottom: 4px; width: 100%;"><strong>Tramo:</strong> ${tramo}</div>
-            <div class="detalle" style="font-size: 22px; margin-bottom: 5px;"><strong>C. Int:</strong> ${cuerdaInterna} | <strong>C. Ext:</strong> ${cuerdaExterna}</div>
-            <div class="detalle" style="font-size: 22px; margin-bottom: 5px;"><strong>Flecha:</strong> ${flecha}</div>
+            <div class="detalle"><strong>Marco:</strong> ${marco}</div>
+            <div class="detalle"><strong>Tramo:</strong> ${tramo}</div>
+            <div class="detalle detalle-medidas"><strong>C. Int:</strong> ${cuerdaInterna} | <strong>C. Ext:</strong> ${cuerdaExterna}</div>
+            <div class="detalle detalle-flecha"><strong>Flecha:</strong> ${flecha}</div>
             <svg id="barcode-${index}"></svg>
         </div>
         <script>
             JsBarcode("#barcode-${index}", "${codigo}", {
                 format: "CODE128",
                 width: 3,
-                height: 50,
+                height: 42,
                 displayValue: true,
-                fontSize: 24,
-                margin: 5,
-                textMargin: 2
+                fontSize: 18,
+                margin: 3,
+                textMargin: 1
             });
         <\/script>
         `;
