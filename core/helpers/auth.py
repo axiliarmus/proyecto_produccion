@@ -51,11 +51,29 @@ def build_login_required(db):
                 if request.endpoint == "cambiar_password":
                     return fn(*args, **kwargs)
 
-                user = db.usuarios.find_one({"_id": ObjectId(session["user_id"])})
-                if user and is_password_expired(user.get("password_changed_at")):
-                    if user.get("password_changed_at"):
-                        flash("Tu contraseña ha expirado. Debes cambiarla.", "warning")
+                pw_changed_raw = session.get("password_changed_at")
+                if pw_changed_raw is None:
+                    user = db.usuarios.find_one({"_id": ObjectId(session["user_id"])})
+                    if user:
+                        dt = user.get("password_changed_at")
+                        session["password_changed_at"] = dt.isoformat() if dt else ""
+                        pw_changed_raw = session["password_changed_at"]
+                    else:
+                        pw_changed_raw = ""
+
+                if pw_changed_raw == "":
+                    flash("Debes cambiar tu contraseña antes de continuar.", "warning")
                     return redirect(url_for("cambiar_password"))
+                else:
+                    try:
+                        password_changed_at = datetime.fromisoformat(pw_changed_raw)
+                    except Exception:
+                        password_changed_at = None
+
+                    if is_password_expired(password_changed_at):
+                        flash("Tu contraseña ha expirado. Debes cambiarla.", "warning")
+                        return redirect(url_for("cambiar_password"))
+
 
                 user_role = session.get("role")
                 if roles and user_role not in roles:

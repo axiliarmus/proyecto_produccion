@@ -49,8 +49,12 @@ def register_auth_routes(app, db, login_required, login_attempts):
                 session["username"] = user["usuario"]
                 session["nombre"] = user.get("nombre", user["usuario"])
                 session["role"] = user["tipo"]
+                
+                # Cachear password_changed_at en sesión
+                dt = user.get("password_changed_at")
+                session["password_changed_at"] = dt.isoformat() if dt else ""
 
-                if auth_helpers.is_password_expired(user.get("password_changed_at")):
+                if auth_helpers.is_password_expired(dt):
                     flash("Debes cambiar tu contraseña antes de continuar.", "warning")
                     return redirect(url_for("cambiar_password"))
 
@@ -85,6 +89,7 @@ def register_auth_routes(app, db, login_required, login_attempts):
                 return redirect(url_for("cambiar_password"))
 
             auth_helpers.update_user_password(db, session["user_id"], nueva)
+            session["password_changed_at"] = auth_helpers.now_cl().isoformat()
             flash("Contraseña actualizada correctamente 👌", "success")
             return redirect(url_for("index"))
 

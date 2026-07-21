@@ -194,15 +194,25 @@ document.getElementById("modo").dispatchEvent(new Event('change'));
 const operadorRegistrarForm = document.getElementById("operador_registrar_form");
 const operadorRegistrarBtn = document.getElementById("operador_registrar_btn");
 if (operadorRegistrarForm && operadorRegistrarBtn) {
+    // Liberar estado cuando la página se carga/restaura desde la caché del navegador
+    window.addEventListener('pageshow', function() {
+        operadorRegistrarForm.dataset.submitting = "0";
+        operadorRegistrarBtn.disabled = false;
+        operadorRegistrarBtn.textContent = "Registrar pieza";
+    });
+
     operadorRegistrarForm.addEventListener("submit", function (event) {
         if (operadorRegistrarForm.dataset.submitting === "1") {
             event.preventDefault();
             return;
         }
 
+        // Bloquear temporalmente
         operadorRegistrarForm.dataset.submitting = "1";
         operadorRegistrarBtn.disabled = true;
         operadorRegistrarBtn.textContent = "Registrando...";
+        
+        // Se liberará automáticamente al recargar la página
     });
 }
 

@@ -226,11 +226,12 @@ function abrirVentanaImpresion(etiquetas) {
             JsBarcode("#barcode-${index}", "${item.codigo}", {
                 format: "CODE128",
                 width: 3,
-                height: 42,
+                height: 30,
                 displayValue: true,
-                fontSize: 18,
+                fontSize: 38,
+                fontOptions: "bold",
                 margin: 3,
-                textMargin: 1
+                textMargin: 3
             });
         <\/script>
         `;

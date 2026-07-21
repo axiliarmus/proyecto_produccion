@@ -125,7 +125,9 @@ def create_app():
 
     _register_security_hooks(app, runtime_state)
     register_all_routes(app, db, runtime_state, log_audit)
+    ensure_mongo_indexes(app)
     return app
+
 
 
 def get_db(app):

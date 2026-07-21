@@ -356,14 +356,44 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             cuerda_externa_raw,
             flecha_raw,
         )
-        guard_acquired = True
+        guard_acquired = False
 
         def release_submission_guard():
-            pass
+            if guard_acquired:
+                try:
+                    db.operator_submission_guards.delete_one({"_id": submission_guard_id})
+                except Exception:
+                    pass
+
+        # Intentar adquirir el guard de envío
+        guard_expire_at = datetime.utcnow() + timedelta(seconds=15)
+        try:
+            db.operator_submission_guards.insert_one(
+                {
+                    "_id": submission_guard_id,
+                    "user_id": user_id,
+                    "codigo_pieza": codigo_pieza,
+                    "modo": modo,
+                    "expireAt": guard_expire_at,
+                    "created_at": datetime.utcnow(),
+                }
+            )
+            guard_acquired = True
+        except DuplicateKeyError:
+            flash(
+                f"⏳ La pieza {codigo_pieza} ya se está registrando o fue enviada recién. Espera un momento.",
+                "warning",
+            )
+            return redirect(url_for("operador_home"))
+        except Exception:
+            flash("❌ No se pudo iniciar el registro de la pieza. Intenta nuevamente.", "danger")
+            return redirect(url_for("operador_home"))
 
         if not codigo_pieza:
+            release_submission_guard()
             flash("Debes ingresar un código de pieza", "warning")
             return redirect(url_for("operador_home"))
+
 
         pieza_data = db.piezas.find_one({"codigo": codigo_pieza})
         if not pieza_data and codigo_pieza.isdigit():
@@ -562,6 +592,8 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                 return redirect(url_for("operador_home"))
             flash(f"✔ Pieza {codigo_pieza} registrada correctamente como {modo}", "success")
 
+        release_submission_guard()
+
         # #region debug-point D:insert-success
         _debug_report_operator_armado(
             "D",
@@ -577,3 +609,4 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
         # #endregion
 
         return redirect(url_for("operador_home"))
+

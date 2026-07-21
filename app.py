@@ -10,5 +10,5 @@ if __name__ == "__main__":
         set_tunnel_url=lambda url: set_tunnel_url(server_app, url),
     )
     print_startup_banner()
-    ensure_mongo_indexes(server_app)
     server_app.run(host="0.0.0.0", port=5000)
+

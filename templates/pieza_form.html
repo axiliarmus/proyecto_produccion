@@ -55,20 +55,21 @@
           <!-- CUERDA INTERNA -->
           <div class="col-md-3">
             <label class="form-label text-secondary small">Cuerda Interna</label>
-            <input type="text" inputmode="decimal" class="form-control bg-dark text-light border-secondary" name="cuerda_interna" data-decimal-input value="{{ pieza.cuerda_interna if pieza and pieza.cuerda_interna is defined else '' }}">
+            <input type="text" inputmode="decimal" class="form-control bg-dark text-light border-secondary" name="cuerda_interna" data-decimal-input value="{{ pieza.cuerda_interna if (pieza and pieza.cuerda_interna is not none) else '' }}">
           </div>
 
           <!-- CUERDA EXTERNA -->
           <div class="col-md-3">
             <label class="form-label text-secondary small">Cuerda Externa</label>
-            <input type="text" inputmode="decimal" class="form-control bg-dark text-light border-secondary" name="cuerda_externa" data-decimal-input value="{{ pieza.cuerda_externa if pieza and pieza.cuerda_externa is defined else '' }}">
+            <input type="text" inputmode="decimal" class="form-control bg-dark text-light border-secondary" name="cuerda_externa" data-decimal-input value="{{ pieza.cuerda_externa if (pieza and pieza.cuerda_externa is not none) else '' }}">
           </div>
 
           <!-- FLECHA -->
           <div class="col-md-3">
             <label class="form-label text-secondary small">Flecha</label>
-            <input type="text" inputmode="decimal" class="form-control bg-dark text-light border-secondary" name="flecha" data-decimal-input value="{{ pieza.flecha if pieza and pieza.flecha is defined else '' }}">
+            <input type="text" inputmode="decimal" class="form-control bg-dark text-light border-secondary" name="flecha" data-decimal-input value="{{ pieza.flecha if (pieza and pieza.flecha is not none) else '' }}">
           </div>
+
         </div>
 
         {% if modo == 'nuevo' %}
