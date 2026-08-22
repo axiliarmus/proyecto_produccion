@@ -1,0 +1,4970 @@
+==========================================================================================
+BUSQUEDA GLOBAL EN TODA LA BD PARA TERMINO: '102'
+Generado: 2026-08-22 13:57:50
+==========================================================================================
+[OK] Conectado a MongoDB
+[INFO] Colecciones totales en BD 'miBase': 13
+    - boxes                                   :        1 docs
+    - config                                  :        1 docs
+    - cortes                                  :       10 docs
+    - counters                                :        2 docs
+    - jornadas                                :        5 docs
+    - operator_submission_guards              :        0 docs
+    - picking                                 :        2 docs
+    - piezas                                  :        5 docs
+    - piezas_historicas                       :      155 docs
+    - produccion                              :       13 docs
+    - produccion_historica                    :       57 docs
+    - usuarios                                :       10 docs
+    - usuarios_historicos                     :       49 docs
+
+[INFO] Variantes de busqueda probadas: 3 -> 10, 102, 02
+
+==========================================================================================
+FASE 1: Busqueda por campos conocidos (codigo, codigo_pieza, usuario, email, operador...)
+==========================================================================================
+
+[RESULTADO FASE 1] Coincidencias encontradas: 22
+
+[1] COLECCION: cortes
+     CAMPO:    nombre
+     VALOR:    04/01/2026 - 04/01/2026
+     DOC ID:   695abb5182fe8a56f2b6b4e7
+     PREVIEW:
+       - nombre: 04/01/2026 - 04/01/2026
+       - inicio: 2026-01-04 03:00:00
+       - fin: 2026-01-05 02:59:59.999000
+       - creado_en: 2026-01-04 19:11:13.595000
+
+[2] COLECCION: cortes
+     CAMPO:    nombre
+     VALOR:    enero 2 2026
+     DOC ID:   6959b406d0e38a512e4b6b00
+     PREVIEW:
+       - nombre: enero 2 2026
+       - inicio: 2026-01-01 03:00:00
+       - fin: 2026-01-04 02:59:59.999000
+       - creado_en: 2026-01-04 00:27:50.826000
+
+[3] COLECCION: cortes
+     CAMPO:    nombre
+     VALOR:    enero 2026
+     DOC ID:   6959aff1643ece6d00f992d3
+     PREVIEW:
+       - nombre: enero 2026
+       - inicio: 2026-01-01 03:00:00
+       - fin: 2026-01-04 02:59:59.999000
+       - creado_en: 2026-01-04 00:10:25.537000
+
+[4] COLECCION: cortes
+     CAMPO:    nombre
+     VALOR:    enero 3 2026
+     DOC ID:   6959bc17fcea133eb9248543
+     PREVIEW:
+       - nombre: enero 3 2026
+       - inicio: 2026-01-02 03:00:00
+       - fin: 2026-01-04 02:59:59.999000
+       - creado_en: 2026-01-04 01:02:15.759000
+
+[5] COLECCION: cortes
+     CAMPO:    nombre
+     VALOR:    enero 4 2026
+     DOC ID:   6959bd6facfe644fb1709c65
+     PREVIEW:
+       - nombre: enero 4 2026
+       - inicio: 2026-01-01 03:00:00
+       - fin: 2026-01-04 02:59:59.999000
+       - creado_en: 2026-01-04 01:07:59.756000
+
+[6] COLECCION: picking
+     CAMPO:    codigo
+     VALOR:    j10
+     DOC ID:   69a26e829170ad5452c43362
+     PREVIEW:
+       - codigo: j10
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - estado: Rematado
+       - calidad: rechazado
+       - fecha: 2026-02-28 04:26:42.615000
+       - usuario: gus
+
+[7] COLECCION: picking
+     CAMPO:    codigo
+     VALOR:    j100
+     DOC ID:   69a26e899170ad5452c43363
+     PREVIEW:
+       - codigo: j100
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - estado: Rematado
+       - calidad: aprobado
+       - fecha: 2026-02-28 04:26:49.551000
+       - usuario: gus
+
+[8] COLECCION: piezas
+     CAMPO:    codigo
+     VALOR:    j102
+     DOC ID:   6a89e12cff3c6c7d18c9d4b6
+     PREVIEW:
+       - codigo: j102
+       - empresa: None
+       - marco: None
+       - tramo: None
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - flecha: None
+       - estado: Sin Produccion
+       - box: b1
+       - operador_asignado: ale
+       - operador_id: 693126a3903879eba1909ea4
+       - fecha_creacion: 2026-02-28 04:25:45.665000
+       - fecha_restauracion: 2026-08-22 17:49:32.091000
+       - restaurado_desde: produccion (ACTIVA)
+
+[9] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    i10
+     DOC ID:   695b1d7c35c4d9a163a564f1
+     PREVIEW:
+       - codigo: i10
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[10] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    j10
+     DOC ID:   69d3ea3a58eb41b68f5fe286
+     PREVIEW:
+       - codigo: j10
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[11] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    j100
+     DOC ID:   69d3ea3a58eb41b68f5fe2de
+     PREVIEW:
+       - codigo: j100
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[12] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    j101
+     DOC ID:   69d3ea3a58eb41b68f5fe2df
+     PREVIEW:
+       - codigo: j101
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[13] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    j102
+     DOC ID:   69d3ea3a58eb41b68f5fe2e0
+     PREVIEW:
+       - codigo: j102
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[14] COLECCION: produccion
+     CAMPO:    codigo_pieza
+     VALOR:    j10
+     DOC ID:   69a26d5acee933056631de1b
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: j10
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - tipo_precio: metro
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - fecha: 2026-02-28 04:21:46.983000
+       - calidad_status: rechazado
+
+[15] COLECCION: produccion
+     CAMPO:    codigo_pieza
+     VALOR:    j10
+     DOC ID:   69a26d1fcee933056631de1a
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: armador
+       - box: b1
+       - codigo_pieza: j10
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - tipo_precio: metro
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-02-28 04:20:47.255000
+       - calidad_status: pendiente
+
+[16] COLECCION: produccion
+     CAMPO:    codigo_pieza
+     VALOR:    j100
+     DOC ID:   69a26d7ecee933056631de1e
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: j100
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - tipo_precio: avo
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - fecha: 2026-02-28 04:22:22.800000
+       - calidad_status: aprobado
+
+[17] COLECCION: produccion
+     CAMPO:    codigo_pieza
+     VALOR:    j100
+     DOC ID:   69a26d68cee933056631de1c
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: armador
+       - box: b1
+       - codigo_pieza: j100
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - tipo_precio: avo
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-02-28 04:22:00.169000
+       - calidad_status: pendiente
+
+[18] COLECCION: produccion
+     CAMPO:    codigo_pieza
+     VALOR:    j101
+     DOC ID:   69a26d75cee933056631de1d
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: armador
+       - box: b1
+       - codigo_pieza: j101
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - tipo_precio: avo
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-02-28 04:22:13.716000
+       - calidad_status: pendiente
+
+[19] COLECCION: produccion
+     CAMPO:    codigo_pieza
+     VALOR:    j102
+     DOC ID:   69a26e42cee933056631de20
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: armador
+       - box: b1
+       - codigo_pieza: j102
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - tipo_precio: avo
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-02-28 04:25:38.946000
+       - calidad_status: pendiente
+
+[20] COLECCION: produccion
+     CAMPO:    codigo_pieza
+     VALOR:    j102
+     DOC ID:   6a89e1f85ceebf667cf0687c
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: armador
+       - box: b1
+       - codigo_pieza: j102
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - tipo_precio: avo
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-02-28 04:25:38.946000
+       - calidad_status: pendiente
+
+[21] COLECCION: produccion_historica
+     CAMPO:    codigo_pieza
+     VALOR:    101
+     DOC ID:   692fb884601aaac97099493c
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 101
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 04:11:48.848000
+
+[22] COLECCION: produccion_historica
+     CAMPO:    codigo_pieza
+     VALOR:    101
+     DOC ID:   692fb927601aaac97099493d
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: 101
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170
+       - cuerda_externa: 180
+       - fecha: 2025-12-03 04:14:31.256000
+
+==========================================================================================
+FASE 2: Busqueda profunda texto completo en TODO campo string (más lento)
+==========================================================================================
+
+[RESULTADO FASE 2] Nuevas coincidencias (no repetidas fase 1): 285
+
+[1] COLECCION: boxes
+     CAMPO:    created_at
+     VALOR:    2025-11-24 23:48:51.965000
+     DOC ID:   6924eee31f0a45b97f19d4ae
+     PREVIEW:
+       - codigo: b1
+       - descripcion: box 01
+       - created_at: 2025-11-24 23:48:51.965000
+
+[2] COLECCION: cortes
+     CAMPO:    inicio
+     VALOR:    2026-03-01 03:00:00
+     DOC ID:   69d3ea3a58eb41b68f5fe27d
+     PREVIEW:
+       - nombre: MARZO
+       - inicio: 2026-03-01 03:00:00
+       - fin: 2026-04-01 02:59:59.999000
+       - creado_en: 2026-04-06 17:15:38.787000
+
+[3] COLECCION: cortes
+     CAMPO:    creado_en
+     VALOR:    2026-01-05 02:10:04.303000
+     DOC ID:   695b1d7c35c4d9a163a564e7
+     PREVIEW:
+       - nombre: febrero
+       - inicio: 2026-01-04 03:00:00
+       - fin: 2026-01-05 02:59:59.999000
+       - creado_en: 2026-01-05 02:10:04.303000
+
+[4] COLECCION: cortes
+     CAMPO:    inicio
+     VALOR:    2026-01-04 03:00:00
+     DOC ID:   695ac8298a795e13b6abc501
+     PREVIEW:
+       - nombre: prueba final2
+       - inicio: 2026-01-04 03:00:00
+       - fin: 2026-01-05 02:59:59.999000
+       - creado_en: 2026-01-04 20:06:01.464000
+
+[5] COLECCION: cortes
+     CAMPO:    inicio
+     VALOR:    2026-01-04 03:00:00
+     DOC ID:   695ac6db8a795e13b6abc4ed
+     PREVIEW:
+       - nombre: prueba final
+       - inicio: 2026-01-04 03:00:00
+       - fin: 2026-01-05 02:59:59.999000
+       - creado_en: 2026-01-04 20:00:27.813000
+
+[6] COLECCION: cortes
+     CAMPO:    creado_en
+     VALOR:    2026-01-04 01:18:36.201000
+     DOC ID:   6959bfec44d8df9985ae3473
+     PREVIEW:
+       - nombre: enero 4
+       - inicio: 2026-01-01 03:00:00
+       - fin: 2026-01-04 02:59:59.999000
+       - creado_en: 2026-01-04 01:18:36.201000
+
+[7] COLECCION: jornadas
+     CAMPO:    fecha
+     VALOR:    2025-12-04 06:14:12.465000
+     DOC ID:   693126b4d747a47ad4c07813
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - fecha: 2025-12-04 06:14:12.465000
+       - ingreso: 2025-12-04 06:14:12.465000
+       - salida: 2025-12-04 06:14:18.660000
+
+[8] COLECCION: jornadas
+     CAMPO:    fecha
+     VALOR:    2025-12-04 06:04:15.577000
+     DOC ID:   6931245fd747a47ad4c07812
+     PREVIEW:
+       - user_id: 6924eff01f0a45b97f19d578
+       - fecha: 2025-12-04 06:04:15.577000
+       - ingreso: 2025-12-04 06:04:15.577000
+
+[9] COLECCION: jornadas
+     CAMPO:    fecha
+     VALOR:    2025-12-04 05:50:38.529000
+     DOC ID:   6931212ed747a47ad4c07811
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - fecha: 2025-12-04 05:50:38.529000
+       - ingreso: 2025-12-04 05:50:38.529000
+       - salida: 2025-12-04 05:51:40.350000
+
+[10] COLECCION: jornadas
+     CAMPO:    salida
+     VALOR:    2025-12-03 16:57:50.441000
+     DOC ID:   693051c2d747a47ad4c07810
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - fecha: 2025-12-03 15:05:38.560000
+       - ingreso: 2025-12-03 15:05:38.560000
+       - salida: 2025-12-03 16:57:50.441000
+
+[11] COLECCION: jornadas
+     CAMPO:    fecha
+     VALOR:    2025-11-24 23:51:08.546000
+     DOC ID:   6924ef6cd747a47ad4c0780f
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - fecha: 2025-11-24 23:51:08.546000
+       - ingreso: 2025-11-24 23:51:08.546000
+
+[12] COLECCION: piezas
+     CAMPO:    created_at
+     VALOR:    2026-04-30 16:19:38.031000
+     DOC ID:   69f3811a5e103abc7166b154
+     PREVIEW:
+       - codigo: k4
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 1.0
+       - cuerda_interna: 2.0
+       - cuerda_externa: 1.0
+       - created_at: 2026-04-30 16:19:38.031000
+       - flecha: 220.0
+
+[13] COLECCION: piezas
+     CAMPO:    created_at
+     VALOR:    2026-04-30 16:19:38.031000
+     DOC ID:   69f3811a5e103abc7166b153
+     PREVIEW:
+       - codigo: k3
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 1.0
+       - cuerda_interna: 2
+       - cuerda_externa: 1
+       - created_at: 2026-04-30 16:19:38.031000
+       - flecha: 2.0
+
+[14] COLECCION: piezas
+     CAMPO:    created_at
+     VALOR:    2026-04-30 16:19:38.031000
+     DOC ID:   69f3811a5e103abc7166b152
+     PREVIEW:
+       - codigo: k2
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 1.0
+       - cuerda_interna: 2
+       - cuerda_externa: 1
+       - created_at: 2026-04-30 16:19:38.031000
+       - flecha: 2.0
+
+[15] COLECCION: piezas
+     CAMPO:    created_at
+     VALOR:    2026-04-30 16:19:38.031000
+     DOC ID:   69f3811a5e103abc7166b151
+     PREVIEW:
+       - codigo: k1
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 1.0
+       - cuerda_interna: 2.0
+       - cuerda_externa: 9.0
+       - created_at: 2026-04-30 16:19:38.031000
+       - flecha: 88.88
+
+[16] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-22 23:22:22.958000
+     DOC ID:   69d3ea3a58eb41b68f5fe2fe
+     PREVIEW:
+       - codigo: j134
+       - empresa: 1
+       - marco: 1
+       - tramo: 1
+       - tipo_precio: metro
+       - kilo_pieza: 1.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-22 23:22:22.958000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[17] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-22 23:21:16.865000
+     DOC ID:   69d3ea3a58eb41b68f5fe2fd
+     PREVIEW:
+       - codigo: j133
+       - empresa: 1
+       - marco: 1
+       - tramo: 1
+       - tipo_precio: metro
+       - kilo_pieza: 1.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-22 23:21:16.865000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[18] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2fc
+     PREVIEW:
+       - codigo: j130
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[19] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2fb
+     PREVIEW:
+       - codigo: j129
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[20] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2fa
+     PREVIEW:
+       - codigo: j128
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[21] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2f9
+     PREVIEW:
+       - codigo: j127
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[22] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2f8
+     PREVIEW:
+       - codigo: j126
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[23] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2f7
+     PREVIEW:
+       - codigo: j125
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[24] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2f6
+     PREVIEW:
+       - codigo: j124
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[25] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2f5
+     PREVIEW:
+       - codigo: j123
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[26] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2f4
+     PREVIEW:
+       - codigo: j122
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[27] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2f3
+     PREVIEW:
+       - codigo: j121
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[28] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2f2
+     PREVIEW:
+       - codigo: j120
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[29] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2f1
+     PREVIEW:
+       - codigo: j119
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[30] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2f0
+     PREVIEW:
+       - codigo: j118
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[31] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2ef
+     PREVIEW:
+       - codigo: j117
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[32] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2ee
+     PREVIEW:
+       - codigo: j116
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[33] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2ed
+     PREVIEW:
+       - codigo: j115
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[34] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2ec
+     PREVIEW:
+       - codigo: j114
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[35] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2eb
+     PREVIEW:
+       - codigo: j113
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[36] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2ea
+     PREVIEW:
+       - codigo: j112
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[37] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2e9
+     PREVIEW:
+       - codigo: j111
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[38] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    j110
+     DOC ID:   69d3ea3a58eb41b68f5fe2e8
+     PREVIEW:
+       - codigo: j110
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[39] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    j109
+     DOC ID:   69d3ea3a58eb41b68f5fe2e7
+     PREVIEW:
+       - codigo: j109
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[40] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    j108
+     DOC ID:   69d3ea3a58eb41b68f5fe2e6
+     PREVIEW:
+       - codigo: j108
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[41] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    j107
+     DOC ID:   69d3ea3a58eb41b68f5fe2e5
+     PREVIEW:
+       - codigo: j107
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[42] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    j106
+     DOC ID:   69d3ea3a58eb41b68f5fe2e4
+     PREVIEW:
+       - codigo: j106
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[43] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    j105
+     DOC ID:   69d3ea3a58eb41b68f5fe2e3
+     PREVIEW:
+       - codigo: j105
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[44] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    j104
+     DOC ID:   69d3ea3a58eb41b68f5fe2e2
+     PREVIEW:
+       - codigo: j104
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[45] COLECCION: piezas_historicas
+     CAMPO:    codigo
+     VALOR:    j103
+     DOC ID:   69d3ea3a58eb41b68f5fe2e1
+     PREVIEW:
+       - codigo: j103
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[46] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2dd
+     PREVIEW:
+       - codigo: j98
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[47] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2dc
+     PREVIEW:
+       - codigo: j97
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[48] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2db
+     PREVIEW:
+       - codigo: j96
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[49] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2da
+     PREVIEW:
+       - codigo: j95
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[50] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2d9
+     PREVIEW:
+       - codigo: j94
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[51] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2d8
+     PREVIEW:
+       - codigo: j93
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[52] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2d7
+     PREVIEW:
+       - codigo: j92
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[53] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2d6
+     PREVIEW:
+       - codigo: j91
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[54] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2d5
+     PREVIEW:
+       - codigo: j90
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[55] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2d4
+     PREVIEW:
+       - codigo: j89
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[56] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2d3
+     PREVIEW:
+       - codigo: j88
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[57] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2d2
+     PREVIEW:
+       - codigo: j87
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[58] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2d1
+     PREVIEW:
+       - codigo: j86
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[59] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2d0
+     PREVIEW:
+       - codigo: j85
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[60] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2cf
+     PREVIEW:
+       - codigo: j84
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[61] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2ce
+     PREVIEW:
+       - codigo: j83
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[62] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2cd
+     PREVIEW:
+       - codigo: j82
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[63] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2cc
+     PREVIEW:
+       - codigo: j81
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[64] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2cb
+     PREVIEW:
+       - codigo: j80
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[65] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2ca
+     PREVIEW:
+       - codigo: j79
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[66] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2c9
+     PREVIEW:
+       - codigo: j78
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[67] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2c8
+     PREVIEW:
+       - codigo: j77
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[68] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2c7
+     PREVIEW:
+       - codigo: j76
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[69] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2c6
+     PREVIEW:
+       - codigo: j75
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[70] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2c5
+     PREVIEW:
+       - codigo: j74
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[71] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2c4
+     PREVIEW:
+       - codigo: j73
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[72] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2c3
+     PREVIEW:
+       - codigo: j72
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[73] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2c2
+     PREVIEW:
+       - codigo: j71
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[74] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2c1
+     PREVIEW:
+       - codigo: j70
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[75] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2c0
+     PREVIEW:
+       - codigo: j69
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[76] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2bf
+     PREVIEW:
+       - codigo: j68
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[77] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2be
+     PREVIEW:
+       - codigo: j67
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[78] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2bd
+     PREVIEW:
+       - codigo: j66
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[79] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2bc
+     PREVIEW:
+       - codigo: j65
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[80] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2bb
+     PREVIEW:
+       - codigo: j64
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[81] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2ba
+     PREVIEW:
+       - codigo: j63
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[82] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2b9
+     PREVIEW:
+       - codigo: j62
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[83] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2b8
+     PREVIEW:
+       - codigo: j61
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[84] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2b7
+     PREVIEW:
+       - codigo: j60
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[85] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2b6
+     PREVIEW:
+       - codigo: j59
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[86] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2b5
+     PREVIEW:
+       - codigo: j58
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[87] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2b4
+     PREVIEW:
+       - codigo: j57
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[88] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2b3
+     PREVIEW:
+       - codigo: j56
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[89] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2b2
+     PREVIEW:
+       - codigo: j55
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[90] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2b1
+     PREVIEW:
+       - codigo: j54
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[91] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2b0
+     PREVIEW:
+       - codigo: j53
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[92] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2af
+     PREVIEW:
+       - codigo: j52
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[93] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2ae
+     PREVIEW:
+       - codigo: j51
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[94] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2ad
+     PREVIEW:
+       - codigo: j50
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[95] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2ac
+     PREVIEW:
+       - codigo: j49
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[96] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2ab
+     PREVIEW:
+       - codigo: j48
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[97] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2aa
+     PREVIEW:
+       - codigo: j47
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[98] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2a9
+     PREVIEW:
+       - codigo: j46
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[99] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2a8
+     PREVIEW:
+       - codigo: j45
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[100] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2a7
+     PREVIEW:
+       - codigo: j44
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[101] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2a6
+     PREVIEW:
+       - codigo: j43
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[102] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2a5
+     PREVIEW:
+       - codigo: j42
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[103] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2a4
+     PREVIEW:
+       - codigo: j41
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[104] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2a3
+     PREVIEW:
+       - codigo: j40
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[105] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2a2
+     PREVIEW:
+       - codigo: j39
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[106] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2a1
+     PREVIEW:
+       - codigo: j38
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[107] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe2a0
+     PREVIEW:
+       - codigo: j37
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[108] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe29f
+     PREVIEW:
+       - codigo: j36
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[109] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe29e
+     PREVIEW:
+       - codigo: j35
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[110] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe29d
+     PREVIEW:
+       - codigo: j34
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[111] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe29c
+     PREVIEW:
+       - codigo: j33
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[112] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe29b
+     PREVIEW:
+       - codigo: j32
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[113] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-21 04:17:46.358000
+     DOC ID:   69d3ea3a58eb41b68f5fe29a
+     PREVIEW:
+       - codigo: j31
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - tipo_precio: avo
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-21 04:17:46.358000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[114] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-15 14:13:18.831000
+     DOC ID:   69d3ea3a58eb41b68f5fe299
+     PREVIEW:
+       - codigo: j30
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-15 14:13:18.831000
+       - tipo_precio: avo
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[115] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-15 14:13:18.831000
+     DOC ID:   69d3ea3a58eb41b68f5fe298
+     PREVIEW:
+       - codigo: j29
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-15 14:13:18.831000
+       - tipo_precio: avo
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[116] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-15 14:13:18.831000
+     DOC ID:   69d3ea3a58eb41b68f5fe297
+     PREVIEW:
+       - codigo: j28
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-15 14:13:18.831000
+       - tipo_precio: avo
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[117] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-15 14:13:18.831000
+     DOC ID:   69d3ea3a58eb41b68f5fe296
+     PREVIEW:
+       - codigo: j27
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-15 14:13:18.831000
+       - tipo_precio: avo
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[118] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-15 14:13:18.831000
+     DOC ID:   69d3ea3a58eb41b68f5fe295
+     PREVIEW:
+       - codigo: j26
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-15 14:13:18.831000
+       - tipo_precio: avo
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[119] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-15 14:13:18.831000
+     DOC ID:   69d3ea3a58eb41b68f5fe294
+     PREVIEW:
+       - codigo: j25
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-15 14:13:18.831000
+       - tipo_precio: avo
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[120] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-15 14:13:18.831000
+     DOC ID:   69d3ea3a58eb41b68f5fe293
+     PREVIEW:
+       - codigo: j24
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-15 14:13:18.831000
+       - tipo_precio: avo
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[121] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-15 14:13:18.831000
+     DOC ID:   69d3ea3a58eb41b68f5fe292
+     PREVIEW:
+       - codigo: j23
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-15 14:13:18.831000
+       - tipo_precio: avo
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[122] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-15 14:13:18.831000
+     DOC ID:   69d3ea3a58eb41b68f5fe291
+     PREVIEW:
+       - codigo: j22
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-15 14:13:18.831000
+       - tipo_precio: avo
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[123] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe290
+     PREVIEW:
+       - codigo: j20
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[124] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe28f
+     PREVIEW:
+       - codigo: j19
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[125] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe28e
+     PREVIEW:
+       - codigo: j18
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[126] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe28d
+     PREVIEW:
+       - codigo: j17
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[127] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe28c
+     PREVIEW:
+       - codigo: j16
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[128] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe28b
+     PREVIEW:
+       - codigo: j15
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[129] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe28a
+     PREVIEW:
+       - codigo: j14
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[130] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe289
+     PREVIEW:
+       - codigo: j13
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[131] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe288
+     PREVIEW:
+       - codigo: j12
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[132] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe287
+     PREVIEW:
+       - codigo: j11
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[133] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe285
+     PREVIEW:
+       - codigo: j9
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[134] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe284
+     PREVIEW:
+       - codigo: j8
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[135] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe283
+     PREVIEW:
+       - codigo: j7
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[136] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe282
+     PREVIEW:
+       - codigo: j6
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[137] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe281
+     PREVIEW:
+       - codigo: j5
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[138] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe280
+     PREVIEW:
+       - codigo: j4
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[139] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe27f
+     PREVIEW:
+       - codigo: j3
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[140] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-05 02:16:34.764000
+     DOC ID:   69d3ea3a58eb41b68f5fe27e
+     PREVIEW:
+       - codigo: j2
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-05 02:16:34.764000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[141] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564fb
+     PREVIEW:
+       - codigo: i20
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[142] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564fa
+     PREVIEW:
+       - codigo: i19
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[143] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564f9
+     PREVIEW:
+       - codigo: i18
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[144] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564f8
+     PREVIEW:
+       - codigo: i17
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[145] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564f7
+     PREVIEW:
+       - codigo: i16
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[146] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564f6
+     PREVIEW:
+       - codigo: i15
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[147] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564f5
+     PREVIEW:
+       - codigo: i14
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[148] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564f4
+     PREVIEW:
+       - codigo: i13
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[149] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564f3
+     PREVIEW:
+       - codigo: i12
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[150] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564f2
+     PREVIEW:
+       - codigo: i11
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[151] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564f0
+     PREVIEW:
+       - codigo: i9
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[152] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564ef
+     PREVIEW:
+       - codigo: i8
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[153] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564ee
+     PREVIEW:
+       - codigo: i7
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[154] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564ed
+     PREVIEW:
+       - codigo: i6
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[155] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564ec
+     PREVIEW:
+       - codigo: i5
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[156] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564eb
+     PREVIEW:
+       - codigo: i4
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[157] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564ea
+     PREVIEW:
+       - codigo: i3
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[158] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564e9
+     PREVIEW:
+       - codigo: i2
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[159] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 21:50:00.181000
+     DOC ID:   695b1d7c35c4d9a163a564e8
+     PREVIEW:
+       - codigo: i1
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 21:50:00.181000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[160] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 20:03:26.688000
+     DOC ID:   695ac8298a795e13b6abc506
+     PREVIEW:
+       - codigo: h5
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 30.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 20:03:26.688000
+       - tipo_precio: avo
+       - corte_id: 695ac8298a795e13b6abc501
+
+[161] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 20:03:26.688000
+     DOC ID:   695ac8298a795e13b6abc505
+     PREVIEW:
+       - codigo: h4
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 30.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 20:03:26.688000
+       - tipo_precio: avo
+       - corte_id: 695ac8298a795e13b6abc501
+
+[162] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 20:01:43.125000
+     DOC ID:   695ac8298a795e13b6abc504
+     PREVIEW:
+       - codigo: h3
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 20:01:43.125000
+       - corte_id: 695ac8298a795e13b6abc501
+
+[163] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 20:01:43.125000
+     DOC ID:   695ac8298a795e13b6abc503
+     PREVIEW:
+       - codigo: h2
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 20:01:43.125000
+       - corte_id: 695ac8298a795e13b6abc501
+
+[164] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 20:01:43.125000
+     DOC ID:   695ac8298a795e13b6abc502
+     PREVIEW:
+       - codigo: h1
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 20:01:43.125000
+       - corte_id: 695ac8298a795e13b6abc501
+
+[165] COLECCION: piezas_historicas
+     CAMPO:    created_at
+     VALOR:    2026-01-04 19:19:52.433000
+     DOC ID:   695ac6db8a795e13b6abc4ee
+     PREVIEW:
+       - codigo: g1
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - created_at: 2026-01-04 19:19:52.433000
+       - corte_id: 695ac6db8a795e13b6abc4ed
+
+[166] COLECCION: produccion
+     CAMPO:    fecha
+     VALOR:    2026-07-10 00:51:44.081000
+     DOC ID:   6a5042204c3064fd9b669f4c
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: armador
+       - box: b1
+       - codigo_pieza: k3
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 1.0
+       - tipo_precio: avo
+       - cuerda_interna: 2.0
+       - cuerda_externa: 1.0
+       - flecha: 2.0
+       - fecha: 2026-07-10 00:51:44.081000
+       - calidad_status: pendiente
+
+[167] COLECCION: produccion
+     CAMPO:    fecha
+     VALOR:    2026-07-10 00:51:19.459000
+     DOC ID:   6a5042074c3064fd9b669f4b
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: armador
+       - box: b1
+       - codigo_pieza: k3
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 1.0
+       - tipo_precio: avo
+       - cuerda_interna: 2.0
+       - cuerda_externa: 1.0
+       - flecha: 2.0
+       - fecha: 2026-07-10 00:51:19.459000
+       - calidad_status: pendiente
+
+[168] COLECCION: produccion
+     CAMPO:    fecha
+     VALOR:    2026-04-30 16:19:56.876000
+     DOC ID:   69f3812c5e103abc7166b155
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: armador
+       - box: b1
+       - codigo_pieza: k1
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 1.0
+       - tipo_precio: avo
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-04-30 16:19:56.876000
+       - calidad_status: pendiente
+
+[169] COLECCION: produccion
+     CAMPO:    fecha
+     VALOR:    2026-01-15 14:13:46.864000
+     DOC ID:   6968f61a7b419913773434c3
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: j21
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - tipo_precio: avo
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - fecha: 2026-01-15 14:13:46.864000
+       - calidad_status: rechazado
+       - comentario_supervisor: producto faltante
+
+[170] COLECCION: produccion
+     CAMPO:    fecha
+     VALOR:    2026-01-15 14:13:40.305000
+     DOC ID:   6968f6147b419913773434c2
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: j21
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - tipo_precio: avo
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-15 14:13:40.305000
+       - calidad_status: pendiente
+
+[171] COLECCION: produccion
+     CAMPO:    fecha
+     VALOR:    2026-01-07 11:15:11.797000
+     DOC ID:   695e403f12fb02309d65d05e
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: j1
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - tipo_precio: metro
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-07 11:15:11.797000
+       - calidad_status: pendiente
+
+[172] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-03-05 15:16:44.684000
+     DOC ID:   69a99e5cd552f1f00973fe0b
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: j24
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - tipo_precio: avo
+       - cuerda_interna: 1
+       - cuerda_externa: 1
+       - fecha: 2026-03-05 15:16:44.684000
+       - calidad_status: aprobado
+       - comentario_supervisor: no acorde a la tolarancia
+
+[173] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-03-05 15:16:36.288000
+     DOC ID:   69a99e54d552f1f00973fe0a
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: armador
+       - box: b1
+       - codigo_pieza: j24
+       - empresa: AVO
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200.0
+       - tipo_precio: avo
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-03-05 15:16:36.288000
+       - calidad_status: pendiente
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[174] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-31 15:00:29.516000
+     DOC ID:   697e190d0cd273abeb8ef20e
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: i1
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - tipo_precio: metro
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - fecha: 2026-01-31 15:00:29.516000
+       - calidad_status: pendiente
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[175] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 21:52:00.694000
+     DOC ID:   695ae1003997903904d3b683
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: i1
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 200.0
+       - tipo_precio: metro
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-04 21:52:00.694000
+       - calidad_status: pendiente
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[176] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 20:04:05.576000
+     DOC ID:   695ac7b58a795e13b6abc500
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: h4
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 30.0
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-04 20:04:05.576000
+       - calidad_status: pendiente
+       - corte_id: 695ac8298a795e13b6abc501
+
+[177] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 20:03:44.691000
+     DOC ID:   695ac7a08a795e13b6abc4ff
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: h4
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 30.0
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-04 20:03:44.691000
+       - calidad_status: pendiente
+       - corte_id: 695ac8298a795e13b6abc501
+
+[178] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 20:02:20.309000
+     DOC ID:   695ac74c8a795e13b6abc4fc
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: h2
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-04 20:02:20.309000
+       - calidad_status: pendiente
+       - corte_id: 695ac8298a795e13b6abc501
+
+[179] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 20:02:13.744000
+     DOC ID:   695ac7458a795e13b6abc4fb
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: h1
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - fecha: 2026-01-04 20:02:13.744000
+       - calidad_status: pendiente
+       - corte_id: 695ac8298a795e13b6abc501
+
+[180] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 20:02:06.068000
+     DOC ID:   695ac73e8a795e13b6abc4fa
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: h1
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-04 20:02:06.068000
+       - calidad_status: pendiente
+       - corte_id: 695ac8298a795e13b6abc501
+
+[181] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 20:02:01.005000
+     DOC ID:   695ac7398a795e13b6abc4f9
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: h1
+       - empresa: metro
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-04 20:02:01.005000
+       - calidad_status: pendiente
+       - corte_id: 695ac8298a795e13b6abc501
+
+[182] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 19:20:09.687000
+     DOC ID:   695abd69dbc3dbc63f8a10c0
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: g1
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 20.0
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-04 19:20:09.687000
+       - calidad_status: pendiente
+       - corte_id: 695ac6db8a795e13b6abc4ed
+
+[183] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 19:10:34.360000
+     DOC ID:   695abb2a82fe8a56f2b6b4e6
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: f1
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 50.0
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - fecha: 2026-01-04 19:10:34.360000
+       - calidad_status: pendiente
+       - corte_id: 695abb5182fe8a56f2b6b4e7
+
+[184] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 18:52:54.210000
+     DOC ID:   695ab7067a717915116e7df2
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: f1
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 50.0
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-04 18:52:54.210000
+       - calidad_status: pendiente
+       - corte_id: 695abb5182fe8a56f2b6b4e7
+
+[185] COLECCION: produccion_historica
+     CAMPO:    kilo_pieza
+     VALOR:    0.02
+     DOC ID:   6959bfad44d8df9985ae3472
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: e1
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 0.02
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-04 01:17:33.154000
+       - calidad_status: pendiente
+       - corte_id: 6959bfec44d8df9985ae3473
+
+[186] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 01:07:33.771000
+     DOC ID:   6959bd55acfe644fb1709c64
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: d1
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 0.99
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-04 01:07:33.771000
+       - calidad_status: pendiente
+       - corte_id: 6959bd6facfe644fb1709c65
+
+[187] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 01:01:45.404000
+     DOC ID:   6959bbf9fcea133eb9248542
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: c1
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 1.0
+       - cuerda_interna: 1.0
+       - cuerda_externa: 1.0
+       - fecha: 2026-01-04 01:01:45.404000
+       - calidad_status: pendiente
+       - corte_id: 6959bc17fcea133eb9248543
+
+[188] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 00:27:18.523000
+     DOC ID:   6959b3e6d0e38a512e4b6aff
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 1
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200.0
+       - cuerda_interna: 170.0
+       - cuerda_externa: 60.0
+       - fecha: 2026-01-04 00:27:18.523000
+       - calidad_status: pendiente
+       - corte_id: 6959b406d0e38a512e4b6b00
+
+[189] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2026-01-04 00:09:57.671000
+     DOC ID:   6959afd5643ece6d00f992d2
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 01
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200.0
+       - cuerda_interna: 170.0
+       - cuerda_externa: 60.0
+       - fecha: 2026-01-04 00:09:57.671000
+       - calidad_status: pendiente
+       - corte_id: 6959aff1643ece6d00f992d3
+
+[190] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-04 06:14:32.063000
+     DOC ID:   693126c8903879eba1909ea5
+     PREVIEW:
+       - user_id: 693126a3903879eba1909ea4
+       - usuario: ale
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 121
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 20.0
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 60.0
+       - fecha: 2025-12-04 06:14:32.063000
+       - calidad_status: pendiente
+
+[191] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-04 05:37:09.716000
+     DOC ID:   69311e05e1ffba4cd4b14287
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 70
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 20.0
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 60.0
+       - fecha: 2025-12-04 05:37:09.716000
+       - calidad_status: pendiente
+
+[192] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 22:33:30.869000
+     DOC ID:   6930babab04ec24f4b14a327
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: 256
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 300.0
+       - precio_armado: 20.0
+       - precio_remate: 20.0
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - fecha: 2025-12-03 22:33:30.869000
+       - calidad_status: pendiente
+
+[193] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 21:58:12.690000
+     DOC ID:   6930b274b04ec24f4b14a326
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 256
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 300.0
+       - precio_armado: 20.0
+       - precio_remate: 20.0
+       - cuerda_interna: 250.0
+       - cuerda_externa: 300.0
+       - fecha: 2025-12-03 21:58:12.690000
+       - calidad_status: pendiente
+
+[194] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 21:56:23.526000
+     DOC ID:   6930b207b04ec24f4b14a325
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 254
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 300.0
+       - precio_armado: 20.0
+       - precio_remate: 20.0
+       - cuerda_interna: 0.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 21:56:23.526000
+       - calidad_status: pendiente
+
+[195] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 21:55:17.962000
+     DOC ID:   6930b1c5b04ec24f4b14a324
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 253
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 300.0
+       - precio_armado: 20.0
+       - precio_remate: 20.0
+       - cuerda_interna: 0.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 21:55:17.962000
+       - calidad_status: pendiente
+
+[196] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 21:53:57.080000
+     DOC ID:   6930b175b04ec24f4b14a323
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 252
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 300.0
+       - precio_armado: 20.0
+       - precio_remate: 20.0
+       - cuerda_interna: 0.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 21:53:57.080000
+       - calidad_status: pendiente
+
+[197] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 21:51:26.735000
+     DOC ID:   6930b0deb04ec24f4b14a322
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 251
+       - empresa: avo
+       - marco: th1
+       - tramo: th1
+       - kilo_pieza: 300.0
+       - precio_armado: 20.0
+       - precio_remate: 20.0
+       - cuerda_interna: 0.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 21:51:26.735000
+       - calidad_status: pendiente
+
+[198] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 20:43:33.361000
+     DOC ID:   6930a0f52aaf6b587138fba0
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: 64
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - fecha: 2025-12-03 20:43:33.361000
+       - calidad_status: pendiente
+
+[199] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 20:42:51.414000
+     DOC ID:   6930a0cb2aaf6b587138fb9f
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 64
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 20:42:51.414000
+       - calidad_status: pendiente
+
+[200] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 20:32:19.116000
+     DOC ID:   69309e532aaf6b587138fb9e
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 62
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 20:32:19.116000
+       - calidad_status: pendiente
+
+[201] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 20:31:16.640000
+     DOC ID:   69309e142aaf6b587138fb9d
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: 62
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - fecha: 2025-12-03 20:31:16.640000
+       - calidad_status: pendiente
+
+[202] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 20:29:30.773000
+     DOC ID:   69309daa2aaf6b587138fb9c
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 62
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 20:29:30.773000
+       - calidad_status: pendiente
+
+[203] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 20:18:46.442000
+     DOC ID:   69309b262aaf6b587138fb9b
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: 61
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - fecha: 2025-12-03 20:18:46.442000
+       - calidad_status: pendiente
+
+[204] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 20:16:43.083000
+     DOC ID:   69309aab2aaf6b587138fb9a
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 61
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 20:16:43.083000
+       - calidad_status: pendiente
+
+[205] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 19:54:03.871000
+     DOC ID:   6930955b2aaf6b587138fb99
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 60
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 19:54:03.871000
+       - calidad_status: pendiente
+
+[206] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 19:52:55.911000
+     DOC ID:   693095172aaf6b587138fb98
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 60
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 19:52:55.911000
+       - calidad_status: pendiente
+
+[207] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 19:37:37.621000
+     DOC ID:   693091812aaf6b587138fb97
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 58
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 19:37:37.621000
+       - calidad_status: pendiente
+
+[208] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 19:30:10.783000
+     DOC ID:   69308fc22aaf6b587138fb96
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: 58
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 
+       - cuerda_externa: 
+       - fecha: 2025-12-03 19:30:10.783000
+       - calidad_status: aprobado
+
+[209] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 19:29:02.712000
+     DOC ID:   69308f7e2aaf6b587138fb95
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 58
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 19:29:02.712000
+       - calidad_status: pendiente
+
+[210] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 16:58:04.072000
+     DOC ID:   69306c1c983994e0012bf94f
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: 56
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 
+       - cuerda_externa: 
+       - fecha: 2025-12-03 16:58:04.072000
+       - calidad_status: rechazado
+
+[211] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 16:44:01.841000
+     DOC ID:   693068d1983994e0012bf94e
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: 57
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - fecha: 2025-12-03 16:44:01.841000
+       - calidad_status: pendiente
+
+[212] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 16:09:21.682000
+     DOC ID:   693060b1983994e0012bf94d
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 200
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 16:09:21.682000
+       - calidad_status: pendiente
+
+[213] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 15:56:24.028000
+     DOC ID:   69305da8983994e0012bf94c
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: 36
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - fecha: 2025-12-03 15:56:24.028000
+       - calidad_status: pendiente
+
+[214] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 15:55:52.304000
+     DOC ID:   69305d88983994e0012bf94b
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 36
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 15:55:52.304000
+       - calidad_status: pendiente
+
+[215] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 15:36:13.587000
+     DOC ID:   693058ed983994e0012bf94a
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 56
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 15:36:13.587000
+       - calidad_status: pendiente
+
+[216] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 15:32:51.020000
+     DOC ID:   69305823983994e0012bf949
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 57
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 15:32:51.020000
+       - calidad_status: pendiente
+
+[217] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 15:29:50.344000
+     DOC ID:   6930576e983994e0012bf948
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 56
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 15:29:50.344000
+       - calidad_status: pendiente
+
+[218] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 15:04:18.368000
+     DOC ID:   69305172983994e0012bf947
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 36
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 15:04:18.368000
+       - calidad_status: pendiente
+
+[219] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 14:49:39.609000
+     DOC ID:   69304e03983994e0012bf946
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 35
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 14:49:39.609000
+       - calidad_status: pendiente
+
+[220] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 14:30:47.672000
+     DOC ID:   69304997983994e0012bf945
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: 34
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: None
+       - cuerda_externa: None
+       - fecha: 2025-12-03 14:30:47.672000
+       - calidad_status: pendiente
+
+[221] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 14:30:04.608000
+     DOC ID:   6930496c983994e0012bf944
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 34
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 14:30:04.608000
+       - calidad_status: pendiente
+
+[222] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 14:29:43.225000
+     DOC ID:   69304957983994e0012bf943
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 34
+       - empresa: avo
+       - marco: th1
+       - tramo: t2
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 170.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 14:29:43.225000
+       - calidad_status: pendiente
+
+[223] COLECCION: produccion_historica
+     CAMPO:    fecha
+     VALOR:    2025-12-03 14:02:45.498000
+     DOC ID:   69304305983994e0012bf942
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 98
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 200
+       - precio_armado: 30
+       - precio_remate: 30
+       - cuerda_interna: 179.0
+       - cuerda_externa: 0.0
+       - fecha: 2025-12-03 14:02:45.498000
+       - calidad_status: pendiente
+
+[224] COLECCION: produccion_historica
+     CAMPO:    kilo_pieza
+     VALOR:    100.0
+     DOC ID:   6924f19a1f0a45b97f19d57b
+     PREVIEW:
+       - user_id: 6924eff01f0a45b97f19d578
+       - usuario: maria
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 2
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 100.0
+       - precio_armado: 25.0
+       - precio_remate: 25.0
+       - fecha: 2025-11-25 00:00:26.462000
+       - calidad_status: pendiente
+
+[225] COLECCION: produccion_historica
+     CAMPO:    kilo_pieza
+     VALOR:    100.0
+     DOC ID:   6924f0441f0a45b97f19d579
+     PREVIEW:
+       - user_id: 6924eff01f0a45b97f19d578
+       - usuario: maria
+       - modo: rematador
+       - box: b1
+       - codigo_pieza: 1
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 100.0
+       - precio_armado: 25.0
+       - precio_remate: 25.0
+       - fecha: 2025-11-24 23:54:44.390000
+       - calidad_status: rechazado
+       - comentario_supervisor: mal estado
+       - cuerda_externa: 2
+
+[226] COLECCION: produccion_historica
+     CAMPO:    kilo_pieza
+     VALOR:    100.0
+     DOC ID:   6924ef891f0a45b97f19d577
+     PREVIEW:
+       - user_id: 6924eebe1f0a45b97f19d4ad
+       - usuario: Felipe
+       - modo: armador
+       - box: b1
+       - codigo_pieza: 1
+       - empresa: avo
+       - marco: th1
+       - tramo: t1
+       - kilo_pieza: 100.0
+       - precio_armado: 25.0
+       - precio_remate: 25.0
+       - fecha: 2025-11-24 23:51:37.624000
+       - calidad_status: pendiente
+
+[227] COLECCION: usuarios
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$1UCbcUqZ0RHx0mGI$10148005cddee4c17957fa5c3ceac1613c02dd68acdf7fcf675c2496f458aa7842
+     DOC ID:   6a4d90b38ce9805c94356ad8
+     PREVIEW:
+       - usuario: qa_soporte
+       - nombre: QA Soporte
+       - tipo: soporte
+       - password: scrypt:32768:8:1$1UCbcUqZ0RHx0mGI$10148005cddee4c17957fa5c3c
+       - password_changed_at: 2026-07-08 00:02:12.133000
+
+[228] COLECCION: usuarios
+     CAMPO:    precio_metro_armado
+     VALOR:    1000
+     DOC ID:   6a4d86218ce9805c94356ad7
+     PREVIEW:
+       - usuario: qa_operador
+       - nombre: QA Operador
+       - tipo: operador
+       - sin_restriccion: True
+       - precio_metro_armado: 1000
+       - precio_metro_remate: 1200
+       - precio_avo_armado: 800
+       - precio_avo_remate: 900
+       - password: scrypt:32768:8:1$EmpVm9MEYj9AGoXN$46fde2236bbd795f90e502465d
+       - password_changed_at: 2026-07-07 23:05:05.096000
+
+[229] COLECCION: usuarios
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$W3JAdHeArPSfRQtx$d18ffe06e08fea0dddd1f4ff7ac59804e98ca14dcb9b6eaa17ba872b44f63f6e90
+     DOC ID:   6a4d86208ce9805c94356ad6
+     PREVIEW:
+       - usuario: qa_admin
+       - nombre: QA Admin
+       - tipo: administrador
+       - password: scrypt:32768:8:1$W3JAdHeArPSfRQtx$d18ffe06e08fea0dddd1f4ff7a
+       - password_changed_at: 2026-07-08 00:02:12.040000
+
+[230] COLECCION: usuarios
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8aca7b7e737712f5a42d86d53304d4b737e5310517d
+     DOC ID:   693ff7104be7cfd5ff040046
+     PREVIEW:
+       - usuario: vargas
+       - nombre: vargas
+       - tipo: cliente
+       - password: scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8ac
+       - password_changed_at: 2025-12-15 11:55:13.117000
+
+[231] COLECCION: usuarios
+     CAMPO:    password_changed_at
+     VALOR:    2026-07-07 23:38:49.289000
+     DOC ID:   6933aab401c0a20ee1daecc6
+     PREVIEW:
+       - usuario: soporte
+       - nombre: Soporte
+       - tipo: soporte
+       - password: scrypt:32768:8:1$Cx05iBZPbozxQ7vK$a27eadc0dc3b19aa809ba29746
+       - password_changed_at: 2026-07-07 23:38:49.289000
+
+[232] COLECCION: usuarios
+     CAMPO:    password_changed_at
+     VALOR:    2026-07-10 00:51:09.884000
+     DOC ID:   693126a3903879eba1909ea4
+     PREVIEW:
+       - usuario: ale
+       - nombre: ale
+       - tipo: operador
+       - password: scrypt:32768:8:1$3mapUoAtq20s1TMY$18c682d65ebd22c1a80d6aee46
+       - password_changed_at: 2026-07-10 00:51:09.884000
+       - precio_avo_armado: 0.0
+       - precio_avo_remate: 0.0
+       - precio_metro_armado: 0.0
+       - precio_metro_remate: 0.0
+       - sin_restriccion: True
+
+[233] COLECCION: usuarios
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$6Q6ygHQjAsPdQEtR$46324a7bc9734744ef4fd04e1e9717481f6a6b5833f8bd0bbe610d9bec8a23ecd7
+     DOC ID:   6924f0851f0a45b97f19d57a
+     PREVIEW:
+       - usuario: gus
+       - nombre: gus
+       - tipo: supervisor
+       - password: scrypt:32768:8:1$6Q6ygHQjAsPdQEtR$46324a7bc9734744ef4fd04e1e
+       - password_changed_at: 2026-07-10 00:50:56.876000
+       - precio_avo_armado: 0.0
+       - precio_avo_remate: 0.0
+       - precio_metro_armado: 0.0
+       - precio_metro_remate: 0.0
+
+[234] COLECCION: usuarios
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e40a22102b943a63fb161237f069fb3a85f5b781f
+     DOC ID:   6924eff01f0a45b97f19d578
+     PREVIEW:
+       - usuario: maria
+       - nombre: maria
+       - tipo: operador
+       - password: scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e
+       - password_changed_at: 2025-12-04 06:04:13.678000
+
+[235] COLECCION: usuarios
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$t99c1f3VmDW5dJXQ$b0a15bd48a4827a3ef8be7a52a459757aca29962239d31034c40e961eaaf35467a
+     DOC ID:   6924eebe1f0a45b97f19d4ad
+     PREVIEW:
+       - usuario: Felipe
+       - nombre: Felipe
+       - tipo: operador
+       - password: scrypt:32768:8:1$t99c1f3VmDW5dJXQ$b0a15bd48a4827a3ef8be7a52a
+       - password_changed_at: 2026-01-03 22:54:40.003000
+       - precio_avo_armado: 45.0
+       - precio_avo_remate: 80.0
+       - precio_metro_armado: 30.0
+       - precio_metro_remate: 70.0
+       - sin_restriccion: False
+
+[236] COLECCION: usuarios
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$artEzDGsRCBMomDg$2fd7701c276d25ad702d1a7fcf8d2e7fb697b98412a0a522acc763d3b2ad1bca90
+     DOC ID:   6924913d3e34458465c2ba70
+     PREVIEW:
+       - usuario: admin
+       - nombre: Administrador
+       - tipo: administrador
+       - password: scrypt:32768:8:1$artEzDGsRCBMomDg$2fd7701c276d25ad702d1a7fcf
+       - password_changed_at: 2026-07-07 03:32:52.305000
+
+[237] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8aca7b7e737712f5a42d86d53304d4b737e5310517d
+     DOC ID:   69d3ea3a58eb41b68f5fe305
+     PREVIEW:
+       - usuario: vargas
+       - nombre: vargas
+       - tipo: cliente
+       - password: scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8ac
+       - password_changed_at: 2025-12-15 11:55:13.117000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[238] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2026-01-19 10:30:20.509000
+     DOC ID:   69d3ea3a58eb41b68f5fe304
+     PREVIEW:
+       - usuario: soporte
+       - nombre: Soporte
+       - tipo: soporte
+       - password: scrypt:32768:8:1$dbiluk3opsGaPIEL$470171eb90392188ea6543515d
+       - password_changed_at: 2026-01-19 10:30:20.509000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[239] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$5oTQPyEX5EY2bq9Q$cef6edb93610e49552e324b26a0a74fa5f714677a76fc4074414a10d82fd9cc377
+     DOC ID:   69d3ea3a58eb41b68f5fe303
+     PREVIEW:
+       - usuario: ale
+       - nombre: ale
+       - tipo: operador
+       - password: scrypt:32768:8:1$5oTQPyEX5EY2bq9Q$cef6edb93610e49552e324b26a
+       - password_changed_at: 2026-02-28 04:20:35.462000
+       - precio_avo_armado: 0.0
+       - precio_avo_remate: 0.0
+       - precio_metro_armado: 0.0
+       - precio_metro_remate: 0.0
+       - sin_restriccion: True
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[240] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2026-04-06 16:54:04.190000
+     DOC ID:   69d3ea3a58eb41b68f5fe302
+     PREVIEW:
+       - usuario: gus
+       - nombre: gus
+       - tipo: supervisor
+       - password: scrypt:32768:8:1$LclAxFti8zAwcudp$b323556908f8da255a0a8ba286
+       - password_changed_at: 2026-04-06 16:54:04.190000
+       - precio_avo_armado: 0.0
+       - precio_avo_remate: 0.0
+       - precio_metro_armado: 0.0
+       - precio_metro_remate: 0.0
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[241] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e40a22102b943a63fb161237f069fb3a85f5b781f
+     DOC ID:   69d3ea3a58eb41b68f5fe301
+     PREVIEW:
+       - usuario: maria
+       - nombre: maria
+       - tipo: operador
+       - password: scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e
+       - password_changed_at: 2025-12-04 06:04:13.678000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[242] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$t99c1f3VmDW5dJXQ$b0a15bd48a4827a3ef8be7a52a459757aca29962239d31034c40e961eaaf35467a
+     DOC ID:   69d3ea3a58eb41b68f5fe300
+     PREVIEW:
+       - usuario: Felipe
+       - nombre: Felipe
+       - tipo: operador
+       - password: scrypt:32768:8:1$t99c1f3VmDW5dJXQ$b0a15bd48a4827a3ef8be7a52a
+       - password_changed_at: 2026-01-03 22:54:40.003000
+       - precio_avo_armado: 45.0
+       - precio_avo_remate: 80.0
+       - precio_metro_armado: 30.0
+       - precio_metro_remate: 70.0
+       - sin_restriccion: False
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[243] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$egGAuaI1AEILWLf9$2f3209e7ac4ca5289201f38d515accb8c9a8549fb0dcce92fd28e23885f3316f7f
+     DOC ID:   69d3ea3a58eb41b68f5fe2ff
+     PREVIEW:
+       - usuario: admin
+       - nombre: Administrador
+       - tipo: administrador
+       - password: scrypt:32768:8:1$egGAuaI1AEILWLf9$2f3209e7ac4ca5289201f38d51
+       - password_changed_at: 2026-04-06 17:15:13.769000
+       - corte_id: 69d3ea3a58eb41b68f5fe27d
+
+[244] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8aca7b7e737712f5a42d86d53304d4b737e5310517d
+     DOC ID:   695b1d7c35c4d9a163a56502
+     PREVIEW:
+       - usuario: vargas
+       - nombre: vargas
+       - tipo: cliente
+       - password: scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8ac
+       - password_changed_at: 2025-12-15 11:55:13.117000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[245] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2025-12-06 04:01:56.900000
+     DOC ID:   695b1d7c35c4d9a163a56501
+     PREVIEW:
+       - usuario: soporte
+       - nombre: Soporte
+       - tipo: soporte
+       - password: scrypt:32768:8:1$Ol1rByBLDIH2P8z1$6dd5fafef4ad2b4135bf605afb
+       - password_changed_at: 2025-12-06 04:01:56.900000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[246] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2025-12-04 06:14:10.565000
+     DOC ID:   695b1d7c35c4d9a163a56500
+     PREVIEW:
+       - usuario: ale
+       - nombre: ale
+       - tipo: operador
+       - password: scrypt:32768:8:1$ITop427FBykheXKL$5fe92cc5b73c92252b1e125dd9
+       - password_changed_at: 2025-12-04 06:14:10.565000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[247] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$T8SoLiVkEeF4S6IM$991e2a0b6165674b4d0dc39dbd414d6b2f080b9b291b07d71fe613ee9403e385c6
+     DOC ID:   695b1d7c35c4d9a163a564ff
+     PREVIEW:
+       - usuario: gus
+       - nombre: gus
+       - tipo: supervisor
+       - password: scrypt:32768:8:1$T8SoLiVkEeF4S6IM$991e2a0b6165674b4d0dc39dbd
+       - password_changed_at: 2026-01-03 22:14:24.476000
+       - precio_avo_armado: 0.0
+       - precio_avo_remate: 0.0
+       - precio_metro_armado: 0.0
+       - precio_metro_remate: 0.0
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[248] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e40a22102b943a63fb161237f069fb3a85f5b781f
+     DOC ID:   695b1d7c35c4d9a163a564fe
+     PREVIEW:
+       - usuario: maria
+       - nombre: maria
+       - tipo: operador
+       - password: scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e
+       - password_changed_at: 2025-12-04 06:04:13.678000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[249] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$o0BxcL1q30nfxTD2$d8344e3cce7f3dd054969b207363c2d630f0d347e55eaead9dfe03b91b4ffee959
+     DOC ID:   695b1d7c35c4d9a163a564fd
+     PREVIEW:
+       - usuario: Felipe
+       - nombre: Felipe
+       - tipo: operador
+       - password: scrypt:32768:8:1$o0BxcL1q30nfxTD2$d8344e3cce7f3dd054969b2073
+       - password_changed_at: 2026-01-03 22:54:40.003000
+       - precio_avo_armado: 45.0
+       - precio_avo_remate: 80.0
+       - precio_metro_armado: 30.0
+       - precio_metro_remate: 70.0
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[250] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2026-01-03 17:23:26.839000
+     DOC ID:   695b1d7c35c4d9a163a564fc
+     PREVIEW:
+       - usuario: admin
+       - nombre: Administrador
+       - tipo: administrador
+       - password: scrypt:32768:8:1$0AXhLK36SU1sXn8E$065512df5f389d9969e36fcc7d
+       - password_changed_at: 2026-01-03 17:23:26.839000
+       - corte_id: 695b1d7c35c4d9a163a564e7
+
+[251] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8aca7b7e737712f5a42d86d53304d4b737e5310517d
+     DOC ID:   695ac8298a795e13b6abc50d
+     PREVIEW:
+       - usuario: vargas
+       - nombre: vargas
+       - tipo: cliente
+       - password: scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8ac
+       - password_changed_at: 2025-12-15 11:55:13.117000
+       - corte_id: 695ac8298a795e13b6abc501
+
+[252] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2025-12-06 04:01:56.900000
+     DOC ID:   695ac8298a795e13b6abc50c
+     PREVIEW:
+       - usuario: soporte
+       - nombre: Soporte
+       - tipo: soporte
+       - password: scrypt:32768:8:1$Ol1rByBLDIH2P8z1$6dd5fafef4ad2b4135bf605afb
+       - password_changed_at: 2025-12-06 04:01:56.900000
+       - corte_id: 695ac8298a795e13b6abc501
+
+[253] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2025-12-04 06:14:10.565000
+     DOC ID:   695ac8298a795e13b6abc50b
+     PREVIEW:
+       - usuario: ale
+       - nombre: ale
+       - tipo: operador
+       - password: scrypt:32768:8:1$ITop427FBykheXKL$5fe92cc5b73c92252b1e125dd9
+       - password_changed_at: 2025-12-04 06:14:10.565000
+       - corte_id: 695ac8298a795e13b6abc501
+
+[254] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$T8SoLiVkEeF4S6IM$991e2a0b6165674b4d0dc39dbd414d6b2f080b9b291b07d71fe613ee9403e385c6
+     DOC ID:   695ac8298a795e13b6abc50a
+     PREVIEW:
+       - usuario: gus
+       - nombre: gus
+       - tipo: supervisor
+       - password: scrypt:32768:8:1$T8SoLiVkEeF4S6IM$991e2a0b6165674b4d0dc39dbd
+       - password_changed_at: 2026-01-03 22:14:24.476000
+       - precio_avo_armado: 0.0
+       - precio_avo_remate: 0.0
+       - precio_metro_armado: 0.0
+       - precio_metro_remate: 0.0
+       - corte_id: 695ac8298a795e13b6abc501
+
+[255] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e40a22102b943a63fb161237f069fb3a85f5b781f
+     DOC ID:   695ac8298a795e13b6abc509
+     PREVIEW:
+       - usuario: maria
+       - nombre: maria
+       - tipo: operador
+       - password: scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e
+       - password_changed_at: 2025-12-04 06:04:13.678000
+       - corte_id: 695ac8298a795e13b6abc501
+
+[256] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$o0BxcL1q30nfxTD2$d8344e3cce7f3dd054969b207363c2d630f0d347e55eaead9dfe03b91b4ffee959
+     DOC ID:   695ac8298a795e13b6abc508
+     PREVIEW:
+       - usuario: Felipe
+       - nombre: Felipe
+       - tipo: operador
+       - password: scrypt:32768:8:1$o0BxcL1q30nfxTD2$d8344e3cce7f3dd054969b2073
+       - password_changed_at: 2026-01-03 22:54:40.003000
+       - precio_avo_armado: 45.0
+       - precio_avo_remate: 80.0
+       - precio_metro_armado: 30.0
+       - precio_metro_remate: 70.0
+       - corte_id: 695ac8298a795e13b6abc501
+
+[257] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2026-01-03 17:23:26.839000
+     DOC ID:   695ac8298a795e13b6abc507
+     PREVIEW:
+       - usuario: admin
+       - nombre: Administrador
+       - tipo: administrador
+       - password: scrypt:32768:8:1$0AXhLK36SU1sXn8E$065512df5f389d9969e36fcc7d
+       - password_changed_at: 2026-01-03 17:23:26.839000
+       - corte_id: 695ac8298a795e13b6abc501
+
+[258] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8aca7b7e737712f5a42d86d53304d4b737e5310517d
+     DOC ID:   695ac6db8a795e13b6abc4f5
+     PREVIEW:
+       - usuario: vargas
+       - nombre: vargas
+       - tipo: cliente
+       - password: scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8ac
+       - password_changed_at: 2025-12-15 11:55:13.117000
+       - corte_id: 695ac6db8a795e13b6abc4ed
+
+[259] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2025-12-06 04:01:56.900000
+     DOC ID:   695ac6db8a795e13b6abc4f4
+     PREVIEW:
+       - usuario: soporte
+       - nombre: Soporte
+       - tipo: soporte
+       - password: scrypt:32768:8:1$Ol1rByBLDIH2P8z1$6dd5fafef4ad2b4135bf605afb
+       - password_changed_at: 2025-12-06 04:01:56.900000
+       - corte_id: 695ac6db8a795e13b6abc4ed
+
+[260] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2025-12-04 06:14:10.565000
+     DOC ID:   695ac6db8a795e13b6abc4f3
+     PREVIEW:
+       - usuario: ale
+       - nombre: ale
+       - tipo: operador
+       - password: scrypt:32768:8:1$ITop427FBykheXKL$5fe92cc5b73c92252b1e125dd9
+       - password_changed_at: 2025-12-04 06:14:10.565000
+       - corte_id: 695ac6db8a795e13b6abc4ed
+
+[261] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$T8SoLiVkEeF4S6IM$991e2a0b6165674b4d0dc39dbd414d6b2f080b9b291b07d71fe613ee9403e385c6
+     DOC ID:   695ac6db8a795e13b6abc4f2
+     PREVIEW:
+       - usuario: gus
+       - nombre: gus
+       - tipo: supervisor
+       - password: scrypt:32768:8:1$T8SoLiVkEeF4S6IM$991e2a0b6165674b4d0dc39dbd
+       - password_changed_at: 2026-01-03 22:14:24.476000
+       - precio_avo_armado: 0.0
+       - precio_avo_remate: 0.0
+       - precio_metro_armado: 0.0
+       - precio_metro_remate: 0.0
+       - corte_id: 695ac6db8a795e13b6abc4ed
+
+[262] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e40a22102b943a63fb161237f069fb3a85f5b781f
+     DOC ID:   695ac6db8a795e13b6abc4f1
+     PREVIEW:
+       - usuario: maria
+       - nombre: maria
+       - tipo: operador
+       - password: scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e
+       - password_changed_at: 2025-12-04 06:04:13.678000
+       - corte_id: 695ac6db8a795e13b6abc4ed
+
+[263] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$o0BxcL1q30nfxTD2$d8344e3cce7f3dd054969b207363c2d630f0d347e55eaead9dfe03b91b4ffee959
+     DOC ID:   695ac6db8a795e13b6abc4f0
+     PREVIEW:
+       - usuario: Felipe
+       - nombre: Felipe
+       - tipo: operador
+       - password: scrypt:32768:8:1$o0BxcL1q30nfxTD2$d8344e3cce7f3dd054969b2073
+       - password_changed_at: 2026-01-03 22:54:40.003000
+       - precio_avo_armado: 45.0
+       - precio_avo_remate: 80.0
+       - precio_metro_armado: 30.0
+       - precio_metro_remate: 70.0
+       - corte_id: 695ac6db8a795e13b6abc4ed
+
+[264] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2026-01-03 17:23:26.839000
+     DOC ID:   695ac6db8a795e13b6abc4ef
+     PREVIEW:
+       - usuario: admin
+       - nombre: Administrador
+       - tipo: administrador
+       - password: scrypt:32768:8:1$0AXhLK36SU1sXn8E$065512df5f389d9969e36fcc7d
+       - password_changed_at: 2026-01-03 17:23:26.839000
+       - corte_id: 695ac6db8a795e13b6abc4ed
+
+[265] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8aca7b7e737712f5a42d86d53304d4b737e5310517d
+     DOC ID:   695abb5182fe8a56f2b6b4ee
+     PREVIEW:
+       - usuario: vargas
+       - nombre: vargas
+       - tipo: cliente
+       - password: scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8ac
+       - password_changed_at: 2025-12-15 11:55:13.117000
+       - corte_id: 695abb5182fe8a56f2b6b4e7
+
+[266] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2025-12-06 04:01:56.900000
+     DOC ID:   695abb5182fe8a56f2b6b4ed
+     PREVIEW:
+       - usuario: soporte
+       - nombre: Soporte
+       - tipo: soporte
+       - password: scrypt:32768:8:1$Ol1rByBLDIH2P8z1$6dd5fafef4ad2b4135bf605afb
+       - password_changed_at: 2025-12-06 04:01:56.900000
+       - corte_id: 695abb5182fe8a56f2b6b4e7
+
+[267] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2025-12-04 06:14:10.565000
+     DOC ID:   695abb5182fe8a56f2b6b4ec
+     PREVIEW:
+       - usuario: ale
+       - nombre: ale
+       - tipo: operador
+       - password: scrypt:32768:8:1$ITop427FBykheXKL$5fe92cc5b73c92252b1e125dd9
+       - password_changed_at: 2025-12-04 06:14:10.565000
+       - corte_id: 695abb5182fe8a56f2b6b4e7
+
+[268] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$T8SoLiVkEeF4S6IM$991e2a0b6165674b4d0dc39dbd414d6b2f080b9b291b07d71fe613ee9403e385c6
+     DOC ID:   695abb5182fe8a56f2b6b4eb
+     PREVIEW:
+       - usuario: gus
+       - nombre: gus
+       - tipo: supervisor
+       - password: scrypt:32768:8:1$T8SoLiVkEeF4S6IM$991e2a0b6165674b4d0dc39dbd
+       - password_changed_at: 2026-01-03 22:14:24.476000
+       - precio_avo_armado: 0.0
+       - precio_avo_remate: 0.0
+       - precio_metro_armado: 0.0
+       - precio_metro_remate: 0.0
+       - corte_id: 695abb5182fe8a56f2b6b4e7
+
+[269] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e40a22102b943a63fb161237f069fb3a85f5b781f
+     DOC ID:   695abb5182fe8a56f2b6b4ea
+     PREVIEW:
+       - usuario: maria
+       - nombre: maria
+       - tipo: operador
+       - password: scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e
+       - password_changed_at: 2025-12-04 06:04:13.678000
+       - corte_id: 695abb5182fe8a56f2b6b4e7
+
+[270] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$o0BxcL1q30nfxTD2$d8344e3cce7f3dd054969b207363c2d630f0d347e55eaead9dfe03b91b4ffee959
+     DOC ID:   695abb5182fe8a56f2b6b4e9
+     PREVIEW:
+       - usuario: Felipe
+       - nombre: Felipe
+       - tipo: operador
+       - password: scrypt:32768:8:1$o0BxcL1q30nfxTD2$d8344e3cce7f3dd054969b2073
+       - password_changed_at: 2026-01-03 22:54:40.003000
+       - precio_avo_armado: 45.0
+       - precio_avo_remate: 80.0
+       - precio_metro_armado: 30.0
+       - precio_metro_remate: 70.0
+       - corte_id: 695abb5182fe8a56f2b6b4e7
+
+[271] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2026-01-03 17:23:26.839000
+     DOC ID:   695abb5182fe8a56f2b6b4e8
+     PREVIEW:
+       - usuario: admin
+       - nombre: Administrador
+       - tipo: administrador
+       - password: scrypt:32768:8:1$0AXhLK36SU1sXn8E$065512df5f389d9969e36fcc7d
+       - password_changed_at: 2026-01-03 17:23:26.839000
+       - corte_id: 695abb5182fe8a56f2b6b4e7
+
+[272] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8aca7b7e737712f5a42d86d53304d4b737e5310517d
+     DOC ID:   6959bfec44d8df9985ae347a
+     PREVIEW:
+       - usuario: vargas
+       - nombre: vargas
+       - tipo: cliente
+       - password: scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8ac
+       - password_changed_at: 2025-12-15 11:55:13.117000
+       - corte_id: 6959bfec44d8df9985ae3473
+
+[273] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2025-12-06 04:01:56.900000
+     DOC ID:   6959bfec44d8df9985ae3479
+     PREVIEW:
+       - usuario: soporte
+       - nombre: Soporte
+       - tipo: soporte
+       - password: scrypt:32768:8:1$Ol1rByBLDIH2P8z1$6dd5fafef4ad2b4135bf605afb
+       - password_changed_at: 2025-12-06 04:01:56.900000
+       - corte_id: 6959bfec44d8df9985ae3473
+
+[274] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2025-12-04 06:14:10.565000
+     DOC ID:   6959bfec44d8df9985ae3478
+     PREVIEW:
+       - usuario: ale
+       - nombre: ale
+       - tipo: operador
+       - password: scrypt:32768:8:1$ITop427FBykheXKL$5fe92cc5b73c92252b1e125dd9
+       - password_changed_at: 2025-12-04 06:14:10.565000
+       - corte_id: 6959bfec44d8df9985ae3473
+
+[275] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$T8SoLiVkEeF4S6IM$991e2a0b6165674b4d0dc39dbd414d6b2f080b9b291b07d71fe613ee9403e385c6
+     DOC ID:   6959bfec44d8df9985ae3477
+     PREVIEW:
+       - usuario: gus
+       - nombre: gus
+       - tipo: supervisor
+       - password: scrypt:32768:8:1$T8SoLiVkEeF4S6IM$991e2a0b6165674b4d0dc39dbd
+       - password_changed_at: 2026-01-03 22:14:24.476000
+       - precio_avo_armado: 0.0
+       - precio_avo_remate: 0.0
+       - precio_metro_armado: 0.0
+       - precio_metro_remate: 0.0
+       - corte_id: 6959bfec44d8df9985ae3473
+
+[276] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e40a22102b943a63fb161237f069fb3a85f5b781f
+     DOC ID:   6959bfec44d8df9985ae3476
+     PREVIEW:
+       - usuario: maria
+       - nombre: maria
+       - tipo: operador
+       - password: scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e
+       - password_changed_at: 2025-12-04 06:04:13.678000
+       - corte_id: 6959bfec44d8df9985ae3473
+
+[277] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$o0BxcL1q30nfxTD2$d8344e3cce7f3dd054969b207363c2d630f0d347e55eaead9dfe03b91b4ffee959
+     DOC ID:   6959bfec44d8df9985ae3475
+     PREVIEW:
+       - usuario: Felipe
+       - nombre: Felipe
+       - tipo: operador
+       - password: scrypt:32768:8:1$o0BxcL1q30nfxTD2$d8344e3cce7f3dd054969b2073
+       - password_changed_at: 2026-01-03 22:54:40.003000
+       - precio_avo_armado: 45.0
+       - precio_avo_remate: 80.0
+       - precio_metro_armado: 30.0
+       - precio_metro_remate: 70.0
+       - corte_id: 6959bfec44d8df9985ae3473
+
+[278] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2026-01-03 17:23:26.839000
+     DOC ID:   6959bfec44d8df9985ae3474
+     PREVIEW:
+       - usuario: admin
+       - nombre: Administrador
+       - tipo: administrador
+       - password: scrypt:32768:8:1$0AXhLK36SU1sXn8E$065512df5f389d9969e36fcc7d
+       - password_changed_at: 2026-01-03 17:23:26.839000
+       - corte_id: 6959bfec44d8df9985ae3473
+
+[279] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8aca7b7e737712f5a42d86d53304d4b737e5310517d
+     DOC ID:   6959bd6facfe644fb1709c6c
+     PREVIEW:
+       - usuario: vargas
+       - nombre: vargas
+       - tipo: cliente
+       - password: scrypt:32768:8:1$kU2eJzUxJZrxuS8I$4d99c9a9c35507a62006f1c8ac
+       - password_changed_at: 2025-12-15 11:55:13.117000
+       - corte_id: 6959bd6facfe644fb1709c65
+
+[280] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2025-12-06 04:01:56.900000
+     DOC ID:   6959bd6facfe644fb1709c6b
+     PREVIEW:
+       - usuario: soporte
+       - nombre: Soporte
+       - tipo: soporte
+       - password: scrypt:32768:8:1$Ol1rByBLDIH2P8z1$6dd5fafef4ad2b4135bf605afb
+       - password_changed_at: 2025-12-06 04:01:56.900000
+       - corte_id: 6959bd6facfe644fb1709c65
+
+[281] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2025-12-04 06:14:10.565000
+     DOC ID:   6959bd6facfe644fb1709c6a
+     PREVIEW:
+       - usuario: ale
+       - nombre: ale
+       - tipo: operador
+       - password: scrypt:32768:8:1$ITop427FBykheXKL$5fe92cc5b73c92252b1e125dd9
+       - password_changed_at: 2025-12-04 06:14:10.565000
+       - corte_id: 6959bd6facfe644fb1709c65
+
+[282] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$T8SoLiVkEeF4S6IM$991e2a0b6165674b4d0dc39dbd414d6b2f080b9b291b07d71fe613ee9403e385c6
+     DOC ID:   6959bd6facfe644fb1709c69
+     PREVIEW:
+       - usuario: gus
+       - nombre: gus
+       - tipo: supervisor
+       - password: scrypt:32768:8:1$T8SoLiVkEeF4S6IM$991e2a0b6165674b4d0dc39dbd
+       - password_changed_at: 2026-01-03 22:14:24.476000
+       - precio_avo_armado: 0.0
+       - precio_avo_remate: 0.0
+       - precio_metro_armado: 0.0
+       - precio_metro_remate: 0.0
+       - corte_id: 6959bd6facfe644fb1709c65
+
+[283] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e40a22102b943a63fb161237f069fb3a85f5b781f
+     DOC ID:   6959bd6facfe644fb1709c68
+     PREVIEW:
+       - usuario: maria
+       - nombre: maria
+       - tipo: operador
+       - password: scrypt:32768:8:1$3mF3cHJsHq2G7sry$85ef1ce27f582d06782c193d7e
+       - password_changed_at: 2025-12-04 06:04:13.678000
+       - corte_id: 6959bd6facfe644fb1709c65
+
+[284] COLECCION: usuarios_historicos
+     CAMPO:    password
+     VALOR:    scrypt:32768:8:1$o0BxcL1q30nfxTD2$d8344e3cce7f3dd054969b207363c2d630f0d347e55eaead9dfe03b91b4ffee959
+     DOC ID:   6959bd6facfe644fb1709c67
+     PREVIEW:
+       - usuario: Felipe
+       - nombre: Felipe
+       - tipo: operador
+       - password: scrypt:32768:8:1$o0BxcL1q30nfxTD2$d8344e3cce7f3dd054969b2073
+       - password_changed_at: 2026-01-03 22:54:40.003000
+       - precio_avo_armado: 45.0
+       - precio_avo_remate: 80.0
+       - precio_metro_armado: 30.0
+       - precio_metro_remate: 70.0
+       - corte_id: 6959bd6facfe644fb1709c65
+
+[285] COLECCION: usuarios_historicos
+     CAMPO:    password_changed_at
+     VALOR:    2026-01-03 17:23:26.839000
+     DOC ID:   6959bd6facfe644fb1709c66
+     PREVIEW:
+       - usuario: admin
+       - nombre: Administrador
+       - tipo: administrador
+       - password: scrypt:32768:8:1$0AXhLK36SU1sXn8E$065512df5f389d9969e36fcc7d
+       - password_changed_at: 2026-01-03 17:23:26.839000
+       - corte_id: 6959bd6facfe644fb1709c65
+
+==========================================================================================
+RESUMEN FINAL
+==========================================================================================
+Total coincidencias encontradas: 307
+  - Fase 1 (campos conocidos): 22
+  - Fase 2 (cualquier campo): 285
+
+[EXITO] Se encontro rastro! Mira los listados de arriba.
+Con los datos de las coincidencias puedes reconstruir el codigo.
+Si encuentras un registro con los datos COMPLETOS (codigo + medidas + operador)
+avisame y te digo como convertirlo en un INSERT para db.piezas.
