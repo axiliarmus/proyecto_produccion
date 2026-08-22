@@ -1,0 +1,67 @@
+================================================================================
+BUSQUEDA Y RESTAURACION DE CODIGO: j102
+Generado: 2026-08-22 13:49:32
+Modo: RESTAURACION CONFIRMADA
+================================================================================
+[OK] Conexion MongoDB exitosa
+
+[PASO 1] Buscando codigo 'j102' en TODAS las colecciones...
+  [OK] Codigo NO existe en db.piezas -> Podemos restaurarlo.
+
+[OK] CODIGO ENCONTRADO! Fuente: produccion (ACTIVA)
+--------------------------------------------------------------------------------
+  Codigo pieza             : j102
+  Fecha ultimo registro    : 2026-02-28 04:25:45
+  Modo produccion          : rematador
+  Box                      : b1
+  Cuerda Interna           : None
+  Cuerda Externa           : None
+  Flecha                   : None
+  Estado reg prod          : None
+
+--------------------------------------------------------------------------------
+DATOS DEL OPERADOR / DUEÑO DEL CODIGO:
+  Nombre operador (BD usuarios): ale
+  Nombre operador (reg produccion): ale
+  Rol: N/A
+  Email: N/A
+  Tipo usuario: N/A
+  ID usuario Mongo: 693126a3903879eba1909ea4
+
+================================================================================
+GENERANDO DOCUMENTO PARA REINSERTAR EN db.piezas:
+================================================================================
+{
+  
+"codigo": "j102",
+  "empresa": null,
+  "marco": null,
+  "tramo": null,
+  "cuerda_interna": null,
+  "cuerda_externa": null,
+  "flecha": null,
+  "estado": "Sin Produccion",
+  "box": "b1",
+  "operador_asignado": "ale",
+  "operador_id": "693126a3903879eba1909ea4",
+  "fecha_creacion": ISODate("2026-02-28T04:25:45Z"),
+  "fecha_restauracion": ISODate("2026-08-22T17:49:32Z"),
+  "restaurado_desde": "produccion (ACTIVA)",
+  "observacion_restauracion": "Restaurado automaticamente desde produccion (ACTIVA); codigo borrado por error."
+
+}
+
+--------------------------------------------------------------------------------
+MODO: RESTAURACION ACTIVADA (--confirmar)
+
+[PASO FINAL] Insertando documento en db.piezas...
+
+[EXITO] CODIGO RESTAURADO CORRECTAMENTE!
+  Nuevo ID Mongo en piezas: 6a89e12cff3c6c7d18c9d4b6
+  Codigo: j102
+  Operador asignado: ale
+  Estado inicial: Sin Produccion
+
+  Ahora puedes verlo en el panel admin en: 'Gestion de Piezas'
+  Si necesitas completar campos vacios (empresa, marco, tramo),
+  usa la opcion EDITAR en el panel para rellenarlos.

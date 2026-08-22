@@ -1,7 +1,7 @@
 ==========================================================================================
-RESULTADO AUTOMATICO - CODIGOS DE PIEZAS BORRADOS DETECTADOS
-Generado: 2026-08-22 13:42:05
-BD conectada: mongodb://localhost:27017
+RESULTADO - CODIGOS BORRADOS DETECTADOS (VERSION OPTIMIZADA VPS)
+Generado: 2026-08-22 13:47:52
+BD: mongodb://localhost:27017
 ==========================================================================================
 
 [OK] Conexion exitosa a MongoDB
@@ -15,254 +15,257 @@ CANTIDAD DE DOCUMENTOS POR COLECCION
   usuarios: 10
 
 ==========================================================================================
-ANALISIS 1: CODIGOS EN PRODUCCION PERO FALTANTES EN PIEZAS (BORRADOS RECIENTES)
+ANALISIS 1: CODIGOS EN PRODUCCION ACTIVA PERO FALTANTES EN PIEZAS
 ==========================================================================================
 
-Total codigos en piezas (activas): 4
-Total codigos unicos en produccion activa: 8
-CODIGOS BORRADOS DETECTADOS EN PRODUCCION ACTIVA: 6
+[INFO] Codigos en piezas (activas): 4
+[INFO] Registros agrupados de produccion activa: 8
+[RESULTADO] CODIGOS BORRADOS EN PRODUCCION ACTIVA: 6
 
---- LISTADO DETALLADO (ordenados por fecha MAS RECIENTE primero) ---
+--- LISTADO (MAS RECIENTES PRIMERO, TOP 100) ---
 
 [1] CODIGO: j102
-    ULTIMO REGISTRO: 2026-02-28 04:25:45
+    FECHA ULTIMO REGISTRO: 2026-02-28 04:25:45
     OPERADOR: ale
-    ROL OPERADOR: None
-    MODO PRODUCCION: rematador | BOX: b1
-    EXISTE EN HISTORICOS: NO
-    COMO RECUPERAR: Reinsertar en piezas con codigo 'j102' y los datos de arriba
+    ROL: N/A
+    MODO: rematador | BOX: b1
 
 [2] CODIGO: j100
-    ULTIMO REGISTRO: 2026-02-28 04:22:22
+    FECHA ULTIMO REGISTRO: 2026-02-28 04:22:22
     OPERADOR: ale
-    ROL OPERADOR: None
-    MODO PRODUCCION: rematador | BOX: b1
-    EXISTE EN HISTORICOS: NO
-    COMO RECUPERAR: Reinsertar en piezas con codigo 'j100' y los datos de arriba
+    ROL: N/A
+    MODO: rematador | BOX: b1
 
 [3] CODIGO: j101
-    ULTIMO REGISTRO: 2026-02-28 04:22:13
+    FECHA ULTIMO REGISTRO: 2026-02-28 04:22:13
     OPERADOR: ale
-    ROL OPERADOR: None
-    MODO PRODUCCION: armador | BOX: b1
-    MEDIDAS - Cuerda Interna: 1.0 | Cuerda Externa: 1.0 | Flecha: None
-    EXISTE EN HISTORICOS: NO
-    COMO RECUPERAR: Reinsertar en piezas con codigo 'j101' y los datos de arriba
+    ROL: N/A
+    MODO: armador | BOX: b1
+    MEDIDAS - CI=1.0 | CE=1.0 | Flecha=None
 
 [4] CODIGO: j10
-    ULTIMO REGISTRO: 2026-02-28 04:21:46
+    FECHA ULTIMO REGISTRO: 2026-02-28 04:21:46
     OPERADOR: ale
-    ROL OPERADOR: None
-    MODO PRODUCCION: rematador | BOX: b1
-    EXISTE EN HISTORICOS: NO
-    COMO RECUPERAR: Reinsertar en piezas con codigo 'j10' y los datos de arriba
+    ROL: N/A
+    MODO: rematador | BOX: b1
 
 [5] CODIGO: j21
-    ULTIMO REGISTRO: 2026-01-15 14:13:46
+    FECHA ULTIMO REGISTRO: 2026-01-15 14:13:46
     OPERADOR: Felipe
-    ROL OPERADOR: None
-    MODO PRODUCCION: rematador | BOX: b1
-    MEDIDAS - Cuerda Interna: 1 | Cuerda Externa: 1 | Flecha: None
-    EXISTE EN HISTORICOS: NO
-    COMO RECUPERAR: Reinsertar en piezas con codigo 'j21' y los datos de arriba
+    ROL: N/A
+    MODO: rematador | BOX: b1
+    MEDIDAS - CI=1 | CE=1 | Flecha=None
 
 [6] CODIGO: j1
-    ULTIMO REGISTRO: 2026-01-07 11:15:11
+    FECHA ULTIMO REGISTRO: 2026-01-07 11:15:11
     OPERADOR: Felipe
-    ROL OPERADOR: None
-    MODO PRODUCCION: armador | BOX: b1
-    MEDIDAS - Cuerda Interna: 1.0 | Cuerda Externa: 1.0 | Flecha: None
-    EXISTE EN HISTORICOS: NO
-    COMO RECUPERAR: Reinsertar en piezas con codigo 'j1' y los datos de arriba
+    ROL: N/A
+    MODO: armador | BOX: b1
+    MEDIDAS - CI=1.0 | CE=1.0 | Flecha=None
 
 ==========================================================================================
-ANALISIS 2: CODIGOS SOLO EN PRODUCCION HISTORICA (NO ESTAN EN PIEZAS)
+ANALISIS 2: CODIGOS SOLO EN PRODUCCION HISTORICA (NO EN PIEZAS)
 ==========================================================================================
-Total codigos unicos en produccion historica: 33
-CODIGOS ADICIONALES EN HISTORICOS: 33
+[INFO] Registros agrupados de produccion historica: 33
+[RESULTADO] CODIGOS ADICIONALES EN HISTORICOS: 33
 
---- LISTADO HISTORICOS (TOP 30 mas recientes) ---
+--- TOP 80 HISTORICOS MAS RECIENTES ---
 
 [1] CODIGO: j24
-    ULTIMO REGISTRO: 2026-03-05 15:16:44
-    OPERADOR: ale | ROL: None
+    FECHA: 2026-03-05 15:16:44
+    OPERADOR: ale | ROL: N/A
     MODO: rematador | BOX: b1
     MEDIDAS - CI=1 | CE=1 | Flecha=None
 
 [2] CODIGO: i1
-    ULTIMO REGISTRO: 2026-01-31 15:00:29
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2026-01-31 15:00:29
+    OPERADOR: Felipe | ROL: N/A
     MODO: rematador | BOX: b1
 
 [3] CODIGO: h4
-    ULTIMO REGISTRO: 2026-01-04 20:04:05
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2026-01-04 20:04:05
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=1.0 | CE=1.0 | Flecha=None
 
 [4] CODIGO: h2
-    ULTIMO REGISTRO: 2026-01-04 20:02:20
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2026-01-04 20:02:20
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=1.0 | CE=1.0 | Flecha=None
 
 [5] CODIGO: h1
-    ULTIMO REGISTRO: 2026-01-04 20:02:13
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2026-01-04 20:02:13
+    OPERADOR: Felipe | ROL: N/A
     MODO: rematador | BOX: b1
 
 [6] CODIGO: g1
-    ULTIMO REGISTRO: 2026-01-04 19:20:09
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2026-01-04 19:20:09
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=1.0 | CE=1.0 | Flecha=None
 
 [7] CODIGO: f1
-    ULTIMO REGISTRO: 2026-01-04 19:10:34
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2026-01-04 19:10:34
+    OPERADOR: Felipe | ROL: N/A
     MODO: rematador | BOX: b1
 
 [8] CODIGO: e1
-    ULTIMO REGISTRO: 2026-01-04 01:17:33
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2026-01-04 01:17:33
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=1.0 | CE=1.0 | Flecha=None
 
 [9] CODIGO: d1
-    ULTIMO REGISTRO: 2026-01-04 01:07:33
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2026-01-04 01:07:33
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=1.0 | CE=1.0 | Flecha=None
 
 [10] CODIGO: c1
-    ULTIMO REGISTRO: 2026-01-04 01:01:45
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2026-01-04 01:01:45
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=1.0 | CE=1.0 | Flecha=None
 
 [11] CODIGO: 1
-    ULTIMO REGISTRO: 2026-01-04 00:27:18
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2026-01-04 00:27:18
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=170.0 | CE=60.0 | Flecha=None
 
 [12] CODIGO: 01
-    ULTIMO REGISTRO: 2026-01-04 00:09:57
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2026-01-04 00:09:57
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=170.0 | CE=60.0 | Flecha=None
 
 [13] CODIGO: 121
-    ULTIMO REGISTRO: 2025-12-04 06:14:32
-    OPERADOR: ale | ROL: None
+    FECHA: 2025-12-04 06:14:32
+    OPERADOR: ale | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=170.0 | CE=60.0 | Flecha=None
 
 [14] CODIGO: 70
-    ULTIMO REGISTRO: 2025-12-04 05:37:09
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-04 05:37:09
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=170.0 | CE=60.0 | Flecha=None
 
 [15] CODIGO: 256
-    ULTIMO REGISTRO: 2025-12-03 22:33:30
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 22:33:30
+    OPERADOR: Felipe | ROL: N/A
     MODO: rematador | BOX: b1
 
 [16] CODIGO: 254
-    ULTIMO REGISTRO: 2025-12-03 21:56:23
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 21:56:23
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=0.0 | CE=0.0 | Flecha=None
 
 [17] CODIGO: 253
-    ULTIMO REGISTRO: 2025-12-03 21:55:17
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 21:55:17
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=0.0 | CE=0.0 | Flecha=None
 
 [18] CODIGO: 252
-    ULTIMO REGISTRO: 2025-12-03 21:53:57
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 21:53:57
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=0.0 | CE=0.0 | Flecha=None
 
 [19] CODIGO: 251
-    ULTIMO REGISTRO: 2025-12-03 21:51:26
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 21:51:26
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=0.0 | CE=0.0 | Flecha=None
 
 [20] CODIGO: 64
-    ULTIMO REGISTRO: 2025-12-03 20:43:33
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 20:43:33
+    OPERADOR: Felipe | ROL: N/A
     MODO: rematador | BOX: b1
 
 [21] CODIGO: 62
-    ULTIMO REGISTRO: 2025-12-03 20:32:19
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 20:32:19
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=170.0 | CE=0.0 | Flecha=None
 
 [22] CODIGO: 61
-    ULTIMO REGISTRO: 2025-12-03 20:18:46
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 20:18:46
+    OPERADOR: Felipe | ROL: N/A
     MODO: rematador | BOX: b1
 
 [23] CODIGO: 60
-    ULTIMO REGISTRO: 2025-12-03 19:54:03
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 19:54:03
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=170.0 | CE=0.0 | Flecha=None
 
 [24] CODIGO: 58
-    ULTIMO REGISTRO: 2025-12-03 19:37:37
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 19:37:37
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=170.0 | CE=0.0 | Flecha=None
 
 [25] CODIGO: 56
-    ULTIMO REGISTRO: 2025-12-03 16:58:04
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 16:58:04
+    OPERADOR: Felipe | ROL: N/A
     MODO: rematador | BOX: b1
     MEDIDAS - CI= | CE= | Flecha=None
 
 [26] CODIGO: 57
-    ULTIMO REGISTRO: 2025-12-03 16:44:01
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 16:44:01
+    OPERADOR: Felipe | ROL: N/A
     MODO: rematador | BOX: b1
 
 [27] CODIGO: 200
-    ULTIMO REGISTRO: 2025-12-03 16:09:21
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 16:09:21
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=170.0 | CE=0.0 | Flecha=None
 
 [28] CODIGO: 36
-    ULTIMO REGISTRO: 2025-12-03 15:56:24
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 15:56:24
+    OPERADOR: Felipe | ROL: N/A
     MODO: rematador | BOX: b1
 
 [29] CODIGO: 35
-    ULTIMO REGISTRO: 2025-12-03 14:49:39
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 14:49:39
+    OPERADOR: Felipe | ROL: N/A
     MODO: armador | BOX: b1
     MEDIDAS - CI=170.0 | CE=0.0 | Flecha=None
 
 [30] CODIGO: 34
-    ULTIMO REGISTRO: 2025-12-03 14:30:47
-    OPERADOR: Felipe | ROL: None
+    FECHA: 2025-12-03 14:30:47
+    OPERADOR: Felipe | ROL: N/A
     MODO: rematador | BOX: b1
+
+[31] CODIGO: 98
+    FECHA: 2025-12-03 14:02:45
+    OPERADOR: Felipe | ROL: N/A
+    MODO: armador | BOX: b1
+    MEDIDAS - CI=179.0 | CE=0.0 | Flecha=None
+
+[32] CODIGO: 101
+    FECHA: 2025-12-03 04:14:31
+    OPERADOR: Felipe | ROL: N/A
+    MODO: rematador | BOX: b1
+    MEDIDAS - CI=170 | CE=180 | Flecha=None
+
+[33] CODIGO: 2
+    FECHA: 2025-11-25 00:00:26
+    OPERADOR: maria | ROL: N/A
+    MODO: armador | BOX: b1
 
 ==========================================================================================
 RESUMEN FINAL
 ==========================================================================================
-Total codigos borrados detectados (recuperables): 39
-  - En produccion ACTIVA (mas probables/recientes): 6
-  - En produccion HISTORICA (cortes anteriores): 33
+TOTAL CODIGOS BORRADOS DETECTADOS (RECUPERABLES): 39
+  - Produccion activa (recientes): 6
+  - Produccion historica: 33
 
-[PASO SIGUIENTE] Mira el listado de arriba y localiza el codigo.
-Una vez identificado, podemos:
-  A) Reinsertarlo AUTOMATICAMENTE en db.piezas con todos sus datos.
-  B) Generar un script SQL/Mongo especifico para copiar y pegar.
-Indica cual es el CODIGO que necesitas recuperar.
+[PASO FINAL] - Identifica el codigo en el listado y dime su nombre.
+Yo genero el comando MongoDB para reinsertarlo AUTOMATICAMENTE en db.piezas,
+con todos sus datos: codigo, medidas, estado, operador, etc.

@@ -1,0 +1,71 @@
+==========================================================================================
+RESTAURAR REGISTRO DE PRODUCCION BORRADO PARA CODIGO: j102
+Generado: 2026-08-22 13:52:56
+Modo: RESTAURACION CONFIRMADA
+Modo forzado operacion: (auto detect)
+Usuario forzado: (auto detect)
+==========================================================================================
+[OK] Conectado a MongoDB
+
+[PASO 1] Verificando que el codigo 'j102' EXISTA en db.piezas...
+  [OK] Pieza maestra encontrada en db.piezas. ID: 6a89e12cff3c6c7d18c9d4b6
+    - Estado              : Sin Produccion
+    - Box                 : b1
+    - Fecha creacion      : 2026-02-28 04:25:45
+    - Operador asignado   : ale
+
+[PASO 2] Buscando registros de producción ACTIVOS existentes para 'j102'...
+  Registros ACTIVOS (produccion) encontrados: 1
+
+[PASO 3] Buscando registros de producción HISTÓRICOS para 'j102'...
+  Registros HISTORICOS encontrados: 0
+
+  [INFO] Usando el REGISTRO ACTIVO MAS RECIENTE como plantilla (duplicado).
+  Fuente plantilla usada: produccion_activa_existente
+
+[PASO 4] Detectando OPERADOR/USUARIO del registro...
+  [OK] Usuario recuperado desde plantilla historica: ale
+
+[PASO 5] Detectando MODO (armador / rematador)...
+  [OK] Modo detectado desde plantilla: armador
+
+[PASO 6] Calculando precio unitario (si es posible)...
+  [OK] Precio unitario calculado: $0.0 (tipo_precio=avo)
+
+==========================================================================================
+DOCUMENTO QUE SERA INSERTADO EN db.produccion:
+==========================================================================================
+{ 'box': 'b1',
+  'calidad_status': 'pendiente',
+  'codigo_pieza': 'j102',
+  'cuerda_externa': 1.0,
+  'cuerda_interna': 1.0,
+  'empresa': 'avo',
+  'fecha': '2026-02-28T04:25:38Z',
+  'fecha_restauracion_registro': '2026-08-22T17:52:56Z',
+  'kilo_pieza': 20.0,
+  'marco': 'th1',
+  'modo': 'armador',
+  'observacion_restauracion': 'Registro de produccion restaurado automaticamente desde produccion_activa_existente. '
+                              'Codigo pieza: j102. Modo: armador.',
+  'precio_unitario': 0.0,
+  'restaurado_registro_desde': 'produccion_activa_existente',
+  'tipo_precio': 'avo',
+  'tramo': 't1',
+  'user_id': "ObjectId('693126a3903879eba1909ea4')",
+  'usuario': 'ale'}
+
+------------------------------------------------------------------------------------------
+[MODO CONFIRMAR] Insertando registro en db.produccion ...
+
+[EXITO] REGISTRO DE PRODUCCION RESTAURADO!
+  Nuevo ID Mongo en produccion: 6a89e1f85ceebf667cf0687c
+  Codigo pieza: j102
+  Operador: ale
+  Modo: armador
+  Fecha: 2026-02-28 04:25:38.946000
+
+  Ahora deberias ver el registro en:
+    - Panel Soporte -> 'Gestion de Produccion'
+    - Panel Admin -> 'Produccion (Admin)'
+    - Reportes de operador y cierre mensual
