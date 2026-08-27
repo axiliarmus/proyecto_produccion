@@ -1,107 +1,140 @@
-{% extends 'base.html' %}
+{% extends 'admin_layout.html' %}
 {% block title %}Usuarios Archivados{% endblock %}
+{% block header_title %}Usuarios Archivados{% endblock %}
+{% block header_subtitle %}Edición de datos históricos de operadores en cortes cerrados{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Usuarios Archivados</h2>
-    <a href="{{ url_for('soporte_dashboard') }}" class="btn btn-secondary">← Volver</a>
-</div>
 
-<div class="card mb-4">
-    <div class="card-body">
-        <form method="GET" class="row g-3 align-items-end">
-            <div class="col-md-6">
-                <label class="form-label">Seleccione Corte (Mes/Rango)</label>
-                <select name="corte_id" class="form-select" onchange="this.form.submit()">
-                    <option value="">-- Seleccione --</option>
-                    {% for c in cortes %}
-                        <option value="{{ c._id }}" {% if c._id|string == corte_sel %}selected{% endif %}>
-                            {{ c.nombre }} ({{ c.inicio.strftime('%d/%m/%Y') }} - {{ c.fin.strftime('%d/%m/%Y') }})
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-        </form>
-    </div>
+<div class="admin-card mb-4">
+    <form method="GET" class="row g-3 align-items-end">
+        <div class="col-md-6">
+            <label class="form-label text-secondary small">Seleccione Corte (Mes/Rango)</label>
+            <select name="corte_id" class="form-select bg-dark text-light border-secondary" onchange="this.form.submit()">
+                <option value="">-- Seleccione --</option>
+                {% for c in cortes %}
+                    <option value="{{ c._id }}" {% if c._id|string == corte_sel %}selected{% endif %}>
+                        {{ c.nombre }} ({{ c.inicio.strftime('%d/%m/%Y') }} - {{ c.fin.strftime('%d/%m/%Y') }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-6 d-flex justify-content-end gap-2">
+            <a href="{{ url_for('soporte_dashboard') }}" class="btn btn-outline-secondary">
+                <i class='bx bx-arrow-back'></i> Panel Soporte
+            </a>
+            <a href="{{ url_for('admin_archivados_menu') }}" class="btn btn-outline-primary">
+                <i class='bx bxs-folder-open'></i> Menú Cortes
+            </a>
+        </div>
+    </form>
 </div>
 
 {% if usuarios %}
-<div class="table-responsive">
-    <table class="table table-dark table-striped table-hover">
-        <thead>
-            <tr>
-                <th>Usuario</th>
-                <th>Rol</th>
-                <th>$ Metro Armado</th>
-                <th>$ Metro Remate</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for u in usuarios %}
-            <tr>
-                <td>{{ u.usuario }}</td>
-                <td>{{ u.rol }}</td>
-                <td>{{ u.precio_metro_armado }}</td>
-                <td>{{ u.precio_metro_remate }}</td>
-                <td>
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editUserModal{{ loop.index }}">
-                        Editar
-                    </button>
+<div class="admin-card">
+    <div class="table-responsive">
+        <table class="table table-dark table-striped table-hover align-middle mb-0">
+            <thead>
+                <tr class="text-secondary small">
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th class="text-end">$ Metro Armado</th>
+                    <th class="text-end">$ Metro Remate</th>
+                    <th class="text-end">$ Avo Armado</th>
+                    <th class="text-end">$ Avo Remate</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in usuarios %}
+                <tr>
+                    <td class="fw-bold text-white">{{ u.usuario }}</td>
+                    <td>
+                        {% if u.rol == 'administrador' %}
+                        <span class="badge bg-danger">{{ u.rol }}</span>
+                        {% elif u.rol == 'soporte' %}
+                        <span class="badge bg-info text-dark">{{ u.rol }}</span>
+                        {% elif u.rol == 'supervisor' %}
+                        <span class="badge bg-warning text-dark">{{ u.rol }}</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ u.rol }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">{{ u.precio_metro_armado or '-' }}</td>
+                    <td class="text-end">{{ u.precio_metro_remate or '-' }}</td>
+                    <td class="text-end">{{ u.precio_avo_armado or '-' }}</td>
+                    <td class="text-end">{{ u.precio_avo_remate or '-' }}</td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editUserModal{{ loop.index }}">
+                            <i class='bx bx-edit-alt'></i> Editar
+                        </button>
 
-                    <!-- Modal Edición -->
-                    <div class="modal fade" id="editUserModal{{ loop.index }}" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content bg-dark text-light">
-                                <form method="POST" action="{{ url_for('soporte_archivados_usuarios_editar') }}">
-                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-                                    <input type="hidden" name="user_id" value="{{ u._id }}">
-                                    <input type="hidden" name="corte_id" value="{{ corte_sel }}">
-                                    <input type="hidden" name="page" value="{{ pagination.page if pagination else 1 }}">
-                                    
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Editar Usuario Histórico</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body text-start">
-                                        <div class="mb-3">
-                                            <label class="form-label">Usuario</label>
-                                            <input type="text" class="form-control" value="{{ u.usuario }}" disabled>
+                        <div class="modal fade" id="editUserModal{{ loop.index }}" tabindex="-1" aria-labelledby="editUserModal{{ loop.index }}Label" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content bg-dark text-light border border-secondary">
+                                    <form method="POST" action="{{ url_for('soporte_archivados_usuarios_editar') }}">
+                                        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                        <input type="hidden" name="user_id" value="{{ u._id }}">
+                                        <input type="hidden" name="corte_id" value="{{ corte_sel }}">
+                                        <input type="hidden" name="page" value="{{ pagination.page if pagination else 1 }}">
+
+                                        <div class="modal-header border-bottom border-secondary">
+                                            <h5 class="modal-title" id="editUserModal{{ loop.index }}Label">
+                                                <i class='bx bx-edit-alt me-2'></i>Editar Usuario Histórico
+                                            </h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                         </div>
-                                        <div class="row">
-                                            <div class="col-6 mb-3">
-                                                <label class="form-label">$ Metro Armado</label>
-                                                <input type="number" step="0.01" name="precio_metro_armado" class="form-control" value="{{ u.precio_metro_armado }}">
+                                        <div class="modal-body text-start">
+                                            <div class="mb-3">
+                                                <label class="form-label text-secondary small">Usuario</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary" value="{{ u.usuario }}" disabled>
                                             </div>
-                                            <div class="col-6 mb-3">
-                                                <label class="form-label">$ Metro Remate</label>
-                                                <input type="number" step="0.01" name="precio_metro_remate" class="form-control" value="{{ u.precio_metro_remate }}">
-                                            </div>
-                                            <div class="col-6 mb-3">
-                                                <label class="form-label">$ Avo Armado</label>
-                                                <input type="number" step="0.01" name="precio_avo_armado" class="form-control" value="{{ u.precio_avo_armado }}">
-                                            </div>
-                                            <div class="col-6 mb-3">
-                                                <label class="form-label">$ Avo Remate</label>
-                                                <input type="number" step="0.01" name="precio_avo_remate" class="form-control" value="{{ u.precio_avo_remate }}">
+                                            <div class="row">
+                                                <div class="col-6 mb-3">
+                                                    <label class="form-label text-secondary small">$ Metro Armado</label>
+                                                    <input type="number" step="0.01" name="precio_metro_armado" class="form-control bg-dark text-light border-secondary" value="{{ u.precio_metro_armado }}">
+                                                </div>
+                                                <div class="col-6 mb-3">
+                                                    <label class="form-label text-secondary small">$ Metro Remate</label>
+                                                    <input type="number" step="0.01" name="precio_metro_remate" class="form-control bg-dark text-light border-secondary" value="{{ u.precio_metro_remate }}">
+                                                </div>
+                                                <div class="col-6 mb-3">
+                                                    <label class="form-label text-secondary small">$ Avo Armado</label>
+                                                    <input type="number" step="0.01" name="precio_avo_armado" class="form-control bg-dark text-light border-secondary" value="{{ u.precio_avo_armado }}">
+                                                </div>
+                                                <div class="col-6 mb-3">
+                                                    <label class="form-label text-secondary small">$ Avo Remate</label>
+                                                    <input type="number" step="0.01" name="precio_avo_remate" class="form-control bg-dark text-light border-secondary" value="{{ u.precio_avo_remate }}">
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-success">Guardar Cambios</button>
-                                    </div>
-                                </form>
+                                        <div class="modal-footer border-top border-secondary">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-accent">
+                                                <i class='bx bx-save'></i> Guardar Cambios
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include '_pagination.html' %}
 </div>
-{% include '_pagination.html' %}
+{% elif corte_sel %}
+<div class="admin-card text-center py-5">
+    <div class="mb-3 text-secondary display-6"><i class='bx bxs-user-circle'></i></div>
+    <p class="text-secondary mb-0">No hay usuarios en este corte.</p>
+</div>
+{% else %}
+<div class="admin-card text-center py-5">
+    <div class="mb-3 text-secondary display-6"><i class='bx bxs-folder-open'></i></div>
+    <p class="text-secondary mb-0">Selecciona un corte para visualizar los usuarios históricos.</p>
+</div>
 {% endif %}
 
 {% endblock %}

@@ -4,7 +4,9 @@ import time
 import urllib.request
 
 from bson import ObjectId
-from flask import flash, redirect, render_template, request, url_for
+from flask import flash, redirect, render_template, request, session, url_for
+
+from core.helpers.soft_delete import soft_delete_one, soft_delete_many
 
 
 # #region debug-point helpers:piece-master-measures
@@ -89,7 +91,53 @@ def register_soporte_basic_routes(
     @app.route("/soporte")
     @login_required("soporte")
     def soporte_dashboard():
-        return render_template("soporte_dashboard.html")
+        from datetime import datetime, timedelta, timezone
+        from core.helpers.date_utils import CL, now_cl
+
+        total_piezas = db.piezas.count_documents({})
+        total_produccion = db.produccion.count_documents({})
+        total_usuarios = db.usuarios.count_documents({})
+
+        # Duplicados (rápido):
+        pipeline_dup = [
+            {"$match": {"codigo": {"$ne": None}}},
+            {"$group": {"_id": "$codigo", "count": {"$sum": 1}}},
+            {"$match": {"count": {"$gt": 1}}},
+            {"$count": "cantidad"},
+        ]
+        dup_result = list(db.piezas.aggregate(pipeline_dup, allowDiskUse=True))
+        total_duplicados = dup_result[0]["cantidad"] if dup_result else 0
+
+        # Papelera:
+        from core.helpers.soft_delete import COLLECTION_PAPELERA
+        total_papelera = db[COLLECTION_PAPELERA].count_documents({})
+
+        # Producción HOY:
+        today = now_cl().date()
+        start_today = datetime.combine(today, datetime.min.time()).replace(tzinfo=CL)
+        end_today = datetime.combine(today, datetime.max.time()).replace(tzinfo=CL)
+        prod_hoy = list(db.produccion.find(
+            {"fecha": {"$gte": start_today.astimezone(timezone.utc), "$lte": end_today.astimezone(timezone.utc)}},
+            {"kilo_pieza": 1, "tipo_precio": 1, "_id": 0},
+        ))
+        kilos_hoy = {"avo": 0.0, "metro": 0.0}
+        for r in prod_hoy:
+            p = float(r.get("kilo_pieza") or 0)
+            t = r.get("tipo_precio") or "metro"
+            if t == "avo":
+                kilos_hoy["avo"] += p
+            else:
+                kilos_hoy["metro"] += p
+
+        return render_template(
+            "soporte_dashboard.html",
+            total_piezas=total_piezas,
+            total_produccion=total_produccion,
+            total_usuarios=total_usuarios,
+            total_duplicados=total_duplicados,
+            total_papelera=total_papelera,
+            kilos_hoy=kilos_hoy,
+        )
 
     @app.route("/soporte/piezas/duplicadas", methods=["GET", "POST"])
     @login_required("soporte")
@@ -134,8 +182,16 @@ def register_soporte_basic_routes(
     @login_required("soporte")
     def soporte_eliminar_duplicado(id_pieza):
         try:
-            db.piezas.delete_one({"_id": ObjectId(id_pieza)})
-            flash("Pieza duplicada eliminada correctamente.", "success")
+            ok, msg = soft_delete_one(
+                db,
+                collection_origen="piezas",
+                filtro_doc={"_id": ObjectId(id_pieza)},
+                deleted_by_user_id=session.get("user_id"),
+                deleted_by_user_name=session.get("nombre"),
+                deleted_by_ip=request.remote_addr,
+                motivo="soporte eliminar pieza duplicada",
+            )
+            flash(msg, "success" if ok else "danger")
         except Exception as exc:
             flash(f"Error al eliminar: {str(exc)}", "danger")
         return redirect(url_for("soporte_piezas_duplicadas"))
@@ -234,8 +290,16 @@ def register_soporte_basic_routes(
 
         try:
             object_ids = [ObjectId(uid) for uid in ids_to_delete]
-            result = db.piezas.delete_many({"_id": {"$in": object_ids}})
-            flash(f"✅ Se eliminaron {result.deleted_count} piezas correctamente.", "success")
+            cantidad, msg = soft_delete_many(
+                db,
+                collection_origen="piezas",
+                filtro_doc={"_id": {"$in": object_ids}},
+                deleted_by_user_id=session.get("user_id"),
+                deleted_by_user_name=session.get("nombre"),
+                deleted_by_ip=request.remote_addr,
+                motivo="soporte eliminación masiva piezas",
+            )
+            flash(msg, "success" if cantidad > 0 else "danger")
         except Exception as exc:
             flash(f"Error al eliminar piezas: {str(exc)}", "danger")
 

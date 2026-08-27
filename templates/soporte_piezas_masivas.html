@@ -2,49 +2,51 @@
 
 {% block title %}Gestión Masiva de Piezas{% endblock %}
 {% block header_title %}Gestión Masiva de Piezas{% endblock %}
-{% block header_subtitle %}Eliminación y consulta de piezas en bloque{% endblock %}
+{% block header_subtitle %}Búsqueda, filtrado y eliminación en bloque con papelera de 7 días{% endblock %}
 
 {% block content %}
 
-<div class="card bg-dark border-light shadow mb-4">
-    <div class="card-body">
-        <form method="POST" class="row g-3">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-            <div class="col-md-6">
-                <label class="form-label text-secondary small">Buscar</label>
-                <input type="text" name="search" class="form-control bg-dark text-light border-secondary" 
-                       placeholder="Código, cliente o marco..." 
-                       value="{{ search }}">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label text-secondary small">Estado</label>
-                <select name="estado" class="form-select bg-dark text-light border-secondary">
-                    <option value="todos" {% if estado_sel == 'todos' %}selected{% endif %}>Todos los estados</option>
-                    <option value="Sin producción" {% if estado_sel == 'Sin producción' %}selected{% endif %}>Sin producción</option>
-                    <option value="Armado" {% if estado_sel == 'Armado' %}selected{% endif %}>Armado</option>
-                    <option value="Rematado" {% if estado_sel == 'Rematado' %}selected{% endif %}>Rematado</option>
-                </select>
-            </div>
-            <div class="col-md-3 d-flex align-items-end">
-                <button class="btn btn-accent w-100">
-                    <i class='bx bx-search'></i> Buscar
-                </button>
-            </div>
-        </form>
-    </div>
+<div class="admin-card mb-4">
+    <form method="POST" class="row g-3">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <div class="col-md-6">
+            <label class="form-label text-secondary small">Buscar</label>
+            <input type="text" name="search" class="form-control bg-dark text-light border-secondary"
+                   placeholder="Código, cliente o marco..."
+                   value="{{ search }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label text-secondary small">Estado</label>
+            <select name="estado" class="form-select bg-dark text-light border-secondary">
+                <option value="todos" {% if estado_sel == 'todos' %}selected{% endif %}>Todos los estados</option>
+                <option value="Sin producción" {% if estado_sel == 'Sin producción' %}selected{% endif %}>Sin producción</option>
+                <option value="Armado" {% if estado_sel == 'Armado' %}selected{% endif %}>Armado</option>
+                <option value="Rematado" {% if estado_sel == 'Rematado' %}selected{% endif %}>Rematado</option>
+            </select>
+        </div>
+        <div class="col-md-3 d-flex align-items-end gap-2">
+            <button class="btn btn-accent flex-grow-1">
+                <i class='bx bx-search'></i> Buscar
+            </button>
+            <a href="{{ url_for('papelera_list') }}" class="btn btn-outline-secondary" title="Ver Papelera">
+                <i class='bx bxs-trash-alt'></i>
+            </a>
+        </div>
+    </form>
 </div>
 
 <form method="POST" action="{{ url_for('soporte_eliminar_masivo') }}" id="deleteForm">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-    
+
     {% if piezas %}
-    <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-dark border border-secondary rounded">
+    <div class="d-flex justify-content-between align-items-center mb-3 p-3 admin-card">
         <div class="text-light">
             <i class='bx bx-check-square text-accent'></i>
             <span id="selectedCount" class="fw-bold mx-1">0</span> piezas seleccionadas
+            <span class="text-secondary ms-3 small">(Total: {{ total_registros }})</span>
         </div>
-        <button type="submit" class="btn btn-danger" id="btnDelete" disabled onclick="return confirm('¿Estás SEGURO de eliminar las piezas seleccionadas? Esta acción NO se puede deshacer.')">
-            <i class='bx bx-trash'></i> Eliminar Seleccionadas
+        <button type="submit" class="btn btn-danger" id="btnDelete" disabled onclick="return confirm('¿Estás SEGURO? Las piezas seleccionadas se moverán a la PAPELERA durante 7 días antes de eliminarse permanentemente.')">
+            <i class='bx bxs-trash'></i> Mover a Papelera
         </button>
     </div>
 
@@ -73,9 +75,9 @@
                             <input type="checkbox" name="ids[]" value="{{ p._id }}" class="form-check-input item-check">
                         </td>
                         <td class="fw-bold text-white">{{ p.codigo }}</td>
-                        <td>{{ p.empresa }}</td>
-                        <td>{{ p.marco }}</td>
-                        <td>{{ p.tramo }}</td>
+                        <td>{{ p.empresa or '-' }}</td>
+                        <td>{{ p.marco or '-' }}</td>
+                        <td>{{ p.tramo or '-' }}</td>
                         <td>
                             {% if p.estado_prod == 'Rematado' %}
                                 <span class="badge badge-soft text-success">Rematado</span>
@@ -102,8 +104,9 @@
         {% include '_pagination.html' %}
     </div>
     {% else %}
-    <div class="alert alert-secondary text-center">
-        No se encontraron piezas. Intenta realizar una búsqueda.
+    <div class="admin-card text-center py-5">
+        <div class="mb-3 text-secondary display-6"><i class='bx bxs-extension'></i></div>
+        <p class="text-secondary mb-0">No se encontraron piezas. Intenta realizar una búsqueda.</p>
     </div>
     {% endif %}
 </form>

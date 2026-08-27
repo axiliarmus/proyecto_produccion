@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 
 from bson import ObjectId
-from flask import flash, redirect, render_template, request, url_for
+from flask import flash, redirect, render_template, request, session, url_for
 
 from core.helpers.date_utils import CL, to_cl
+from core.helpers.soft_delete import soft_delete_one
 
 
 def register_soporte_produccion_routes(app, db, login_required):
@@ -165,6 +166,14 @@ def register_soporte_produccion_routes(app, db, login_required):
     @app.route("/soporte/produccion/<id>/delete", methods=["POST"])
     @login_required("soporte")
     def soporte_produccion_delete(id):
-        db.produccion.delete_one({"_id": ObjectId(id)})
-        flash("Registro eliminado", "info")
+        ok, msg = soft_delete_one(
+            db,
+            collection_origen="produccion",
+            filtro_doc={"_id": ObjectId(id)},
+            deleted_by_user_id=session.get("user_id"),
+            deleted_by_user_name=session.get("nombre"),
+            deleted_by_ip=request.remote_addr,
+            motivo="soporte botón eliminar registro producción",
+        )
+        flash(msg, "success" if ok else "danger")
         return redirect(url_for("soporte_produccion_list"))

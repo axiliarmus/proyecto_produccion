@@ -206,6 +206,7 @@ def register_admin_dashboard_routes(app, db, login_required):
 
                 db.produccion.delete_many(filtro)
                 db.piezas.delete_many({})
+                db.planificaciones.delete_many({})
 
                 conf = db.config.find_one({"key": "ciclo_actual"}) or {"key": "ciclo_actual", "value": "a"}
                 letra = conf.get("value", "a")

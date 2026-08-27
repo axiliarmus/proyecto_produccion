@@ -17,10 +17,13 @@ from core.routes.admin_dashboard_routes import register_admin_dashboard_routes
 from core.routes.admin_informes_avanzados_routes import register_admin_informes_avanzados_routes
 from core.routes.admin_informes_operacion_routes import register_admin_informes_operacion_routes
 from core.routes.admin_informes_routes import register_admin_informes_routes
+from core.routes.admin_planificacion_routes import register_admin_planificacion_routes
 from core.routes.admin_produccion_routes import register_admin_produccion_routes
 from core.routes.admin_tools_routes import register_admin_tools_routes
 from core.routes.auth_routes import register_auth_routes
 from core.routes.operator_routes import register_operator_routes
+from core.helpers.soft_delete import init_recycle_bin_indexes
+from core.routes.recycle_bin_routes import register_recycle_bin_routes
 from core.routes.soporte_archivados_routes import register_soporte_archivados_routes
 from core.routes.soporte_basic_routes import register_soporte_basic_routes
 from core.routes.soporte_produccion_routes import register_soporte_produccion_routes
@@ -51,6 +54,13 @@ def register_all_routes(app, db, runtime_state, log_audit):
         DEFAULT_PER_PAGE,
     )
     register_admin_informes_routes(
+        app,
+        db,
+        login_required,
+        reporting_helpers.get_production_status_map,
+        reporting_helpers.build_tarjetas_grupos,
+    )
+    register_admin_planificacion_routes(
         app,
         db,
         login_required,
@@ -133,3 +143,7 @@ def register_all_routes(app, db, runtime_state, log_audit):
     )
     register_soporte_produccion_routes(app, db, login_required)
     register_supervisor_routes(app, db, login_required, _normalize_page, paginate_list)
+
+    # Papelera de reciclaje (7 días de retención)
+    init_recycle_bin_indexes(db)
+    register_recycle_bin_routes(app, db, login_required, _normalize_page, paginate_list)

@@ -1,0 +1,271 @@
+{% extends 'admin_layout.html' %}
+{% block title %}Papelera de Reciclaje{% endblock %}
+{% block header_title %}🗑️ Papelera de Reciclaje{% endblock %}
+{% block header_subtitle %}Documentos eliminados - retención {{ days_retain }} días - luego se borran permanentemente{% endblock %}
+
+{% block content %}
+<!-- Stats rápidos -->
+<div class="row g-4 mb-5">
+    <div class="col-md-3">
+        <div class="admin-card stat-card">
+            <div class="stat-icon bg-danger-subtle text-danger">
+                <i class='bx bxs-trash'></i>
+            </div>
+            <div>
+                <div class="stat-title">Total Papelera</div>
+                <div class="stat-value">{{ total_en_papelera }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="admin-card stat-card">
+            <div class="stat-icon bg-warning-subtle text-warning">
+                <i class='bx bxs-extension'></i>
+            </div>
+            <div>
+                <div class="stat-title">Piezas Eliminadas</div>
+                <div class="stat-value">{{ categorias_counts.get('piezas', 0) }}</div>
+            </div>
+            <a href="{{ url_for('papelera_list', tipo='piezas') }}" class="stretched-link"></a>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="admin-card stat-card">
+            <div class="stat-icon bg-info-subtle text-info">
+                <i class='bx bx-wrench'></i>
+            </div>
+            <div>
+                <div class="stat-title">Producción Eliminada</div>
+                <div class="stat-value">{{ categorias_counts.get('produccion', 0) }}</div>
+            </div>
+            <a href="{{ url_for('papelera_list', tipo='produccion') }}" class="stretched-link"></a>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="admin-card stat-card">
+            <div class="stat-icon bg-secondary-subtle text-secondary">
+                <i class='bx bxs-user-group'></i>
+            </div>
+            <div>
+                <div class="stat-title">Usuarios/Boxes</div>
+                <div class="stat-value">{{ categorias_counts.get('usuarios', 0) + categorias_counts.get('boxes', 0) }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros y acciones -->
+<div class="admin-card mb-4">
+    <form method="post" action="{{ url_for('papelera_list') }}" class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label text-light small">Tipo de Documento</label>
+            <select name="tipo" class="form-select bg-dark text-light border-secondary">
+                <option value="todos" {% if tipo_sel == 'todos' %}selected{% endif %}>Todos</option>
+                <option value="piezas" {% if tipo_sel == 'piezas' %}selected{% endif %}>Piezas ({{ categorias_counts.get('piezas', 0) }})</option>
+                <option value="produccion" {% if tipo_sel == 'produccion' %}selected{% endif %}>Producción ({{ categorias_counts.get('produccion', 0) }})</option>
+                <option value="usuarios" {% if tipo_sel == 'usuarios' %}selected{% endif %}>Usuarios ({{ categorias_counts.get('usuarios', 0) }})</option>
+                <option value="boxes" {% if tipo_sel == 'boxes' %}selected{% endif %}>Boxes ({{ categorias_counts.get('boxes', 0) }})</option>
+            </select>
+        </div>
+        <div class="col-md-5">
+            <label class="form-label text-light small">Buscar (código, operador, empresa, IP...)</label>
+            <input type="text" name="search" class="form-control bg-dark text-light border-secondary" placeholder="Ej: i4237, Alexander, AVO, etc." value="{{ search_query }}">
+        </div>
+        <div class="col-md-4 d-flex gap-2">
+            <button type="submit" class="btn btn-accent flex-grow-1">
+                <i class='bx bx-search-alt-2'></i> Filtrar
+            </button>
+            <a href="{{ url_for('papelera_list') }}" class="btn btn-outline-secondary">Limpiar</a>
+            {% if session.get('role') == 'administrador' %}
+            <form method="post" action="{{ url_for('papelera_purgar_expirados') }}" style="display:inline;" onsubmit="return confirm('¿Purgar los documentos expirados ahora? (los no expirados se conservan)');">
+                <button type="submit" class="btn btn-outline-info" title="Purgar documentos que ya pasaron los {{ days_retain }} días">
+                    <i class='bx bx-wind'></i> Purgar Expirados
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Tabla / Listado -->
+<div class="admin-card">
+    {% if not documentos %}
+    <div class="text-center py-5">
+        <div class="display-3 mb-3 text-secondary opacity-50">
+            <i class='bx bx-clean'></i>
+        </div>
+        <h4 class="text-secondary">Papelera Vacía</h4>
+        <p class="text-secondary small mb-0">No hay documentos borrados que mostrar.</p>
+    </div>
+    {% else %}
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Documento</th>
+                    <th>Quién lo borró</th>
+                    <th>Fecha Eliminación</th>
+                    <th>Expira en</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for d in documentos %}
+                <tr>
+                    <td>
+                        {% if d.collection_origen == 'piezas' %}
+                            <span class="badge bg-warning text-dark">
+                                <i class='bx bxs-extension me-1'></i>Pieza
+                            </span>
+                        {% elif d.collection_origen == 'produccion' %}
+                            <span class="badge bg-info text-dark">
+                                <i class='bx bx-wrench me-1'></i>Producción
+                            </span>
+                        {% elif d.collection_origen == 'usuarios' %}
+                            <span class="badge bg-primary">
+                                <i class='bx bxs-user me-1'></i>Usuario
+                            </span>
+                        {% elif d.collection_origen == 'boxes' %}
+                            <span class="badge bg-secondary">
+                                <i class='bx bxs-package me-1'></i>Box
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ d.tipo_documento }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="fw-semibold text-light">{{ d.doc_preview }}</div>
+                        <small class="text-secondary">Origen: {{ d.collection_origen }} · ID orig: {{ d.documento_id_original }}</small>
+                    </td>
+                    <td>
+                        <div class="text-light small">
+                            {{ d.deleted_by_user_name or 'Sistema' }}
+                        </div>
+                        {% if d.deleted_by_ip %}
+                        <small class="text-secondary">IP: {{ d.deleted_by_ip }}</small>
+                        {% endif %}
+                        <div class="small text-secondary">{{ d.motivo }}</div>
+                    </td>
+                    <td>
+                        <span class="text-light small">{{ d.deleted_at_cl.strftime('%d/%m/%Y %H:%M') }}</span>
+                    </td>
+                    <td>
+                        {% if d.restante and 'Expirado' in d.restante %}
+                            <span class="badge bg-danger text-white">{{ d.restante }}</span>
+                        {% else %}
+                            <span class="badge bg-success text-white">
+                                <i class='bx bx-time me-1'></i>{{ d.restante }}
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-info"
+                                    data-bs-toggle="modal" data-bs-target="#detalleModal"
+                                    data-id="{{ d._id }}" title="Ver detalle">
+                                <i class='bx bx-show-alt'></i>
+                            </button>
+                            <form method="post" action="{{ url_for('papelera_restaurar', id=d._id, tipo=tipo_sel, search=search_query) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-success" title="Restaurar" onclick="return confirm('¿Restaurar este documento?');">
+                                    <i class='bx bx-undo me-1'></i>Restaurar
+                                </button>
+                            </form>
+                            {% if session.get('role') == 'administrador' %}
+                            <form method="post" action="{{ url_for('papelera_eliminar_permanente', id=d._id, tipo=tipo_sel, search=search_query) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger" title="Eliminar permanentemente (NO REVERSIBLE)" onclick="return confirm('¿ESTÁS SEGURO? Eliminar permanentemente de la papelera. NO HAY RECUPERACIÓN.');">
+                                    <i class='bx bxs-trash-alt'></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination and pagination.total_pages > 1 %}
+        <div class="mt-4 d-flex justify-content-center">
+            {% include '_pagination.html' %}
+        </div>
+    {% endif %}
+    {% endif %}
+</div>
+
+<!-- Modal Detalle -->
+<div class="modal fade" id="detalleModal" tabindex="-1" aria-labelledby="detalleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content bg-dark border-secondary text-light">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="detalleModalLabel">
+                    <i class='bx bx-detail me-2'></i>Detalle Documento
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="detalleModalBody">
+                <div class="text-center py-4 text-secondary">
+                    <div class="spinner-border mb-2" role="status"></div>
+                    <div>Cargando detalle...</div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const detalleModal = document.getElementById('detalleModal');
+    if (detalleModal) {
+        detalleModal.addEventListener('show.bs.modal', async function(event) {
+            const button = event.relatedTarget;
+            const id = button.getAttribute('data-id');
+            const body = document.getElementById('detalleModalBody');
+
+            body.innerHTML = `
+                <div class="text-center py-4 text-secondary">
+                    <div class="spinner-border mb-2" role="status"></div>
+                    <div>Cargando detalle...</div>
+                </div>
+            `;
+
+            try {
+                const resp = await fetch(`/api/papelera/${encodeURIComponent(id)}`);
+                const data = await resp.json();
+                if (data.error) {
+                    body.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                    return;
+                }
+                body.innerHTML = `
+                    <div class="mb-3">
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <span class="badge bg-accent">${data.tipo_documento || ''}</span>
+                            <span class="badge bg-secondary">Colección: ${data.collection_origen || ''}</span>
+                        </div>
+                        <div class="row small text-secondary">
+                            <div class="col-md-4">📅 Eliminado: ${data.deleted_at_cl || ''}</div>
+                            <div class="col-md-4">⏰ Expira: ${data.expire_at_cl || ''}</div>
+                            <div class="col-md-4">👤 ${data.deleted_by_user_name || 'Sistema'} ${data.deleted_by_ip ? '| IP ' + data.deleted_by_ip : ''}</div>
+                        </div>
+                        ${data.motivo ? `<div class="small mt-1">Motivo: <span class="text-light">${data.motivo}</span></div>` : ''}
+                    </div>
+                    <div class="border-top border-secondary pt-3">
+                        <h6 class="text-accent mb-2">📄 Documento Original (${data.collection_origen})</h6>
+                        <pre class="bg-black text-light p-3 rounded small border border-secondary overflow-auto" style="max-height: 60vh;">${JSON.stringify(data.documento_original, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (err) {
+                body.innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

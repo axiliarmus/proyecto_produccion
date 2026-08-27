@@ -1,0 +1,332 @@
+{% extends 'admin_layout.html' %}
+
+{% block title %}Planificación{% endblock %}
+{% block header_title %}Planificación{% endblock %}
+{% block header_subtitle %}Asignación de piezas por operador (armador / rematador) y control de cupos{% endblock %}
+
+{% block content %}
+
+<div class="admin-card mb-4">
+  <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
+    <div>
+      <div class="text-secondary small">Ciclo actual</div>
+      <div class="fw-bold text-white">{{ ciclo }}</div>
+    </div>
+    <div class="text-secondary small">
+      Selecciona un marco para planificar (se divide por tramo).
+    </div>
+  </div>
+</div>
+
+{% if selected %}
+<div class="admin-card mb-4">
+  <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
+    <div>
+      <div class="text-secondary small">Grupo seleccionado</div>
+      <div class="fw-bold text-white">
+        {{ selected.empresa or 'Sin Cliente' }} · {{ selected.marco or 'Sin Marco' }}
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if session.get('role') == 'administrador' %}
+      <button class="btn btn-accent" data-bs-toggle="modal" data-bs-target="#modalPlanArmador">
+        <i class='bx bxs-hard-hat'></i> Planificar Armador
+      </button>
+      <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#modalPlanRematador">
+        <i class='bx bx-check-shield'></i> Planificar Rematador
+      </button>
+      {% if plan %}
+      <form method="POST" action="{{ url_for('admin_planificacion_eliminar') }}" class="d-inline"
+            onsubmit="return confirm('¿Eliminar esta planificación? La pieza quedará liberada para todos.')">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="empresa" value="{{ selected.empresa }}">
+        <input type="hidden" name="marco" value="{{ selected.marco }}">
+        <button class="btn btn-danger" type="submit">
+          <i class='bx bxs-trash'></i>
+        </button>
+      </form>
+      {% endif %}
+      {% else %}
+      <span class="badge badge-soft">Vista de solo lectura</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if session.get('role') == 'administrador' %}
+<div class="modal fade" id="modalPlanArmador" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content bg-dark text-light border border-secondary">
+      <form method="POST" action="{{ url_for('admin_planificacion_crear') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="modo" value="armador">
+        <input type="hidden" name="empresa" value="{{ selected.empresa }}">
+        <input type="hidden" name="marco" value="{{ selected.marco }}">
+
+        <div class="modal-header border-bottom border-secondary">
+          <h5 class="modal-title">
+            <i class='bx bxs-hard-hat me-2'></i>Planificar Armador
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label text-secondary small">Operadores</label>
+              <div class="border border-secondary rounded p-2" style="max-height: 320px; overflow:auto;">
+                {% for op in operadores %}
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="operadores[]" value="{{ op._id }}"
+                         id="opA{{ op._id }}"
+                         {% if plan and (op._id in operador_ids_armador) %}checked{% endif %}>
+                  <label class="form-check-label" for="opA{{ op._id }}">
+                    {{ op.nombre or op.usuario }}
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
+              <div class="text-secondary small mt-2">
+                Cada tramo se divide automáticamente entre los operadores seleccionados.
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-secondary small">Tramos (faltan armar)</label>
+              <div class="border border-secondary rounded p-2" style="max-height: 320px; overflow:auto;">
+                {% for t in tramos_info %}
+                <div class="d-flex justify-content-between small">
+                  <span class="text-secondary">{{ t.tramo }}</span>
+                  <span class="text-white fw-bold">{{ t.faltan_arm }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-top border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-accent">
+            <i class='bx bx-save'></i> Guardar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalPlanRematador" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content bg-dark text-light border border-secondary">
+      <form method="POST" action="{{ url_for('admin_planificacion_crear') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="modo" value="rematador">
+        <input type="hidden" name="empresa" value="{{ selected.empresa }}">
+        <input type="hidden" name="marco" value="{{ selected.marco }}">
+
+        <div class="modal-header border-bottom border-secondary">
+          <h5 class="modal-title">
+            <i class='bx bx-check-shield me-2'></i>Planificar Rematador
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label text-secondary small">Operadores</label>
+              <div class="border border-secondary rounded p-2" style="max-height: 320px; overflow:auto;">
+                {% for op in operadores %}
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="operadores[]" value="{{ op._id }}"
+                         id="opR{{ op._id }}"
+                         {% if plan and (op._id in operador_ids_rematador) %}checked{% endif %}>
+                  <label class="form-check-label" for="opR{{ op._id }}">
+                    {{ op.nombre or op.usuario }}
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
+              <div class="text-secondary small mt-2">
+                Cada tramo se divide automáticamente entre los operadores seleccionados.
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-secondary small">Tramos (faltan rematar)</label>
+              <div class="border border-secondary rounded p-2" style="max-height: 320px; overflow:auto;">
+                {% for t in tramos_info %}
+                <div class="d-flex justify-content-between small">
+                  <span class="text-secondary">{{ t.tramo }}</span>
+                  <span class="text-white fw-bold">{{ t.faltan_rem }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-top border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-accent">
+            <i class='bx bx-save'></i> Guardar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if plan %}
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="admin-card h-100">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="text-white mb-0"><i class='bx bxs-hard-hat me-2'></i>Armador</h5>
+        <span class="badge badge-soft">Total: {{ plan.modos.armador.total if plan.modos and plan.modos.armador else 0 }}</span>
+      </div>
+
+      {% if plan.modos and plan.modos.armador and plan.modos.armador.tramos and plan.modos.armador.tramos|length > 0 %}
+        {% for tramo_key, tramo_doc in plan.modos.armador.tramos.items() %}
+          <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+            <div class="text-secondary small">Tramo {{ tramo_key }}</div>
+            <span class="badge badge-soft">Total: {{ tramo_doc.total }}</span>
+          </div>
+          <div class="row g-3">
+            {% for a in tramo_doc.asignaciones %}
+            <div class="col-md-6">
+              <div class="card bg-dark border-secondary h-100">
+                <div class="card-body">
+                  <div class="fw-bold text-white">{{ a.user_name }}</div>
+                  <div class="text-secondary small mb-2">{{ selected.marco }} · {{ tramo_key }}</div>
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div class="small text-secondary">Producidas</div>
+                    <div class="fw-bold text-white">{{ a.producido or 0 }} / {{ a.objetivo or 0 }}</div>
+                  </div>
+
+                  {% if session.get('role') == 'administrador' %}
+                  <form method="POST" action="{{ url_for('admin_planificacion_ajustar') }}" class="mt-3 d-flex gap-2">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="plan_id" value="{{ plan._id }}">
+                    <input type="hidden" name="modo" value="armador">
+                    <input type="hidden" name="tramo" value="{{ tramo_key }}">
+                    <input type="hidden" name="user_id" value="{{ a.user_id }}">
+                    <input type="number" min="{{ a.producido or 0 }}" name="objetivo" class="form-control form-control-sm bg-dark text-light border-secondary" value="{{ a.objetivo or 0 }}">
+                    <button class="btn btn-sm btn-outline-light" type="submit">Ajustar</button>
+                  </form>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+        <div class="text-secondary small mt-3">
+          Al aumentar a uno, se descuenta automáticamente a quienes menos han producido (sin bajar de lo ya producido).
+        </div>
+      {% else %}
+        <div class="text-secondary">Sin asignaciones de armador.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="admin-card h-100">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="text-white mb-0"><i class='bx bx-check-shield me-2'></i>Rematador</h5>
+        <span class="badge badge-soft">Total: {{ plan.modos.rematador.total if plan.modos and plan.modos.rematador else 0 }}</span>
+      </div>
+
+      {% if plan.modos and plan.modos.rematador and plan.modos.rematador.tramos and plan.modos.rematador.tramos|length > 0 %}
+        {% for tramo_key, tramo_doc in plan.modos.rematador.tramos.items() %}
+          <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+            <div class="text-secondary small">Tramo {{ tramo_key }}</div>
+            <span class="badge badge-soft">Total: {{ tramo_doc.total }}</span>
+          </div>
+          <div class="row g-3">
+            {% for a in tramo_doc.asignaciones %}
+            <div class="col-md-6">
+              <div class="card bg-dark border-secondary h-100">
+                <div class="card-body">
+                  <div class="fw-bold text-white">{{ a.user_name }}</div>
+                  <div class="text-secondary small mb-2">{{ selected.marco }} · {{ tramo_key }}</div>
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div class="small text-secondary">Producidas</div>
+                    <div class="fw-bold text-white">{{ a.producido or 0 }} / {{ a.objetivo or 0 }}</div>
+                  </div>
+
+                  {% if session.get('role') == 'administrador' %}
+                  <form method="POST" action="{{ url_for('admin_planificacion_ajustar') }}" class="mt-3 d-flex gap-2">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="plan_id" value="{{ plan._id }}">
+                    <input type="hidden" name="modo" value="rematador">
+                    <input type="hidden" name="tramo" value="{{ tramo_key }}">
+                    <input type="hidden" name="user_id" value="{{ a.user_id }}">
+                    <input type="number" min="{{ a.producido or 0 }}" name="objetivo" class="form-control form-control-sm bg-dark text-light border-secondary" value="{{ a.objetivo or 0 }}">
+                    <button class="btn btn-sm btn-outline-light" type="submit">Ajustar</button>
+                  </form>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+        <div class="text-secondary small mt-3">
+          Al aumentar a uno, se descuenta automáticamente a quienes menos han producido (sin bajar de lo ya producido).
+        </div>
+      {% else %}
+        <div class="text-secondary">Sin asignaciones de rematador.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+
+<div class="admin-card mt-4">
+  {% for g in grupos %}
+    <h5 class="mt-2 text-white">Cliente: {{ g.cliente }}</h5>
+    <div class="row row-cols-1 row-cols-md-3 g-4 mt-1">
+      {% for m in g.marcos %}
+      <div class="col">
+        <div class="card bg-dark border-light shadow h-100 fixed-card">
+          <div class="card-body d-flex flex-column">
+            <div class="mb-3 d-flex justify-content-between align-items-center">
+              <h5 class="card-title text-light mb-0">{{ m.marco }}</h5>
+              <a class="btn btn-sm btn-outline-light"
+                 href="{{ url_for('admin_planificacion_home', empresa=g.cliente, marco=m.marco) }}">
+                Planificar Marco
+              </a>
+            </div>
+
+            <div class="flex-grow-1">
+              <table class="table table-dark table-sm mb-0 table-fixed">
+                <thead>
+                  <tr class="text-secondary small text-center">
+                      <th>Tramo</th>
+                      <th>Faltan Arm</th>
+                      <th>Faltan Rem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for t in m.tramos %}
+                  <tr class="{% if t.pendientes <= 0 %}table-success text-dark fw-bold{% endif %}">
+                    <td class="text-center align-middle">{{ t.tramo }}</td>
+                    <td class="text-center align-middle">{{ t.total - t.armadas }}</td>
+                    <td class="text-center align-middle">{{ t.total - t.rematadas }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% endfor %}
+
+  {% if grupos|length == 0 %}
+    <div class="alert alert-secondary text-center">No hay datos de piezas.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

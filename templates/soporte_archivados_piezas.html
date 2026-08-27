@@ -1,118 +1,140 @@
-{% extends 'base.html' %}
+{% extends 'admin_layout.html' %}
 {% block title %}Piezas Archivadas{% endblock %}
+{% block header_title %}Piezas Archivadas (Snapshot){% endblock %}
+{% block header_subtitle %}Edición de datos históricos del catálogo de piezas en cortes cerrados{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Piezas Archivadas (Snapshot)</h2>
-    <a href="{{ url_for('soporte_dashboard') }}" class="btn btn-secondary">← Volver</a>
-</div>
 
-<div class="card mb-4">
-    <div class="card-body">
-        <form method="GET" class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label class="form-label">Seleccione Corte</label>
-                <select name="corte_id" class="form-select" onchange="this.form.submit()">
-                    <option value="">-- Seleccione --</option>
-                    {% for c in cortes %}
-                        <option value="{{ c._id }}" {% if c._id|string == corte_sel %}selected{% endif %}>
-                            {{ c.nombre }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Filtrar por Código</label>
-                <input type="text" name="codigo" class="form-control" value="{{ codigo_sel or '' }}">
-            </div>
-            <div class="col-md-2">
-                <button class="btn btn-accent w-100">Buscar</button>
-            </div>
-        </form>
-    </div>
+<div class="admin-card mb-4">
+    <form method="GET" class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label text-secondary small">Seleccione Corte</label>
+            <select name="corte_id" class="form-select bg-dark text-light border-secondary" onchange="this.form.submit()">
+                <option value="">-- Seleccione --</option>
+                {% for c in cortes %}
+                    <option value="{{ c._id }}" {% if c._id|string == corte_sel %}selected{% endif %}>
+                        {{ c.nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label text-secondary small">Filtrar por Código</label>
+            <input type="text" name="codigo" class="form-control bg-dark text-light border-secondary" value="{{ codigo_sel or '' }}" placeholder="Código a buscar...">
+        </div>
+        <div class="col-md-4 d-flex justify-content-end gap-2">
+            <button class="btn btn-accent">
+                <i class='bx bx-search'></i> Buscar
+            </button>
+            <a href="{{ url_for('soporte_dashboard') }}" class="btn btn-outline-secondary">
+                <i class='bx bx-arrow-back'></i> Panel
+            </a>
+        </div>
+    </form>
 </div>
 
 {% if piezas %}
-<div class="table-responsive">
-    <table class="table table-dark table-striped table-hover">
-        <thead>
-            <tr>
-                <th>Código</th>
-                <th>Cliente</th>
-                <th>Marco</th>
-                <th>Tramo</th>
-                <th>Kilo/Pieza</th>
-                <th>Tipo Precio</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in piezas %}
-            <tr>
-                <td>{{ p.codigo }}</td>
-                <td>{{ p.empresa }}</td>
-                <td>{{ p.marco }}</td>
-                <td>{{ p.tramo }}</td>
-                <td>{{ p.kilo_pieza }}</td>
-                <td>{{ p.tipo_precio }}</td>
-                <td>
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editPiezaModal{{ loop.index }}">
-                        Editar
-                    </button>
+<div class="admin-card">
+    <div class="table-responsive">
+        <table class="table table-dark table-striped table-hover align-middle mb-0">
+            <thead>
+                <tr class="text-secondary small">
+                    <th>Código</th>
+                    <th>Cliente</th>
+                    <th>Marco</th>
+                    <th>Tramo</th>
+                    <th>Kilo/Pieza</th>
+                    <th>Tipo Precio</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in piezas %}
+                <tr>
+                    <td class="fw-bold text-white">{{ p.codigo }}</td>
+                    <td>{{ p.empresa or '-' }}</td>
+                    <td>{{ p.marco or '-' }}</td>
+                    <td>{{ p.tramo or '-' }}</td>
+                    <td>{{ p.kilo_pieza }}</td>
+                    <td>
+                        {% if p.tipo_precio == 'avo' %}
+                        <span class="badge bg-success">Avo</span>
+                        {% else %}
+                        <span class="badge bg-info text-dark">Metro</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editPiezaModal{{ loop.index }}">
+                            <i class='bx bx-edit-alt'></i> Editar
+                        </button>
 
-                    <!-- Modal Edición -->
-                    <div class="modal fade" id="editPiezaModal{{ loop.index }}" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content bg-dark text-light">
-                                <form method="POST" action="{{ url_for('soporte_archivados_piezas_editar') }}">
-                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-                                    <input type="hidden" name="pieza_id" value="{{ p._id }}">
-                                    <input type="hidden" name="corte_id" value="{{ corte_sel }}">
-                                    <input type="hidden" name="codigo" value="{{ codigo_sel or '' }}">
-                                    <input type="hidden" name="page" value="{{ pagination.page if pagination else 1 }}">
-                                    
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Editar Pieza Histórica</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body text-start">
-                                        <div class="row g-3">
-                                            <div class="col-6">
-                                                <label class="form-label">Kilo Pieza</label>
-                                                <input type="number" step="0.0001" name="kilo_pieza" class="form-control" value="{{ p.kilo_pieza }}">
-                                            </div>
-                                            <div class="col-6">
-                                                <label class="form-label">Tipo Precio</label>
-                                                <select name="tipo_precio" class="form-select">
-                                                    <option value="metro" {% if p.tipo_precio == 'metro' %}selected{% endif %}>Metro</option>
-                                                    <option value="avo" {% if p.tipo_precio == 'avo' %}selected{% endif %}>Avo</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-12">
-                                                <label class="form-label">Marco</label>
-                                                <input type="text" name="marco" class="form-control" value="{{ p.marco }}">
-                                            </div>
-                                            <div class="col-12">
-                                                <label class="form-label">Tramo</label>
-                                                <input type="text" name="tramo" class="form-control" value="{{ p.tramo }}">
+                        <div class="modal fade" id="editPiezaModal{{ loop.index }}" tabindex="-1" aria-labelledby="editPiezaModal{{ loop.index }}Label" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content bg-dark text-light border border-secondary">
+                                    <form method="POST" action="{{ url_for('soporte_archivados_piezas_editar') }}">
+                                        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                        <input type="hidden" name="pieza_id" value="{{ p._id }}">
+                                        <input type="hidden" name="corte_id" value="{{ corte_sel }}">
+                                        <input type="hidden" name="codigo" value="{{ codigo_sel or '' }}">
+                                        <input type="hidden" name="page" value="{{ pagination.page if pagination else 1 }}">
+
+                                        <div class="modal-header border-bottom border-secondary">
+                                            <h5 class="modal-title" id="editPiezaModal{{ loop.index }}Label">
+                                                <i class='bx bx-edit-alt me-2'></i>Editar Pieza Histórica
+                                            </h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body text-start">
+                                            <div class="row g-3">
+                                                <div class="col-6">
+                                                    <label class="form-label text-secondary small">Kilo Pieza</label>
+                                                    <input type="number" step="0.0001" name="kilo_pieza" class="form-control bg-dark text-light border-secondary" value="{{ p.kilo_pieza }}">
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label text-secondary small">Tipo Precio</label>
+                                                    <select name="tipo_precio" class="form-select bg-dark text-light border-secondary">
+                                                        <option value="metro" {% if p.tipo_precio == 'metro' %}selected{% endif %}>Metro</option>
+                                                        <option value="avo" {% if p.tipo_precio == 'avo' %}selected{% endif %}>Avo</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label text-secondary small">Marco</label>
+                                                    <input type="text" name="marco" class="form-control bg-dark text-light border-secondary" value="{{ p.marco or '' }}">
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label text-secondary small">Tramo</label>
+                                                    <input type="text" name="tramo" class="form-control bg-dark text-light border-secondary" value="{{ p.tramo or '' }}">
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-success">Guardar Cambios</button>
-                                    </div>
-                                </form>
+                                        <div class="modal-footer border-top border-secondary">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-accent">
+                                                <i class='bx bx-save'></i> Guardar Cambios
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include '_pagination.html' %}
 </div>
-{% include '_pagination.html' %}
+{% elif corte_sel %}
+<div class="admin-card text-center py-5">
+    <div class="mb-3 text-secondary display-6"><i class='bx bxs-extension'></i></div>
+    <p class="text-secondary mb-0">No hay piezas históricas para este corte (o no coinciden con el código buscado).</p>
+</div>
+{% else %}
+<div class="admin-card text-center py-5">
+    <div class="mb-3 text-secondary display-6"><i class='bx bxs-folder-open'></i></div>
+    <p class="text-secondary mb-0">Selecciona un corte para visualizar las piezas archivadas.</p>
+</div>
 {% endif %}
 
 {% endblock %}

@@ -9,6 +9,8 @@ from flask import flash, redirect, render_template, request, session, url_for
 from pymongo import ReturnDocument
 from werkzeug.security import generate_password_hash
 
+from core.helpers.soft_delete import soft_delete_one, soft_delete_many
+
 
 def _parse_optional_measure(raw_value):
     """Normaliza medidas opcionales de piezas a float o None."""
@@ -197,8 +199,16 @@ def register_admin_crud_routes(
             flash("No puedes eliminar tu propio usuario", "warning")
             return redirect(url_for("usuarios_list"))
 
-        db.usuarios.delete_one({"_id": ObjectId(id)})
-        flash("Usuario eliminado", "info")
+        ok, msg = soft_delete_one(
+            db,
+            collection_origen="usuarios",
+            filtro_doc={"_id": ObjectId(id)},
+            deleted_by_user_id=session.get("user_id"),
+            deleted_by_user_name=session.get("nombre"),
+            deleted_by_ip=request.remote_addr,
+            motivo="admin/soporte botón eliminar usuario",
+        )
+        flash(msg, "success" if ok else "danger")
         return redirect(url_for("usuarios_list"))
 
     @app.route("/admin/boxes")
@@ -260,8 +270,16 @@ def register_admin_crud_routes(
     @app.route("/admin/boxes/<id>/delete", methods=["POST"])
     @login_required(["administrador", "soporte"])
     def boxes_delete(id):
-        db.boxes.delete_one({"_id": ObjectId(id)})
-        flash("Box eliminado", "info")
+        ok, msg = soft_delete_one(
+            db,
+            collection_origen="boxes",
+            filtro_doc={"_id": ObjectId(id)},
+            deleted_by_user_id=session.get("user_id"),
+            deleted_by_user_name=session.get("nombre"),
+            deleted_by_ip=request.remote_addr,
+            motivo="admin/soporte botón eliminar box",
+        )
+        flash(msg, "success" if ok else "danger")
         return redirect(url_for("boxes_list"))
 
     @app.route("/admin/piezas")
@@ -427,8 +445,16 @@ def register_admin_crud_routes(
             if not codigos:
                 return {"success": False, "message": "No se seleccionaron piezas"}, 400
 
-            result = db.piezas.delete_many({"codigo": {"$in": codigos}})
-            return {"success": True, "deleted_count": result.deleted_count}
+            cantidad, msg = soft_delete_many(
+                db,
+                collection_origen="piezas",
+                filtro_doc={"codigo": {"$in": codigos}},
+                deleted_by_user_id=session.get("user_id"),
+                deleted_by_user_name=session.get("nombre"),
+                deleted_by_ip=request.remote_addr,
+                motivo="admin eliminación masiva piezas (códigos)",
+            )
+            return {"success": True, "deleted_count": cantidad, "message": msg}
         except Exception as exc:
             return {"success": False, "message": str(exc)}, 500
 
@@ -622,8 +648,16 @@ def register_admin_crud_routes(
     @app.route("/admin/piezas/<id>/delete", methods=["POST"])
     @login_required(["administrador", "soporte"])
     def piezas_delete(id):
-        db.piezas.delete_one({"_id": ObjectId(id)})
-        flash("Pieza eliminada", "info")
+        ok, msg = soft_delete_one(
+            db,
+            collection_origen="piezas",
+            filtro_doc={"_id": ObjectId(id)},
+            deleted_by_user_id=session.get("user_id"),
+            deleted_by_user_name=session.get("nombre"),
+            deleted_by_ip=request.remote_addr,
+            motivo="admin/soporte botón eliminar pieza",
+        )
+        flash(msg, "success" if ok else "danger")
         return redirect(url_for("piezas_list"))
 
     @app.route("/api/marcos/<empresa>")

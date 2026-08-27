@@ -1,5 +1,7 @@
 from bson import ObjectId
-from flask import flash, redirect, render_template, request, url_for
+from flask import flash, redirect, render_template, request, session, url_for
+
+from core.helpers.soft_delete import soft_delete_one
 
 
 def register_soporte_archivados_routes(
@@ -146,9 +148,17 @@ def register_soporte_archivados_routes(
         codigo = request.form.get("codigo") or ""
         page = normalize_page(request.form.get("page") or 1)
 
-        db.produccion_historica.delete_one({"_id": ObjectId(prod_id)})
-        log_audit("DELETE_PROD_HIST", f"ID: {prod_id}")
-        flash("Registro histórico eliminado.", "info")
+        ok, msg = soft_delete_one(
+            db,
+            collection_origen="produccion_historica",
+            filtro_doc={"_id": ObjectId(prod_id)},
+            deleted_by_user_id=session.get("user_id"),
+            deleted_by_user_name=session.get("nombre"),
+            deleted_by_ip=request.remote_addr,
+            motivo="soporte eliminar producción histórica (corte cerrado)",
+        )
+        log_audit("DELETE_PROD_HIST", f"ID: {prod_id}, soft_delete_ok={ok}")
+        flash(msg, "success" if ok else "danger")
         return redirect(url_for("soporte_archivados_produccion", corte_id=corte_id, codigo=codigo, page=page))
 
     @app.route("/soporte/archivados/piezas", methods=["GET"])

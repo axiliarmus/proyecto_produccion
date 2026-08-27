@@ -59,6 +59,14 @@
                 </a>
             </li>
 
+            {% if session.get('role') in ['administrador', 'soporte'] %}
+            <li>
+                <a href="{{ url_for('admin_planificacion_home') }}" class="nav-link {% if 'admin_planificacion' in request.endpoint %}active{% endif %}">
+                    <i class='bx bx-calendar-check'></i> Planificación
+                </a>
+            </li>
+            {% endif %}
+
             {% if session.get('role') in ['administrador', 'soporte', 'supervisor'] %}
             <li>
                 <a href="{{ url_for('admin_picking') }}" class="nav-link {% if 'picking' in request.endpoint %}active{% endif %}">
@@ -71,6 +79,45 @@
             <li>
                 <a href="{{ url_for('admin_archivados_menu') }}" class="nav-link {% if 'archivada' in request.endpoint or 'archivados' in request.endpoint %}active{% endif %}">
                     <i class='bx bxs-archive-in'></i> Archivados
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('papelera_list') }}" class="nav-link {% if 'papelera' in request.endpoint %}active{% endif %}">
+                    <i class='bx bxs-trash-alt'></i> Papelera
+                </a>
+            </li>
+            {% endif %}
+
+            {% if session.get('role') == 'soporte' %}
+            <li class="sidebar-section-title mt-3"><small>ÁREA SOPORTE</small></li>
+            <li>
+                <a href="{{ url_for('soporte_dashboard') }}" class="nav-link {% if request.endpoint == 'soporte_dashboard' %}active{% endif %}">
+                    <i class='bx bxs-help-circle'></i> Panel Soporte
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('soporte_produccion_list') }}" class="nav-link {% if 'soporte_produccion' in request.endpoint %}active{% endif %}">
+                    <i class='bx bxs-edit-alt'></i> Editar Producción
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('soporte_piezas_duplicadas') }}" class="nav-link {% if 'soporte_piezas_duplicadas' in request.endpoint %}active{% endif %}">
+                    <i class='bx bxs-copy-alt'></i> Piezas Duplicadas
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('soporte_piezas_masivas') }}" class="nav-link {% if 'soporte_piezas_masivas' in request.endpoint %}active{% endif %}">
+                    <i class='bx bx-layer'></i> Gestión Masiva
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('soporte_etiquetas') }}" class="nav-link {% if 'soporte_etiquetas' in request.endpoint %}active{% endif %}">
+                    <i class='bx bxs-barcode'></i> Etiquetas
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('soporte_archivados_usuarios') }}" class="nav-link {% if 'soporte_archivados' in request.endpoint %}active{% endif %}">
+                    <i class='bx bx-folder-open'></i> Archivados Soporte
                 </a>
             </li>
             {% endif %}
@@ -119,13 +166,18 @@
                 </div>
             </div>
             
-            <div class="user-profile">
+            <div class="d-flex align-items-center gap-2">
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm d-none d-md-inline-flex align-items-center gap-2">
+                    <i class='bx bx-log-out'></i> Cerrar Sesión
+                </a>
+                <div class="user-profile">
                 <div class="user-info text-end me-2">
                     <small class="d-block text-secondary">{{ session.get('role', 'Usuario')|capitalize }}</small>
                     <span class="fw-bold">{{ session.get('nombre', 'Usuario') }}</span>
                 </div>
                 <div class="user-avatar">
                     {{ session.get('nombre', 'A')[0]|upper }}
+                </div>
                 </div>
             </div>
         </header>

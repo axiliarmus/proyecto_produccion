@@ -430,6 +430,59 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             collection_prod = db.produccion
             filtro_base = {"codigo_pieza": codigo_pieza}
 
+        plan_control = None
+        if not es_historico:
+            empresa_plan = pieza_data.get("empresa") or "Sin Cliente"
+            marco_plan = pieza_data.get("marco") or "Sin Marco"
+            tramo_plan = pieza_data.get("tramo") or "Sin Tramo"
+            conf = db.config.find_one({"key": "ciclo_actual"}) or {"value": "a"}
+            ciclo = str(conf.get("value") or "a")
+            plan = db.planificaciones.find_one(
+                {
+                    "ciclo": ciclo,
+                    "grupo.empresa": empresa_plan,
+                    "grupo.marco": marco_plan,
+                }
+            )
+            if plan:
+                modo_doc = ((plan.get("modos") or {}).get(modo) or {})
+                tramos_doc = modo_doc.get("tramos") or {}
+                tramo_doc = tramos_doc.get(tramo_plan)
+                if not tramo_doc:
+                    plan = None
+                if plan:
+                    asignaciones = tramo_doc.get("asignaciones") or []
+                    total_modo = int(tramo_doc.get("total") or 0)
+                    if total_modo <= 0 or not asignaciones:
+                        plan = None
+
+                if plan:
+                    user_oid = ObjectId(user_id) if ObjectId.is_valid(str(user_id)) else user_id
+                    asignacion = None
+                    for a in asignaciones:
+                        if a.get("user_id") == user_oid:
+                            asignacion = a
+                            break
+                    if not asignacion:
+                        release_submission_guard()
+                        flash("❌ Esta pieza está planificada y no tienes permiso para registrarla.", "danger")
+                        return redirect(url_for("operador_home"))
+
+                    objetivo = int(asignacion.get("objetivo") or 0)
+                    producido = int(asignacion.get("producido") or 0)
+                    if producido >= objetivo:
+                        release_submission_guard()
+                        flash("⛔ Ya completaste tu cupo asignado para esta planificación.", "warning")
+                        return redirect(url_for("operador_home"))
+
+                    plan_control = {
+                        "plan_id": plan.get("_id"),
+                        "modo": modo,
+                        "tramo": tramo_plan,
+                        "user_oid": user_oid,
+                        "objetivo": objetivo,
+                    }
+
         armado_count = collection_prod.count_documents({**filtro_base, "modo": "armador"})
         remate_count = collection_prod.count_documents({**filtro_base, "modo": "rematador"})
         # #region debug-point B:counts
@@ -585,11 +638,37 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             flash(f"✔ Pieza {codigo_pieza} registrada en ARCHIVO HISTÓRICO como {modo} (Corte cerrado)", "warning")
         else:
             try:
-                db.produccion.insert_one(registro)
+                res_ins = db.produccion.insert_one(registro)
             except Exception:
                 release_submission_guard()
                 flash("❌ No se pudo registrar la pieza. Intenta nuevamente.", "danger")
                 return redirect(url_for("operador_home"))
+            if plan_control and plan_control.get("plan_id"):
+                upd = db.planificaciones.update_one(
+                    {
+                        "_id": plan_control["plan_id"],
+                        f"modos.{plan_control['modo']}.tramos.{plan_control['tramo']}.total": {"$gt": 0},
+                    },
+                    {
+                        "$inc": {
+                            f"modos.{plan_control['modo']}.tramos.{plan_control['tramo']}.asignaciones.$[a].producido": 1
+                        }
+                    },
+                    array_filters=[
+                        {
+                            "a.user_id": plan_control["user_oid"],
+                            "a.producido": {"$lt": int(plan_control.get("objetivo") or 0)},
+                        }
+                    ],
+                )
+                if upd.modified_count != 1:
+                    try:
+                        db.produccion.delete_one({"_id": res_ins.inserted_id})
+                    except Exception:
+                        pass
+                    release_submission_guard()
+                    flash("⛔ No se pudo aplicar el cupo de planificación (posible concurrencia). Intenta nuevamente.", "warning")
+                    return redirect(url_for("operador_home"))
             flash(f"✔ Pieza {codigo_pieza} registrada correctamente como {modo}", "success")
 
         release_submission_guard()
@@ -609,4 +688,3 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
         # #endregion
 
         return redirect(url_for("operador_home"))
-

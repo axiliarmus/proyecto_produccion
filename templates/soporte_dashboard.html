@@ -1,104 +1,247 @@
-{% extends 'base.html' %}
-{% block title %}Soporte{% endblock %}
+{% extends 'admin_layout.html' %}
+{% block title %}Panel Soporte{% endblock %}
+{% block header_title %}Soporte Técnico{% endblock %}
+{% block header_subtitle %}Panel de herramientas y gestión de apoyo a la operación{% endblock %}
 
 {% block content %}
-
-<div class="text-center mb-4">
-  <h2 class="fw-bold">Panel de Soporte</h2>
-  <p class="text-secondary mb-0">Accesos rápidos para tareas de ayuda y revisión.</p>
+<!-- Stats Row -->
+<div class="row g-4 mb-5">
+    <div class="col-md-3">
+        <div class="admin-card stat-card">
+            <div class="stat-icon bg-gradient-3 text-white">
+                <i class='bx bxs-extension'></i>
+            </div>
+            <div>
+                <div class="stat-title">Piezas Definidas</div>
+                <div class="stat-value">{{ total_piezas or 0 }}</div>
+            </div>
+            <a href="{{ url_for('piezas_list') }}" class="stretched-link"></a>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="admin-card stat-card">
+            <div class="stat-icon bg-primary text-white">
+                <i class='bx bxs-bar-chart-alt-2'></i>
+            </div>
+            <div>
+                <div class="stat-title">Producción Activa</div>
+                <div class="stat-value">{{ total_produccion or 0 }}</div>
+            </div>
+            <a href="{{ url_for('soporte_produccion_list') }}" class="stretched-link"></a>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="admin-card stat-card">
+            <div class="stat-icon bg-gradient-1 text-white">
+                <i class='bx bxs-user'></i>
+            </div>
+            <div>
+                <div class="stat-title">Operadores</div>
+                <div class="stat-value">{{ total_usuarios or 0 }}</div>
+            </div>
+            <a href="{{ url_for('usuarios_list') }}" class="stretched-link"></a>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="admin-card stat-card {% if total_duplicados > 0 %}border-danger{% endif %}">
+            <div class="stat-icon bg-danger text-white">
+                <i class='bx bxs-copy-alt'></i>
+            </div>
+            <div>
+                <div class="stat-title">Piezas Duplicadas</div>
+                <div class="stat-value {% if total_duplicados > 0 %}text-danger{% endif %}">{{ total_duplicados or 0 }}</div>
+            </div>
+            <a href="{{ url_for('soporte_piezas_duplicadas') }}" class="stretched-link"></a>
+        </div>
+    </div>
 </div>
 
-<div class="row g-4 justify-content-center">
-  <div class="col-md-4 col-lg-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <div class="display-6">🛠️</div>
-          <h5 class="card-title text-light mt-2">Panel Administrador</h5>
-          <p class="text-secondary">Acceso al panel principal de administración.</p>
+<!-- Producción Hoy -->
+<div class="row g-4 mb-5">
+    <div class="col-md-5">
+        <div class="admin-card h-100">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="text-white mb-0">📅 Producción Hoy</h5>
+                <span class="badge badge-soft text-success">En tiempo real</span>
+            </div>
+            <div class="row text-center">
+                <div class="col-6 border-end border-secondary">
+                    <small class="text-secondary">AVO</small>
+                    <h4 class="text-light fw-bold">{{ "%.1f"|format(kilos_hoy.avo) }}</h4>
+                </div>
+                <div class="col-6">
+                    <small class="text-secondary">METRO</small>
+                    <h4 class="text-light fw-bold">{{ "%.1f"|format(kilos_hoy.metro) }}</h4>
+                </div>
+            </div>
+            <div class="mt-3 pt-3 border-top border-secondary text-center">
+                <small class="text-secondary">TOTAL HOY</small>
+                <h3 class="text-accent fw-bold">
+                    {{ "%.1f"|format(kilos_hoy.avo + kilos_hoy.metro) }}
+                    <small class="fs-6 text-secondary">kg</small>
+                </h3>
+            </div>
         </div>
-        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-accent w-100 mt-3">Ir al Panel</a>
-      </div>
     </div>
-  </div>
 
-  <div class="col-md-4 col-lg-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <div class="display-6">📄</div>
-          <h5 class="card-title text-light mt-2">Registros de Producción</h5>
-          <p class="text-secondary">Ver, editar y eliminar registros realizados por operadores.</p>
+    <div class="col-md-7">
+        <div class="admin-card h-100">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="text-white mb-0">🚨 Alertas y Acciones</h5>
+                <span class="badge badge-soft text-warning">Rápido acceso</span>
+            </div>
+            <div class="row g-3">
+                <div class="col-6">
+                    <a href="{{ url_for('papelera_list') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3 h-100">
+                        <i class='bx bxs-trash-alt fs-4 text-danger'></i>
+                        <div class="flex-grow-1">
+                            <div class="fw-bold">Papelera</div>
+                            <small class="text-secondary">{{ total_papelera }} elementos · 7d retención</small>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('soporte_piezas_masivas') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3 h-100">
+                        <i class='bx bx-layer fs-4 text-warning'></i>
+                        <div class="flex-grow-1">
+                            <div class="fw-bold">Gestión Masiva</div>
+                            <small class="text-secondary">Edición / Eliminación múltiple</small>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('soporte_etiquetas') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3 h-100">
+                        <i class='bx bxs-barcode fs-4 text-info'></i>
+                        <div class="flex-grow-1">
+                            <div class="fw-bold">Etiquetas / Códigos</div>
+                            <small class="text-secondary">Generar códigos Zebra</small>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('admin_buscador_piezas') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3 h-100">
+                        <i class='bx bx-search fs-4 text-success'></i>
+                        <div class="flex-grow-1">
+                            <div class="fw-bold">Buscador Universal</div>
+                            <small class="text-secondary">Rastrear cualquier pieza</small>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-12">
+                    <a href="{{ url_for('admin_archivados_menu') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3 h-100">
+                        <i class='bx bxs-archive-in fs-4 text-primary'></i>
+                        <div class="flex-grow-1">
+                            <div class="fw-bold">Cortes / Históricos</div>
+                            <small class="text-secondary">Ver cortes mensuales cerrados · Producción Archivada · Piezas Archivadas</small>
+                        </div>
+                    </a>
+                </div>
+            </div>
         </div>
-        <a href="{{ url_for('soporte_produccion_list') }}" class="btn btn-warning w-100 mt-3">Abrir Registros</a>
-      </div>
     </div>
-  </div>
-
-  <!-- NUEVO: GESTIÓN DE ARCHIVADOS -->
-  <div class="col-md-4 col-lg-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <div class="display-6">🗂️</div>
-          <h5 class="card-title text-light mt-2">Archivos Históricos</h5>
-          <p class="text-secondary">Modificar usuarios, producción y piezas de cortes anteriores.</p>
-        </div>
-        <div class="d-grid gap-2 mt-3">
-            <a href="{{ url_for('soporte_archivados_usuarios') }}" class="btn btn-outline-info btn-sm">Usuarios Archivados</a>
-            <a href="{{ url_for('soporte_archivados_produccion') }}" class="btn btn-outline-info btn-sm">Producción Archivada</a>
-            <a href="{{ url_for('soporte_archivados_piezas') }}" class="btn btn-outline-info btn-sm">Piezas Archivadas</a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- GESTIÓN DE DUPLICADOS -->
-  <div class="col-md-4 col-lg-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <div class="display-6">⚠️</div>
-          <h5 class="card-title text-light mt-2">Piezas Duplicadas</h5>
-          <p class="text-secondary">Detectar y gestionar piezas con códigos repetidos.</p>
-        </div>
-        <a href="{{ url_for('soporte_piezas_duplicadas') }}" class="btn btn-danger w-100 mt-3">Gestionar Duplicados</a>
-      </div>
-    </div>
-  </div>
-
-  <!-- GESTIÓN MASIVA DE PIEZAS -->
-  <div class="col-md-4 col-lg-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <div class="display-6">🗑️</div>
-          <h5 class="card-title text-light mt-2">Gestión Masiva</h5>
-          <p class="text-secondary">Listar todas las piezas y eliminar múltiples registros.</p>
-        </div>
-        <a href="{{ url_for('soporte_piezas_masivas') }}" class="btn btn-danger w-100 mt-3">Abrir Listado</a>
-      </div>
-    </div>
-  </div>
-
-  <!-- ETIQUETAS Y CÓDIGOS DE BARRA -->
-  <div class="col-md-4 col-lg-3">
-    <div class="card bg-dark border-light shadow text-center h-100">
-      <div class="card-body d-flex flex-column justify-content-between">
-        <div>
-          <div class="display-6">🏷️</div>
-          <h5 class="card-title text-light mt-2">Etiquetas</h5>
-          <p class="text-secondary">Generar códigos de barra para impresión (Zebra).</p>
-        </div>
-        <a href="{{ url_for('soporte_etiquetas') }}" class="btn btn-info w-100 mt-3">Generar Etiquetas</a>
-      </div>
-    </div>
-  </div>
-
 </div>
 
-<div class="text-center mt-5">
-  <a href="{{ url_for('index') }}" class="btn btn-secondary px-4">← Volver</a>
-</div>
+<!-- Accesos Directos / Tarjetas -->
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="admin-card h-100">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="text-white mb-0">🛠️ Herramientas Soporte</h4>
+                <span class="badge bg-secondary">Accesos Directos</span>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <a href="{{ url_for('soporte_produccion_list') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3">
+                        <i class='bx bxs-edit-alt fs-4 text-warning'></i>
+                        <div>
+                            <div class="fw-bold">Registros Producción</div>
+                            <small class="text-secondary">Editar / Eliminar registros operadores</small>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="{{ url_for('soporte_piezas_duplicadas') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3">
+                        <i class='bx bxs-copy-alt fs-4 text-danger'></i>
+                        <div>
+                            <div class="fw-bold">Piezas Duplicadas</div>
+                            <small class="text-secondary">Detectar y limpiar códigos repetidos</small>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="{{ url_for('piezas_list') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3">
+                        <i class='bx bxs-extension fs-4 text-accent'></i>
+                        <div>
+                            <div class="fw-bold">Catálogo Piezas</div>
+                            <small class="text-secondary">Crear / Editar piezas maestras</small>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="{{ url_for('usuarios_list') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3">
+                        <i class='bx bxs-user-group fs-4 text-info'></i>
+                        <div>
+                            <div class="fw-bold">Usuarios y Permisos</div>
+                            <small class="text-secondary">Gestionar cuentas operadores</small>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="{{ url_for('boxes_list') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3">
+                        <i class='bx bxs-package fs-4 text-primary'></i>
+                        <div>
+                            <div class="fw-bold">Catálogo Boxes</div>
+                            <small class="text-secondary">Gestión de códigos de caja</small>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="{{ url_for('admin_informes') }}" class="btn btn-outline-light w-100 p-3 text-start d-flex align-items-center gap-3">
+                        <i class='bx bxs-report fs-4 text-success'></i>
+                        <div>
+                            <div class="fw-bold">Informes</div>
+                            <small class="text-secondary">Ver producción / horarios / operadores</small>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <div class="col-lg-4">
+        <div class="admin-card bg-dark border-danger h-100">
+            <div class="d-flex align-items-center gap-2 mb-3 text-warning">
+                <i class='bx bxs-message-square-error fs-3'></i>
+                <h5 class="mb-0">Archivos Soporte</h5>
+            </div>
+            <p class="text-secondary small mb-4">
+                Accede a datos de cortes cerrados (usuarios, producción, piezas) con permiso de edición de soporte.
+            </p>
+            <div class="d-grid gap-2">
+                <a href="{{ url_for('soporte_archivados_usuarios') }}" class="btn btn-outline-info btn-sm d-flex align-items-center justify-content-start gap-2 w-100">
+                    <i class='bx bxs-user-circle'></i> Usuarios Archivados
+                </a>
+                <a href="{{ url_for('soporte_archivados_produccion') }}" class="btn btn-outline-info btn-sm d-flex align-items-center justify-content-start gap-2 w-100">
+                    <i class='bx bx-bar-chart-alt-2'></i> Producción Archivada
+                </a>
+                <a href="{{ url_for('soporte_archivados_piezas') }}" class="btn btn-outline-info btn-sm d-flex align-items-center justify-content-start gap-2 w-100">
+                    <i class='bx bxs-extension'></i> Piezas Archivadas
+                </a>
+            </div>
+
+            <hr class="border-secondary my-4">
+
+            <div class="d-flex align-items-center gap-2 mb-3 text-success">
+                <i class='bx bx-cycling fs-3'></i>
+                <h5 class="mb-0">Volver al Admin</h5>
+            </div>
+            <p class="text-secondary small mb-3">
+                Regresa al panel principal administrador si requieres acceso a configuración avanzada o cierre mensual.
+            </p>
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-accent w-100 d-flex align-items-center justify-content-center gap-2">
+                <i class='bx bxs-dashboard'></i> Ir a Panel Admin
+            </a>
+        </div>
+    </div>
+</div>
 {% endblock %}

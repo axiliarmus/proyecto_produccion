@@ -6,9 +6,8 @@
 
 {% block content %}
 
-<div class="card bg-dark border-light shadow mb-4">
-    <div class="card-body">
-        <form method="POST" class="row g-3">
+<div class="admin-card mb-4">
+    <form method="POST" class="row g-3">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
             <div class="col-md-4">
                 <label class="form-label text-secondary small">Cliente</label>
@@ -52,7 +51,6 @@
                 </button>
             </div>
         </form>
-    </div>
 </div>
 
 {% if piezas %}

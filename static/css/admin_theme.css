@@ -281,6 +281,16 @@ body {
     font-weight: 600;
 }
 
+.sidebar-section-title {
+    color: #6b7280;
+    opacity: 0.85;
+    letter-spacing: 0.05em;
+    padding: 0 1rem;
+    text-transform: uppercase;
+    user-select: none;
+    list-style: none;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .admin-sidebar {

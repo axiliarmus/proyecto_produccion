@@ -1,116 +1,150 @@
-{% extends 'base.html' %}
+{% extends 'admin_layout.html' %}
 {% block title %}Producción Archivada{% endblock %}
+{% block header_title %}Producción Archivada{% endblock %}
+{% block header_subtitle %}Edición y eliminación segura de registros históricos de producción{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Producción Archivada</h2>
-    <a href="{{ url_for('soporte_dashboard') }}" class="btn btn-secondary">← Volver</a>
-</div>
 
-<div class="card mb-4">
-    <div class="card-body">
-        <form method="GET" class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label class="form-label">Seleccione Corte</label>
-                <select name="corte_id" class="form-select" onchange="this.form.submit()">
-                    <option value="">-- Seleccione --</option>
-                    {% for c in cortes %}
-                        <option value="{{ c._id }}" {% if c._id|string == corte_sel %}selected{% endif %}>
-                            {{ c.nombre }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Filtrar por Código Pieza</label>
-                <input type="text" name="codigo" class="form-control" value="{{ codigo_sel or '' }}">
-            </div>
-            <div class="col-md-2">
-                <button class="btn btn-accent w-100">Buscar</button>
-            </div>
-        </form>
-    </div>
+<div class="admin-card mb-4">
+    <form method="GET" class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label text-secondary small">Seleccione Corte</label>
+            <select name="corte_id" class="form-select bg-dark text-light border-secondary" onchange="this.form.submit()">
+                <option value="">-- Seleccione --</option>
+                {% for c in cortes %}
+                    <option value="{{ c._id }}" {% if c._id|string == corte_sel %}selected{% endif %}>
+                        {{ c.nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label text-secondary small">Filtrar por Código Pieza</label>
+            <input type="text" name="codigo" class="form-control bg-dark text-light border-secondary" value="{{ codigo_sel or '' }}" placeholder="Código a buscar...">
+        </div>
+        <div class="col-md-4 d-flex justify-content-end gap-2">
+            <button class="btn btn-accent">
+                <i class='bx bx-search'></i> Buscar
+            </button>
+            <a href="{{ url_for('soporte_dashboard') }}" class="btn btn-outline-secondary">
+                <i class='bx bx-arrow-back'></i> Panel
+            </a>
+        </div>
+    </form>
 </div>
 
 {% if produccion %}
-<div class="table-responsive">
-    <table class="table table-dark table-striped table-hover">
-        <thead>
-            <tr>
-                <th>Fecha</th>
-                <th>Código</th>
-                <th>Operador</th>
-                <th>Modo</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in produccion %}
-            <tr>
-                <td>{{ p.fecha.strftime('%d/%m/%Y %H:%M') if p.fecha else '-' }}</td>
-                <td>{{ p.codigo_pieza }}</td>
-                <td>{{ p.usuario }}</td>
-                <td>{{ p.modo }}</td>
-                <td>
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editProdModal{{ loop.index }}">
-                        Editar
-                    </button>
-                    <form method="POST" action="{{ url_for('soporte_archivados_produccion_eliminar') }}" class="d-inline" onsubmit="return confirm('¿Seguro que deseas eliminar este registro histórico?');">
-                        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-                        <input type="hidden" name="prod_id" value="{{ p._id }}">
-                        <input type="hidden" name="corte_id" value="{{ corte_sel }}">
-                        <input type="hidden" name="codigo" value="{{ codigo_sel or '' }}">
-                        <input type="hidden" name="page" value="{{ pagination.page if pagination else 1 }}">
-                        <button class="btn btn-sm btn-danger">🗑️</button>
-                    </form>
+<div class="admin-card">
+    <div class="table-responsive">
+        <table class="table table-dark table-striped table-hover align-middle mb-0">
+            <thead>
+                <tr class="text-secondary small">
+                    <th>Fecha</th>
+                    <th>Código</th>
+                    <th>Operador</th>
+                    <th>Modo</th>
+                    <th>Box</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in produccion %}
+                <tr>
+                    <td>{{ p.fecha.strftime('%d/%m/%Y %H:%M') if p.fecha else '-' }}</td>
+                    <td class="fw-bold text-white">{{ p.codigo_pieza }}</td>
+                    <td>{{ p.usuario }}</td>
+                    <td>
+                        {% if p.modo == 'armador' %}
+                        <span class="badge bg-warning text-dark">Armador</span>
+                        {% elif p.modo == 'rematador' %}
+                        <span class="badge bg-success">Rematador</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ p.modo or '-' }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ p.box or '-' }}</td>
+                    <td class="text-center">
+                        <div class="d-flex gap-1 justify-content-center">
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editProdModal{{ loop.index }}">
+                                <i class='bx bx-edit-alt'></i> Editar
+                            </button>
+                            <form method="POST" action="{{ url_for('soporte_archivados_produccion_eliminar') }}" class="d-inline" onsubmit="return confirm('¿Seguro que deseas eliminar este registro histórico? Se moverá a PAPELERA por 7 días.');">
+                                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="prod_id" value="{{ p._id }}">
+                                <input type="hidden" name="corte_id" value="{{ corte_sel }}">
+                                <input type="hidden" name="codigo" value="{{ codigo_sel or '' }}">
+                                <input type="hidden" name="page" value="{{ pagination.page if pagination else 1 }}">
+                                <button class="btn btn-sm btn-danger" title="Mover a papelera">
+                                    <i class='bx bxs-trash'></i>
+                                </button>
+                            </form>
+                        </div>
 
-                    <!-- Modal Edición -->
-                    <div class="modal fade" id="editProdModal{{ loop.index }}" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content bg-dark text-light">
-                                <form method="POST" action="{{ url_for('soporte_archivados_produccion_editar') }}">
-                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-                                    <input type="hidden" name="prod_id" value="{{ p._id }}">
-                                    <input type="hidden" name="corte_id" value="{{ corte_sel }}">
-                                    <input type="hidden" name="codigo" value="{{ codigo_sel or '' }}">
-                                    <input type="hidden" name="page" value="{{ pagination.page if pagination else 1 }}">
-                                    
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Editar Producción Histórica</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body text-start">
-                                        <div class="mb-3">
-                                            <label class="form-label">Código Pieza</label>
-                                            <input type="text" name="codigo_pieza" class="form-control" value="{{ p.codigo_pieza }}" required>
+                        <div class="modal fade" id="editProdModal{{ loop.index }}" tabindex="-1" aria-labelledby="editProdModal{{ loop.index }}Label" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content bg-dark text-light border border-secondary">
+                                    <form method="POST" action="{{ url_for('soporte_archivados_produccion_editar') }}">
+                                        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                        <input type="hidden" name="prod_id" value="{{ p._id }}">
+                                        <input type="hidden" name="corte_id" value="{{ corte_sel }}">
+                                        <input type="hidden" name="codigo" value="{{ codigo_sel or '' }}">
+                                        <input type="hidden" name="page" value="{{ pagination.page if pagination else 1 }}">
+
+                                        <div class="modal-header border-bottom border-secondary">
+                                            <h5 class="modal-title" id="editProdModal{{ loop.index }}Label">
+                                                <i class='bx bx-edit-alt me-2'></i>Editar Producción Histórica
+                                            </h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                         </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Operador</label>
-                                            <input type="text" name="usuario" class="form-control" value="{{ p.usuario }}" required>
+                                        <div class="modal-body text-start">
+                                            <div class="mb-3">
+                                                <label class="form-label text-secondary small">Código Pieza</label>
+                                                <input type="text" name="codigo_pieza" class="form-control bg-dark text-light border-secondary" value="{{ p.codigo_pieza }}" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label text-secondary small">Operador</label>
+                                                <input type="text" name="usuario" class="form-control bg-dark text-light border-secondary" value="{{ p.usuario }}" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label text-secondary small">Modo</label>
+                                                <select name="modo" class="form-select bg-dark text-light border-secondary">
+                                                    <option value="armador" {% if p.modo == 'armador' %}selected{% endif %}>Armador</option>
+                                                    <option value="rematador" {% if p.modo == 'rematador' %}selected{% endif %}>Rematador</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label text-secondary small">Box</label>
+                                                <input type="text" name="box" class="form-control bg-dark text-light border-secondary" value="{{ p.box or '' }}">
+                                            </div>
                                         </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Modo</label>
-                                            <select name="modo" class="form-select">
-                                                <option value="armador" {% if p.modo == 'armador' %}selected{% endif %}>Armador</option>
-                                                <option value="rematador" {% if p.modo == 'rematador' %}selected{% endif %}>Rematador</option>
-                                            </select>
+                                        <div class="modal-footer border-top border-secondary">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-accent">
+                                                <i class='bx bx-save'></i> Guardar Cambios
+                                            </button>
                                         </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-success">Guardar Cambios</button>
-                                    </div>
-                                </form>
+                                    </form>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include '_pagination.html' %}
 </div>
-{% include '_pagination.html' %}
+{% elif corte_sel %}
+<div class="admin-card text-center py-5">
+    <div class="mb-3 text-secondary display-6"><i class='bx bx-bar-chart-alt-2'></i></div>
+    <p class="text-secondary mb-0">No hay producción histórica para este corte (o no hay coincidencias con el código buscado).</p>
+</div>
+{% else %}
+<div class="admin-card text-center py-5">
+    <div class="mb-3 text-secondary display-6"><i class='bx bxs-folder-open'></i></div>
+    <p class="text-secondary mb-0">Selecciona un corte para visualizar la producción archivada.</p>
+</div>
 {% endif %}
 
 {% endblock %}
