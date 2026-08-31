@@ -83,13 +83,13 @@ def _rebalanced_set_objetivo(modo_doc, target_user_id, new_objetivo):
     producido_target = int(asignaciones[idx].get("producido") or 0)
     new_objetivo = max(new_objetivo, producido_target)
 
-    sum_otros = 0
+    min_sum_otros = 0
     for i, a in enumerate(asignaciones):
         if i == idx:
             continue
-        sum_otros += int(a.get("objetivo") or 0)
+        min_sum_otros += int(a.get("producido") or 0)
 
-    max_target = total_global - sum_otros
+    max_target = total_global - min_sum_otros
     max_target = max(max_target, producido_target)
     if new_objetivo > max_target:
         new_objetivo = max_target
@@ -150,17 +150,76 @@ def _rebalanced_set_objetivo(modo_doc, target_user_id, new_objetivo):
                 asignaciones[i]["objetivo"] = int(asignaciones[i].get("objetivo") or 0) + 1
                 extra -= 1
 
+    total_now = sum(int(a.get("objetivo") or 0) for a in asignaciones)
+    if total_now != total_global:
+        diff = total_global - total_now
+        if diff > 0:
+            receivers = []
+            for i, a in enumerate(asignaciones):
+                if i == idx:
+                    continue
+                receivers.append((int(a.get("producido") or 0), i))
+            receivers.sort()
+            while diff > 0 and receivers:
+                for _, i in receivers:
+                    if diff <= 0:
+                        break
+                    asignaciones[i]["objetivo"] = int(asignaciones[i].get("objetivo") or 0) + 1
+                    diff -= 1
+        elif diff < 0:
+            remaining = -diff
+            donors = []
+            for i, a in enumerate(asignaciones):
+                if i == idx:
+                    continue
+                prod = int(a.get("producido") or 0)
+                obj = int(a.get("objetivo") or 0)
+                slack = max(obj - prod, 0)
+                if slack <= 0:
+                    continue
+                donors.append((prod, -slack, i))
+            donors.sort()
+            for _, __, i in donors:
+                if remaining <= 0:
+                    break
+                prod = int(asignaciones[i].get("producido") or 0)
+                obj = int(asignaciones[i].get("objetivo") or 0)
+                slack = max(obj - prod, 0)
+                take = min(slack, remaining)
+                asignaciones[i]["objetivo"] = obj - take
+                remaining -= take
+
     modo_doc["asignaciones"] = asignaciones
     return modo_doc
 
 
+def _modo_planificado(plan_doc, modo_key):
+    modos = plan_doc.get("modos") or {}
+    modo_doc = modos.get(modo_key) or {}
+    tramos_doc = modo_doc.get("tramos") or {}
+    for _, tramo_doc in tramos_doc.items():
+        try:
+            total = int(tramo_doc.get("total") or 0)
+        except Exception:
+            total = 0
+        if total <= 0:
+            continue
+        asignaciones = tramo_doc.get("asignaciones") or []
+        if asignaciones:
+            return True
+    return False
+
+
 def register_admin_planificacion_routes(app, db, login_required, get_production_status_map, build_tarjetas_grupos):
     @app.route("/admin/planificacion", methods=["GET"])
-    @login_required(["administrador", "soporte"])
+    @login_required(["administrador", "soporte", "supervisor"])
     def admin_planificacion_home():
         production_status_map = get_production_status_map(db, db.produccion, {})
         piezas = list(db.piezas.find({}, {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0}))
         grupos = build_tarjetas_grupos(piezas, production_status_map, include_orphans=True)
+
+        filtro_marco = (request.args.get("f_marco") or "").strip()
+        filtro_operador = (request.args.get("f_operador") or "").strip()
 
         selected = _normalize_grupo(
             {
@@ -172,6 +231,61 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         selected_active = bool(selected["empresa"] or selected["marco"])
 
         ciclo = _get_ciclo_actual(db)
+
+        plan_status = {}
+        for p in db[COLLECTION_PLANIFICACIONES].find({"ciclo": ciclo}, {"grupo": 1, "modos": 1}):
+            grupo_p = p.get("grupo") or {}
+            empresa_p = str(grupo_p.get("empresa") or "")
+            marco_p = str(grupo_p.get("marco") or "")
+            if not empresa_p or not marco_p:
+                continue
+            arm_ok = _modo_planificado(p, "armador")
+            rem_ok = _modo_planificado(p, "rematador")
+            plan_status.setdefault(empresa_p, {})[marco_p] = {"armador": arm_ok, "rematador": rem_ok}
+
+        marcos_permitidos = None
+        if filtro_operador and ObjectId.is_valid(filtro_operador):
+            user_oid = ObjectId(filtro_operador)
+            marcos_permitidos = set()
+            for plan_doc in db[COLLECTION_PLANIFICACIONES].find({"ciclo": ciclo}):
+                grupo = plan_doc.get("grupo") or {}
+                empresa = str(grupo.get("empresa") or "")
+                marco = str(grupo.get("marco") or "")
+                modos = plan_doc.get("modos") or {}
+                found = False
+                for modo_key in ("armador", "rematador"):
+                    modo_doc = modos.get(modo_key) or {}
+                    tramos_doc = modo_doc.get("tramos") or {}
+                    for _, tramo_doc in tramos_doc.items():
+                        for a in (tramo_doc.get("asignaciones") or []):
+                            if a.get("user_id") == user_oid:
+                                found = True
+                                break
+                        if found:
+                            break
+                    if found:
+                        break
+                if found:
+                    marcos_permitidos.add((empresa, marco))
+
+        if filtro_marco or marcos_permitidos is not None:
+            grupos_filtrados = []
+            for g in grupos:
+                cliente = str(g.get("cliente") or "")
+                marcos = []
+                for m in g.get("marcos", []):
+                    marco = str(m.get("marco") or "")
+                    if filtro_marco and filtro_marco.lower() not in marco.lower():
+                        continue
+                    if marcos_permitidos is not None and (cliente, marco) not in marcos_permitidos:
+                        continue
+                    marcos.append(m)
+                if marcos:
+                    g2 = dict(g)
+                    g2["marcos"] = marcos
+                    grupos_filtrados.append(g2)
+            grupos = grupos_filtrados
+
         plan = None
         tramos_info = []
         pendientes_armador = {}
@@ -221,6 +335,19 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                 break
 
         operadores = list(db.usuarios.find({"tipo": "operador"}, {"nombre": 1, "usuario": 1}).sort("nombre", 1))
+        for op in operadores:
+            if op.get("_id") is not None:
+                op["id_str"] = str(op["_id"])
+
+        role = session.get("role")
+        can_edit_planificacion = False
+        if role == "administrador":
+            can_edit_planificacion = True
+        elif role == "supervisor":
+            user_id = session.get("user_id")
+            if ObjectId.is_valid(str(user_id)):
+                u = db.usuarios.find_one({"_id": ObjectId(user_id)}, {"puede_editar_planificacion": 1})
+                can_edit_planificacion = bool(u.get("puede_editar_planificacion")) if u else False
 
         return render_template(
             "admin_planificacion.html",
@@ -234,11 +361,25 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             pendientes_rematador=pendientes_rematador,
             operador_ids_armador=operador_ids_armador,
             operador_ids_rematador=operador_ids_rematador,
+            filtro_marco=filtro_marco,
+            filtro_operador=filtro_operador,
+            can_edit_planificacion=can_edit_planificacion,
+            plan_status=plan_status,
         )
 
     @app.route("/admin/planificacion/crear", methods=["POST"])
-    @login_required("administrador")
+    @login_required(["administrador", "supervisor"])
     def admin_planificacion_crear():
+        if session.get("role") == "supervisor":
+            user_id = session.get("user_id")
+            can_edit = False
+            if ObjectId.is_valid(str(user_id)):
+                u = db.usuarios.find_one({"_id": ObjectId(user_id)}, {"puede_editar_planificacion": 1})
+                can_edit = bool(u.get("puede_editar_planificacion")) if u else False
+            if not can_edit:
+                flash("No tienes permisos para modificar la planificación.", "warning")
+                return redirect(url_for("admin_planificacion_home"))
+
         modo = request.form.get("modo")
         modo_key = _mode_key(modo)
         if not modo_key:
@@ -341,8 +482,18 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         return redirect(url_for("admin_planificacion_home", **grupo))
 
     @app.route("/admin/planificacion/ajustar", methods=["POST"])
-    @login_required("administrador")
+    @login_required(["administrador", "supervisor"])
     def admin_planificacion_ajustar():
+        if session.get("role") == "supervisor":
+            user_id = session.get("user_id")
+            can_edit = False
+            if ObjectId.is_valid(str(user_id)):
+                u = db.usuarios.find_one({"_id": ObjectId(user_id)}, {"puede_editar_planificacion": 1})
+                can_edit = bool(u.get("puede_editar_planificacion")) if u else False
+            if not can_edit:
+                flash("No tienes permisos para modificar la planificación.", "warning")
+                return redirect(url_for("admin_planificacion_home"))
+
         plan_id = request.form.get("plan_id")
         modo = request.form.get("modo")
         modo_key = _mode_key(modo)

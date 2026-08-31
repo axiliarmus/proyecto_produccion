@@ -46,11 +46,30 @@
                 {% set back_url = url_for('admin_dashboard') %}
             {% endif %}
 
-            <li class="nav-item">
-                <a class="btn btn-outline-secondary btn-lg px-4 fw-bold" href="{{ back_url }}">
-                    ⬅ VOLVER
-                </a>
-            </li>
+            {% if session.get('role') != 'operador' %}
+              <li class="nav-item">
+                  <a class="btn btn-outline-secondary btn-lg px-4 fw-bold" href="{{ back_url }}">
+                      ⬅ VOLVER
+                  </a>
+              </li>
+            {% endif %}
+
+            {% if session.get('role') == 'operador' %}
+              <li class="nav-item">
+                <form method="post" action="{{ url_for('operador_toggle_armado_solo') }}" class="d-flex align-items-center gap-2">
+                  <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="armado_solo" value="0">
+                  <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="armadoSoloSwitch" name="armado_solo" value="1"
+                           {% if session.get('armado_solo') %}checked{% endif %}
+                           onchange="this.form.submit()">
+                    <label class="form-check-label text-light small fw-bold" for="armadoSoloSwitch">
+                      Armado solo x2
+                    </label>
+                  </div>
+                </form>
+              </li>
+            {% endif %}
             <li class="nav-item">
                 <a class="btn btn-outline-danger btn-lg px-4 fw-bold" href="{{ url_for('logout') }}">
                     CERRAR SESIÓN ➡

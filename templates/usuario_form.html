@@ -55,6 +55,14 @@
             </label>
         </div>
 
+        <div class="form-check form-switch mb-5">
+            <input class="form-check-input" type="checkbox" name="puede_editar_planificacion" id="planEdit"
+                   {% if usuario and usuario.puede_editar_planificacion %}checked{% endif %}>
+            <label class="form-check-label text-light" for="planEdit">
+                📋 Permitir editar planificación (solo supervisores)
+            </label>
+        </div>
+
         <h5 class="text-accent mb-4">Tarifas de Producción ($)</h5>
         
         <div class="row g-3 mb-4">

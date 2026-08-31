@@ -49,6 +49,7 @@ def register_auth_routes(app, db, login_required, login_attempts):
                 session["username"] = user["usuario"]
                 session["nombre"] = user.get("nombre", user["usuario"])
                 session["role"] = user["tipo"]
+                session["armado_solo"] = False
                 
                 # Cachear password_changed_at en sesión
                 dt = user.get("password_changed_at")

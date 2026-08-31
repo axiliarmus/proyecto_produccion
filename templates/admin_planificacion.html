@@ -18,6 +18,39 @@
   </div>
 </div>
 
+<div class="admin-card mb-4">
+  <form method="get" class="row g-3 align-items-end">
+    {% if selected %}
+      <input type="hidden" name="empresa" value="{{ selected.empresa }}">
+      <input type="hidden" name="marco" value="{{ selected.marco }}">
+    {% endif %}
+
+    <div class="col-md-6">
+      <label class="form-label text-secondary small">Filtrar por marco</label>
+      <input type="text" name="f_marco" value="{{ filtro_marco or '' }}" class="form-control bg-dark text-light border-secondary" placeholder="Ej: 3 CARRILES">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label text-secondary small">Filtrar por operador</label>
+      <select name="f_operador" class="form-select bg-dark text-light border-secondary">
+        <option value="">Todos</option>
+        {% for op in operadores %}
+          <option value="{{ op.id_str }}" {% if filtro_operador and (filtro_operador == op.id_str) %}selected{% endif %}>
+            {{ op.nombre or op.usuario }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2 d-flex gap-2">
+      <button class="btn btn-accent w-100">
+        <i class='bx bx-search'></i>
+      </button>
+      <a class="btn btn-outline-secondary w-100" href="{{ url_for('admin_planificacion_home') }}">
+        <i class='bx bx-x'></i>
+      </a>
+    </div>
+  </form>
+</div>
+
 {% if selected %}
 <div class="admin-card mb-4">
   <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
@@ -28,7 +61,7 @@
       </div>
     </div>
     <div class="d-flex gap-2">
-      {% if session.get('role') == 'administrador' %}
+      {% if can_edit_planificacion %}
       <button class="btn btn-accent" data-bs-toggle="modal" data-bs-target="#modalPlanArmador">
         <i class='bx bxs-hard-hat'></i> Planificar Armador
       </button>
@@ -36,24 +69,40 @@
         <i class='bx bx-check-shield'></i> Planificar Rematador
       </button>
       {% if plan %}
-      <form method="POST" action="{{ url_for('admin_planificacion_eliminar') }}" class="d-inline"
-            onsubmit="return confirm('¿Eliminar esta planificación? La pieza quedará liberada para todos.')">
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-        <input type="hidden" name="empresa" value="{{ selected.empresa }}">
-        <input type="hidden" name="marco" value="{{ selected.marco }}">
-        <button class="btn btn-danger" type="submit">
-          <i class='bx bxs-trash'></i>
-        </button>
-      </form>
+      <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalVerArmador">
+        <i class='bx bx-show'></i> Ver Armado
+      </button>
+      <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalVerRematador">
+        <i class='bx bx-show'></i> Ver Remate
+      </button>
+      {% if session.get('role') == 'administrador' %}
+        <form method="POST" action="{{ url_for('admin_planificacion_eliminar') }}" class="d-inline"
+              onsubmit="return confirm('¿Eliminar esta planificación? La pieza quedará liberada para todos.')">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="empresa" value="{{ selected.empresa }}">
+          <input type="hidden" name="marco" value="{{ selected.marco }}">
+          <button class="btn btn-danger" type="submit">
+            <i class='bx bxs-trash'></i>
+          </button>
+        </form>
+      {% endif %}
       {% endif %}
       {% else %}
       <span class="badge badge-soft">Vista de solo lectura</span>
+      {% if plan %}
+      <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalVerArmador">
+        <i class='bx bx-show'></i> Ver Armado
+      </button>
+      <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalVerRematador">
+        <i class='bx bx-show'></i> Ver Remate
+      </button>
+      {% endif %}
       {% endif %}
     </div>
   </div>
 </div>
 
-{% if session.get('role') == 'administrador' %}
+{% if can_edit_planificacion %}
 <div class="modal fade" id="modalPlanArmador" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content bg-dark text-light border border-secondary">
@@ -174,106 +223,166 @@
 {% endif %}
 
 {% if plan %}
-<div class="row g-4">
-  <div class="col-lg-6">
-    <div class="admin-card h-100">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="text-white mb-0"><i class='bx bxs-hard-hat me-2'></i>Armador</h5>
-        <span class="badge badge-soft">Total: {{ plan.modos.armador.total if plan.modos and plan.modos.armador else 0 }}</span>
+<div class="modal fade" id="modalVerArmador" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-light border border-secondary">
+      <div class="modal-header border-bottom border-secondary">
+        <h5 class="modal-title">
+          <i class='bx bxs-hard-hat me-2'></i>Planificación Armador · {{ selected.empresa }} · {{ selected.marco }}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
+      <div class="modal-body p-2 p-md-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="badge badge-soft">Total: {{ plan.modos.armador.total if plan.modos and plan.modos.armador else 0 }}</span>
+        </div>
 
-      {% if plan.modos and plan.modos.armador and plan.modos.armador.tramos and plan.modos.armador.tramos|length > 0 %}
-        {% for tramo_key, tramo_doc in plan.modos.armador.tramos.items() %}
-          <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
-            <div class="text-secondary small">Tramo {{ tramo_key }}</div>
-            <span class="badge badge-soft">Total: {{ tramo_doc.total }}</span>
-          </div>
-          <div class="row g-3">
-            {% for a in tramo_doc.asignaciones %}
-            <div class="col-md-6">
-              <div class="card bg-dark border-secondary h-100">
-                <div class="card-body">
-                  <div class="fw-bold text-white">{{ a.user_name }}</div>
-                  <div class="text-secondary small mb-2">{{ selected.marco }} · {{ tramo_key }}</div>
-                  <div class="d-flex justify-content-between align-items-center">
-                    <div class="small text-secondary">Producidas</div>
-                    <div class="fw-bold text-white">{{ a.producido or 0 }} / {{ a.objetivo or 0 }}</div>
-                  </div>
-
-                  {% if session.get('role') == 'administrador' %}
-                  <form method="POST" action="{{ url_for('admin_planificacion_ajustar') }}" class="mt-3 d-flex gap-2">
-                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-                    <input type="hidden" name="plan_id" value="{{ plan._id }}">
-                    <input type="hidden" name="modo" value="armador">
-                    <input type="hidden" name="tramo" value="{{ tramo_key }}">
-                    <input type="hidden" name="user_id" value="{{ a.user_id }}">
-                    <input type="number" min="{{ a.producido or 0 }}" name="objetivo" class="form-control form-control-sm bg-dark text-light border-secondary" value="{{ a.objetivo or 0 }}">
-                    <button class="btn btn-sm btn-outline-light" type="submit">Ajustar</button>
-                  </form>
-                  {% endif %}
+        {% if plan.modos and plan.modos.armador and plan.modos.armador.tramos and plan.modos.armador.tramos|length > 0 %}
+          {% for tramo_key, tramo_doc in plan.modos.armador.tramos.items() %}
+            <div class="card bg-dark border-secondary mb-3">
+              <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="fw-bold text-white">Tramo {{ tramo_key }}</div>
+                  <span class="badge badge-soft">Total: {{ tramo_doc.total }}</span>
                 </div>
               </div>
+              <div class="table-responsive">
+                <table class="table table-dark table-striped table-sm align-middle mb-0">
+                  <thead>
+                    <tr class="text-secondary small">
+                      <th>Operador</th>
+                      <th class="text-end">Producidas</th>
+                      <th class="text-end">Objetivo</th>
+                      <th class="text-end">Restan</th>
+                      {% if can_edit_planificacion %}
+                      <th class="text-end">Ajuste</th>
+                      {% endif %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for a in tramo_doc.asignaciones %}
+                      {% set obj = (a.objetivo or 0)|int %}
+                      {% set prod = (a.producido or 0)|int %}
+                      {% set rest = obj - prod %}
+                      <tr>
+                        <td class="fw-bold text-white">{{ a.user_name }}</td>
+                        <td class="text-end">{{ prod }}</td>
+                        <td class="text-end">{{ obj }}</td>
+                        <td class="text-end fw-bold">{% if rest > 0 %}{{ rest }}{% else %}0{% endif %}</td>
+                        {% if can_edit_planificacion %}
+                        <td class="text-end">
+                          <form method="POST" action="{{ url_for('admin_planificacion_ajustar') }}" class="d-flex gap-2 justify-content-end">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="plan_id" value="{{ plan._id }}">
+                            <input type="hidden" name="modo" value="armador">
+                            <input type="hidden" name="tramo" value="{{ tramo_key }}">
+                            <input type="hidden" name="user_id" value="{{ a.user_id }}">
+                            <input type="number" min="{{ prod }}" name="objetivo" class="form-control form-control-sm bg-dark text-light border-secondary" value="{{ obj }}" style="max-width: 110px;">
+                            <button class="btn btn-sm btn-outline-light" type="submit">
+                              <i class='bx bx-edit-alt'></i>
+                            </button>
+                          </form>
+                        </td>
+                        {% endif %}
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            {% endfor %}
+          {% endfor %}
+          <div class="text-secondary small mt-3">
+            Al aumentar a uno, se descuenta automáticamente a quienes menos han producido (sin bajar de lo ya producido).
           </div>
-        {% endfor %}
-        <div class="text-secondary small mt-3">
-          Al aumentar a uno, se descuenta automáticamente a quienes menos han producido (sin bajar de lo ya producido).
-        </div>
-      {% else %}
-        <div class="text-secondary">Sin asignaciones de armador.</div>
-      {% endif %}
+        {% else %}
+          <div class="text-secondary">Sin asignaciones de armador.</div>
+        {% endif %}
+      </div>
+      <div class="modal-footer border-top border-secondary">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
     </div>
   </div>
+</div>
 
-  <div class="col-lg-6">
-    <div class="admin-card h-100">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="text-white mb-0"><i class='bx bx-check-shield me-2'></i>Rematador</h5>
-        <span class="badge badge-soft">Total: {{ plan.modos.rematador.total if plan.modos and plan.modos.rematador else 0 }}</span>
+<div class="modal fade" id="modalVerRematador" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-light border border-secondary">
+      <div class="modal-header border-bottom border-secondary">
+        <h5 class="modal-title">
+          <i class='bx bx-check-shield me-2'></i>Planificación Rematador · {{ selected.empresa }} · {{ selected.marco }}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
+      <div class="modal-body p-2 p-md-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="badge badge-soft">Total: {{ plan.modos.rematador.total if plan.modos and plan.modos.rematador else 0 }}</span>
+        </div>
 
-      {% if plan.modos and plan.modos.rematador and plan.modos.rematador.tramos and plan.modos.rematador.tramos|length > 0 %}
-        {% for tramo_key, tramo_doc in plan.modos.rematador.tramos.items() %}
-          <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
-            <div class="text-secondary small">Tramo {{ tramo_key }}</div>
-            <span class="badge badge-soft">Total: {{ tramo_doc.total }}</span>
-          </div>
-          <div class="row g-3">
-            {% for a in tramo_doc.asignaciones %}
-            <div class="col-md-6">
-              <div class="card bg-dark border-secondary h-100">
-                <div class="card-body">
-                  <div class="fw-bold text-white">{{ a.user_name }}</div>
-                  <div class="text-secondary small mb-2">{{ selected.marco }} · {{ tramo_key }}</div>
-                  <div class="d-flex justify-content-between align-items-center">
-                    <div class="small text-secondary">Producidas</div>
-                    <div class="fw-bold text-white">{{ a.producido or 0 }} / {{ a.objetivo or 0 }}</div>
-                  </div>
-
-                  {% if session.get('role') == 'administrador' %}
-                  <form method="POST" action="{{ url_for('admin_planificacion_ajustar') }}" class="mt-3 d-flex gap-2">
-                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-                    <input type="hidden" name="plan_id" value="{{ plan._id }}">
-                    <input type="hidden" name="modo" value="rematador">
-                    <input type="hidden" name="tramo" value="{{ tramo_key }}">
-                    <input type="hidden" name="user_id" value="{{ a.user_id }}">
-                    <input type="number" min="{{ a.producido or 0 }}" name="objetivo" class="form-control form-control-sm bg-dark text-light border-secondary" value="{{ a.objetivo or 0 }}">
-                    <button class="btn btn-sm btn-outline-light" type="submit">Ajustar</button>
-                  </form>
-                  {% endif %}
+        {% if plan.modos and plan.modos.rematador and plan.modos.rematador.tramos and plan.modos.rematador.tramos|length > 0 %}
+          {% for tramo_key, tramo_doc in plan.modos.rematador.tramos.items() %}
+            <div class="card bg-dark border-secondary mb-3">
+              <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="fw-bold text-white">Tramo {{ tramo_key }}</div>
+                  <span class="badge badge-soft">Total: {{ tramo_doc.total }}</span>
                 </div>
               </div>
+              <div class="table-responsive">
+                <table class="table table-dark table-striped table-sm align-middle mb-0">
+                  <thead>
+                    <tr class="text-secondary small">
+                      <th>Operador</th>
+                      <th class="text-end">Producidas</th>
+                      <th class="text-end">Objetivo</th>
+                      <th class="text-end">Restan</th>
+                      {% if can_edit_planificacion %}
+                      <th class="text-end">Ajuste</th>
+                      {% endif %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for a in tramo_doc.asignaciones %}
+                      {% set obj = (a.objetivo or 0)|int %}
+                      {% set prod = (a.producido or 0)|int %}
+                      {% set rest = obj - prod %}
+                      <tr>
+                        <td class="fw-bold text-white">{{ a.user_name }}</td>
+                        <td class="text-end">{{ prod }}</td>
+                        <td class="text-end">{{ obj }}</td>
+                        <td class="text-end fw-bold">{% if rest > 0 %}{{ rest }}{% else %}0{% endif %}</td>
+                        {% if can_edit_planificacion %}
+                        <td class="text-end">
+                          <form method="POST" action="{{ url_for('admin_planificacion_ajustar') }}" class="d-flex gap-2 justify-content-end">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="plan_id" value="{{ plan._id }}">
+                            <input type="hidden" name="modo" value="rematador">
+                            <input type="hidden" name="tramo" value="{{ tramo_key }}">
+                            <input type="hidden" name="user_id" value="{{ a.user_id }}">
+                            <input type="number" min="{{ prod }}" name="objetivo" class="form-control form-control-sm bg-dark text-light border-secondary" value="{{ obj }}" style="max-width: 110px;">
+                            <button class="btn btn-sm btn-outline-light" type="submit">
+                              <i class='bx bx-edit-alt'></i>
+                            </button>
+                          </form>
+                        </td>
+                        {% endif %}
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            {% endfor %}
+          {% endfor %}
+          <div class="text-secondary small mt-3">
+            Al aumentar a uno, se descuenta automáticamente a quienes menos han producido (sin bajar de lo ya producido).
           </div>
-        {% endfor %}
-        <div class="text-secondary small mt-3">
-          Al aumentar a uno, se descuenta automáticamente a quienes menos han producido (sin bajar de lo ya producido).
-        </div>
-      {% else %}
-        <div class="text-secondary">Sin asignaciones de rematador.</div>
-      {% endif %}
+        {% else %}
+          <div class="text-secondary">Sin asignaciones de rematador.</div>
+        {% endif %}
+      </div>
+      <div class="modal-footer border-top border-secondary">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -286,11 +395,25 @@
     <h5 class="mt-2 text-white">Cliente: {{ g.cliente }}</h5>
     <div class="row row-cols-1 row-cols-md-3 g-4 mt-1">
       {% for m in g.marcos %}
+      {% set ps = (plan_status.get(g.cliente|string, {}) if plan_status else {}) %}
+      {% set st = (ps.get(m.marco|string) if ps else None) %}
+      {% set arm_ok = (st.armador if st else False) %}
+      {% set rem_ok = (st.rematador if st else False) %}
+      {% set border_class = 'border-secondary' %}
+      {% if arm_ok and rem_ok %}
+        {% set border_class = 'border-success' %}
+      {% elif arm_ok or rem_ok %}
+        {% set border_class = 'border-warning' %}
+      {% endif %}
       <div class="col">
-        <div class="card bg-dark border-light shadow h-100 fixed-card">
+        <div class="card bg-dark {{ border_class }} border-2 shadow h-100 fixed-card">
           <div class="card-body d-flex flex-column">
             <div class="mb-3 d-flex justify-content-between align-items-center">
-              <h5 class="card-title text-light mb-0">{{ m.marco }}</h5>
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h5 class="card-title text-light mb-0">{{ m.marco }}</h5>
+                <span class="badge {% if arm_ok %}bg-success{% else %}bg-secondary{% endif %}">Arm</span>
+                <span class="badge {% if rem_ok %}bg-success{% else %}bg-secondary{% endif %}">Rem</span>
+              </div>
               <a class="btn btn-sm btn-outline-light"
                  href="{{ url_for('admin_planificacion_home', empresa=g.cliente, marco=m.marco) }}">
                 Planificar Marco

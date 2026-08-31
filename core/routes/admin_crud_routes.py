@@ -128,6 +128,7 @@ def register_admin_crud_routes(
         precio_avo_armado = float(request.form.get("precio_avo_armado", 0))
         precio_avo_remate = float(request.form.get("precio_avo_remate", 0))
         sin_restriccion = bool(request.form.get("sin_restriccion"))
+        puede_editar_planificacion = bool(request.form.get("puede_editar_planificacion")) if tipo == "supervisor" else False
 
         password = generate_password_hash(request.form["password"])
 
@@ -145,6 +146,7 @@ def register_admin_crud_routes(
                 "precio_avo_armado": precio_avo_armado,
                 "precio_avo_remate": precio_avo_remate,
                 "sin_restriccion": sin_restriccion,
+                "puede_editar_planificacion": puede_editar_planificacion,
                 "password": password,
             }
         )
@@ -173,6 +175,7 @@ def register_admin_crud_routes(
         precio_avo_armado = float(request.form.get("precio_avo_armado", 0))
         precio_avo_remate = float(request.form.get("precio_avo_remate", 0))
         sin_restriccion = bool(request.form.get("sin_restriccion"))
+        puede_editar_planificacion = bool(request.form.get("puede_editar_planificacion")) if tipo == "supervisor" else False
 
         pwd = request.form.get("password", "").strip()
 
@@ -184,6 +187,7 @@ def register_admin_crud_routes(
             "precio_avo_armado": precio_avo_armado,
             "precio_avo_remate": precio_avo_remate,
             "sin_restriccion": sin_restriccion,
+            "puede_editar_planificacion": puede_editar_planificacion,
         }
         if pwd:
             update["password"] = generate_password_hash(pwd)

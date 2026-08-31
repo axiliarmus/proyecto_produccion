@@ -59,7 +59,7 @@
                 </a>
             </li>
 
-            {% if session.get('role') in ['administrador', 'soporte'] %}
+            {% if session.get('role') in ['administrador', 'soporte', 'supervisor'] %}
             <li>
                 <a href="{{ url_for('admin_planificacion_home') }}" class="nav-link {% if 'admin_planificacion' in request.endpoint %}active{% endif %}">
                     <i class='bx bx-calendar-check'></i> Planificación

@@ -67,6 +67,12 @@ def _build_submission_guard_id(user_id, modo, box, codigo_pieza, cuerda_interna_
 def register_operator_routes(app, db, login_required, normalize_page, paginate_list, get_tunnel_url):
     """Registra rutas del dominio operador."""
 
+    @app.route("/operador/armado-solo", methods=["POST"])
+    @login_required("operador")
+    def operador_toggle_armado_solo():
+        session["armado_solo"] = (request.form.get("armado_solo") or "0") == "1"
+        return redirect(request.referrer or url_for("operador_home"))
+
     @app.route("/operador", methods=["GET", "POST"])
     @login_required("operador")
     def operador_home():
@@ -235,6 +241,61 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             if jornada.get("salida"):
                 jornada["salida"] = to_cl(jornada.get("salida"))
 
+        planificaciones = {"armador": [], "rematador": []}
+        try:
+            user_oid = ObjectId(user_id) if ObjectId.is_valid(str(user_id)) else user_id
+            conf = db.config.find_one({"key": "ciclo_actual"}) or {"value": "a"}
+            ciclo = str(conf.get("value") or "a")
+            planes = list(db.planificaciones.find({"ciclo": ciclo}))
+
+            agrupado = {"armador": {}, "rematador": {}}
+            for plan in planes:
+                grupo = plan.get("grupo") or {}
+                empresa = str(grupo.get("empresa") or "")
+                marco = str(grupo.get("marco") or "")
+                modos = plan.get("modos") or {}
+                for modo_key in ("armador", "rematador"):
+                    modo_doc = modos.get(modo_key) or {}
+                    tramos_doc = modo_doc.get("tramos") or {}
+                    for tramo_key, tramo_doc in tramos_doc.items():
+                        for a in (tramo_doc.get("asignaciones") or []):
+                            if a.get("user_id") != user_oid:
+                                continue
+                            obj = int(a.get("objetivo") or 0)
+                            prod = int(a.get("producido") or 0)
+                            rest = max(obj - prod, 0)
+                            k = (empresa, marco)
+                            if k not in agrupado[modo_key]:
+                                agrupado[modo_key][k] = {
+                                    "empresa": empresa,
+                                    "marco": marco,
+                                    "modo": modo_key,
+                                    "total_objetivo": 0,
+                                    "total_producido": 0,
+                                    "total_restante": 0,
+                                    "tramos": [],
+                                }
+                            agrupado[modo_key][k]["tramos"].append(
+                                {
+                                    "tramo": str(tramo_key),
+                                    "objetivo": obj,
+                                    "producido": prod,
+                                    "restante": rest,
+                                }
+                            )
+                            agrupado[modo_key][k]["total_objetivo"] += obj
+                            agrupado[modo_key][k]["total_producido"] += prod
+                            agrupado[modo_key][k]["total_restante"] += rest
+
+            for modo_key in ("armador", "rematador"):
+                items = list(agrupado[modo_key].values())
+                for it in items:
+                    it["tramos"].sort(key=lambda x: x.get("tramo"))
+                items.sort(key=lambda x: (x.get("empresa") or "", x.get("marco") or ""))
+                planificaciones[modo_key] = items
+        except Exception:
+            planificaciones = {"armador": [], "rematador": []}
+
         return render_template(
             "operador.html",
             nombre=nombre,
@@ -246,6 +307,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             total_general=total_general,
             tunnel_url=get_tunnel_url(),
             pagination=pagination,
+            planificaciones=planificaciones,
         )
 
     @app.route("/operador/jornada/ingreso", methods=["POST"])
@@ -470,7 +532,8 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
 
                     objetivo = int(asignacion.get("objetivo") or 0)
                     producido = int(asignacion.get("producido") or 0)
-                    if producido >= objetivo:
+                    unidades_plan = 2 if (modo == "armador" and bool(session.get("armado_solo"))) else 1
+                    if producido + unidades_plan > objetivo:
                         release_submission_guard()
                         flash("⛔ Ya completaste tu cupo asignado para esta planificación.", "warning")
                         return redirect(url_for("operador_home"))
@@ -481,6 +544,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                         "tramo": tramo_plan,
                         "user_oid": user_oid,
                         "objetivo": objetivo,
+                        "units": unidades_plan,
                     }
 
         armado_count = collection_prod.count_documents({**filtro_base, "modo": "armador"})
@@ -505,6 +569,8 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
         # #endregion
 
         if modo == "armador":
+            armado_solo = bool(session.get("armado_solo"))
+            unidades_registro = 2 if armado_solo else 1
 
             def safe_float(value):
                 try:
@@ -512,7 +578,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                 except Exception:
                     return None
 
-            if armado_count >= 2:
+            if armado_count + unidades_registro > 2:
                 # #region debug-point A:blocked-by-armado-count
                 _debug_report_operator_armado(
                     "A",
@@ -594,6 +660,13 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             cuerda_externa = None
             flecha = None
 
+        if modo == "armador":
+            registro_armado_solo = bool(session.get("armado_solo"))
+            unidades_registro = 2 if registro_armado_solo else 1
+        else:
+            registro_armado_solo = False
+            unidades_registro = 1
+
         registro = {
             "user_id": user_id,
             "usuario": usuario,
@@ -610,6 +683,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             "flecha": flecha,
             "fecha": datetime.utcnow(),
             "calidad_status": "pendiente",
+            "armado_solo": registro_armado_solo,
         }
 
         usuario_valores = db.usuarios.find_one({"_id": ObjectId(user_id)}) or {}
@@ -639,28 +713,44 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
         else:
             try:
                 res_ins = db.produccion.insert_one(registro)
+                inserted_ids = [res_ins.inserted_id]
+                if modo == "armador" and registro_armado_solo:
+                    registro_2 = dict(registro)
+                    registro_2["armado_solo_extra"] = True
+                    registro_2["armado_solo_parent_id"] = res_ins.inserted_id
+                    registro_2["fecha"] = datetime.utcnow()
+                    try:
+                        res_ins_2 = db.produccion.insert_one(registro_2)
+                        inserted_ids.append(res_ins_2.inserted_id)
+                    except Exception:
+                        db.produccion.delete_one({"_id": res_ins.inserted_id})
+                        raise
             except Exception:
                 release_submission_guard()
                 flash("❌ No se pudo registrar la pieza. Intenta nuevamente.", "danger")
                 return redirect(url_for("operador_home"))
             if plan_control and plan_control.get("plan_id"):
+                inc_units = int(plan_control.get("units") or 1)
+                objetivo = int(plan_control.get("objetivo") or 0)
                 upd = db.planificaciones.update_one(
-                    {
-                        "_id": plan_control["plan_id"],
-                        f"modos.{plan_control['modo']}.tramos.{plan_control['tramo']}.total": {"$gt": 0},
-                    },
+                    {"_id": plan_control["plan_id"]},
                     {
                         "$inc": {
-                            f"modos.{plan_control['modo']}.tramos.{plan_control['tramo']}.asignaciones.$[a].producido": 1
+                            f"modos.{plan_control['modo']}.tramos.{plan_control['tramo']}.asignaciones.$[a].producido": inc_units
                         }
                     },
                     array_filters=[
                         {
                             "a.user_id": plan_control["user_oid"],
-                            "a.producido": {"$lt": int(plan_control.get("objetivo") or 0)},
+                            "a.producido": {"$lte": objetivo - inc_units},
                         }
                     ],
                 )
+                if upd.modified_count <= 0:
+                    db.produccion.delete_many({"_id": {"$in": inserted_ids}})
+                    release_submission_guard()
+                    flash("⛔ No se pudo actualizar el cupo de planificación para este registro.", "warning")
+                    return redirect(url_for("operador_home"))
                 if upd.modified_count != 1:
                     try:
                         db.produccion.delete_one({"_id": res_ins.inserted_id})
