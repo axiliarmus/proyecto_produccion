@@ -40,6 +40,42 @@
   </form>
 </div>
 
+<div class="admin-card mb-4">
+  <form method="post" action="{{ url_for('soporte_produccion_asignar_corte_masivo') }}" class="row g-3"
+        onsubmit="return confirm('¿Asignar la producción al corte seleccionado? Esto moverá los registros a PRODUCCIÓN HISTÓRICA.')">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="operador" value="{{ operador_sel or 'todos' }}">
+    <input type="hidden" name="codigo_pieza" value="{{ codigo_sel or '' }}">
+    <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio or '' }}">
+    <input type="hidden" name="fecha_fin" value="{{ fecha_fin or '' }}">
+
+    <div class="col-md-5">
+      <label class="form-label text-secondary small">Corte</label>
+      <select name="corte_id" class="form-select bg-dark text-light border-secondary" required>
+        <option value="" disabled selected>Selecciona un corte…</option>
+        {% for c in cortes %}
+          <option value="{{ c._id }}">{{ c.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label text-secondary small">Aplicar a</label>
+      <select name="scope" class="form-select bg-dark text-light border-secondary">
+        <option value="filtrados" selected>Registros filtrados</option>
+        <option value="todos">Todos los registros activos</option>
+      </select>
+    </div>
+    <div class="col-md-3 d-flex align-items-end justify-content-end">
+      <button class="btn btn-danger w-100">
+        <i class='bx bxs-archive-in'></i> Ingresar al corte
+      </button>
+    </div>
+  </form>
+  <div class="text-secondary small mt-2">
+    Mueve los registros desde producción activa a producción histórica con el corte seleccionado.
+  </div>
+</div>
+
 {% if registros|length > 0 %}
 <div class="admin-card">
   <div class="table-responsive">

@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from bson import ObjectId
 from flask import flash, redirect, render_template, request, session, url_for
+from pymongo.errors import BulkWriteError
 
 from core.helpers.date_utils import CL, to_cl
 from core.helpers.soft_delete import soft_delete_one
@@ -9,6 +10,38 @@ from core.helpers.soft_delete import soft_delete_one
 
 def register_soporte_produccion_routes(app, db, login_required):
     """Registra rutas de soporte para gestión de producción activa."""
+
+    def _build_filtro_from_form():
+        codigo = (request.form.get("codigo_pieza") or "").strip()
+        operador_sel = request.form.get("operador")
+        fecha_inicio = request.form.get("fecha_inicio")
+        fecha_fin = request.form.get("fecha_fin")
+        filtro = {}
+
+        if codigo:
+            filtro["codigo_pieza"] = {"$regex": f"^{str(codigo).strip()}$", "$options": "i"}
+
+        if operador_sel and operador_sel != "todos":
+            filtro["usuario"] = operador_sel
+
+        if fecha_inicio or fecha_fin:
+            start_cl = None
+            end_cl = None
+            if fecha_inicio:
+                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
+            if fecha_fin:
+                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
+            rango = {}
+            if start_cl:
+                rango["$gte"] = start_cl.astimezone(timezone.utc)
+            if end_cl:
+                rango["$lte"] = end_cl.astimezone(timezone.utc)
+            if rango:
+                filtro["fecha"] = rango
+
+        return filtro, codigo, operador_sel, fecha_inicio, fecha_fin
 
     @app.route("/soporte/produccion", methods=["GET", "POST"])
     @login_required("soporte")
@@ -20,36 +53,11 @@ def register_soporte_produccion_routes(app, db, login_required):
         filtro = {}
 
         if request.method == "POST":
-            codigo = (request.form.get("codigo_pieza") or "").strip()
-            operador_sel = request.form.get("operador")
-            fecha_inicio = request.form.get("fecha_inicio")
-            fecha_fin = request.form.get("fecha_fin")
-
-            if codigo:
-                filtro["codigo_pieza"] = {"$regex": f"^{str(codigo).strip()}$", "$options": "i"}
-
-            if operador_sel and operador_sel != "todos":
-                filtro["usuario"] = operador_sel
-
-            if fecha_inicio or fecha_fin:
-                start_cl = None
-                end_cl = None
-                if fecha_inicio:
-                    d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-                    start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
-                if fecha_fin:
-                    d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
-                    end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
-                rango = {}
-                if start_cl:
-                    rango["$gte"] = start_cl.astimezone(timezone.utc)
-                if end_cl:
-                    rango["$lte"] = end_cl.astimezone(timezone.utc)
-                if rango:
-                    filtro["fecha"] = rango
+            filtro, codigo, operador_sel, fecha_inicio, fecha_fin = _build_filtro_from_form()
 
         registros = list(db.produccion.find(filtro).sort("fecha", -1))
         operadores = db.produccion.distinct("usuario")
+        cortes = list(db.cortes.find().sort("creado_en", -1))
 
         for registro in registros:
             if registro.get("fecha"):
@@ -63,7 +71,90 @@ def register_soporte_produccion_routes(app, db, login_required):
             operador_sel=operador_sel,
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
+            cortes=cortes,
         )
+
+    @app.route("/soporte/produccion/asignar-corte-masivo", methods=["POST"])
+    @login_required("soporte")
+    def soporte_produccion_asignar_corte_masivo():
+        corte_id_raw = request.form.get("corte_id") or ""
+        scope = (request.form.get("scope") or "filtrados").strip()
+
+        if not ObjectId.is_valid(str(corte_id_raw)):
+            flash("Debes seleccionar un corte válido.", "warning")
+            return redirect(url_for("soporte_produccion_list"))
+
+        corte_id = ObjectId(corte_id_raw)
+        corte = db.cortes.find_one({"_id": corte_id})
+        if not corte:
+            flash("Corte no encontrado.", "warning")
+            return redirect(url_for("soporte_produccion_list"))
+
+        filtro, _, _, _, _ = _build_filtro_from_form()
+        if scope != "filtrados":
+            filtro = {}
+
+        registros = list(db.produccion.find(filtro))
+        if not registros:
+            flash("No hay registros para asignar al corte.", "info")
+            return redirect(url_for("soporte_produccion_list"))
+
+        codigos = set()
+        for r in registros:
+            if r.get("codigo_pieza"):
+                codigos.add(r.get("codigo_pieza"))
+                codigos.add(str(r.get("codigo_pieza")))
+
+        piezas_cache = {}
+        for codigo in codigos:
+            try:
+                cod_int = int(codigo)
+            except Exception:
+                cod_int = codigo
+            pieza = db.piezas.find_one({"$or": [{"codigo": codigo}, {"codigo": str(codigo)}, {"codigo": cod_int}]})
+            if not pieza:
+                pieza = db.piezas_historicas.find_one(
+                    {"$or": [{"codigo": codigo}, {"codigo": str(codigo)}, {"codigo": cod_int}]},
+                    sort=[("_id", -1)],
+                )
+            if pieza:
+                piezas_cache[codigo] = pieza
+                piezas_cache[str(codigo)] = pieza
+
+        historicos = []
+        ids = []
+        for r in registros:
+            ids.append(r["_id"])
+            pieza_ref = piezas_cache.get(r.get("codigo_pieza")) or piezas_cache.get(str(r.get("codigo_pieza")))
+            r["empresa"] = r.get("empresa") or (pieza_ref.get("empresa") if pieza_ref else "")
+            r["marco"] = r.get("marco") or (pieza_ref.get("marco") if pieza_ref else "")
+            r["tramo"] = r.get("tramo") or (pieza_ref.get("tramo") if pieza_ref else "")
+            r["tipo_precio"] = r.get("tipo_precio") or (pieza_ref.get("tipo_precio") if pieza_ref else "metro")
+            r["corte_id"] = corte_id
+            historicos.append(r)
+
+        try:
+            db.produccion_historica.insert_many(historicos, ordered=False)
+        except BulkWriteError:
+            pass
+
+        for codigo in codigos:
+            if db.piezas_historicas.find_one({"corte_id": corte_id, "$or": [{"codigo": codigo}, {"codigo": str(codigo)}]}):
+                continue
+            pieza_ref = piezas_cache.get(codigo) or piezas_cache.get(str(codigo))
+            if not pieza_ref:
+                continue
+            p_copy = dict(pieza_ref)
+            p_copy.pop("_id", None)
+            p_copy["corte_id"] = corte_id
+            try:
+                db.piezas_historicas.insert_one(p_copy)
+            except Exception:
+                pass
+
+        db.produccion.delete_many({"_id": {"$in": ids}})
+        flash(f"✅ Se asignaron {len(ids)} registros al corte: {corte.get('nombre')}", "success")
+        return redirect(url_for("soporte_produccion_list"))
 
     @app.route("/soporte/produccion/<id>/editar")
     @login_required("soporte")
