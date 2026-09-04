@@ -70,8 +70,10 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
     @app.route("/operador/armado-solo", methods=["POST"])
     @login_required("operador")
     def operador_toggle_armado_solo():
-        session["armado_solo"] = (request.form.get("armado_solo") or "0") == "1"
-        return redirect(request.referrer or url_for("operador_home"))
+        values = request.form.getlist("armado_solo")
+        session["armado_solo"] = "1" in values
+        session.modified = True
+        return redirect(url_for("operador_home"))
 
     @app.route("/operador", methods=["GET", "POST"])
     @login_required("operador")

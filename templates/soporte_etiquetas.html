@@ -176,7 +176,7 @@ function abrirVentanaImpresion(etiquetas) {
         <style>
             @media print {
                 @page {
-                    size: 100mm 50mm; /* Tamaño típico de etiqueta Zebra (4x2 pulgadas) */
+                    size: 100mm 50mm;
                     margin: 0;
                 }
                 body {
@@ -184,15 +184,15 @@ function abrirVentanaImpresion(etiquetas) {
                     padding: 0;
                 }
                 .etiqueta {
-                    width: 95mm;
+                    width: 94mm;
                     height: 48mm;
-                    margin: 2mm;
+                    margin: 1mm;
                     page-break-after: always;
                     display: flex;
                     flex-direction: column;
                     justify-content: flex-start;
                     align-items: center;
-                    border: 1px solid #ddd; /* Borde solo para visualizar en pantalla, quitar si molesta */
+                    border: 0;
                     text-align: center;
                     font-family: Arial, sans-serif;
                     box-sizing: border-box;
@@ -203,7 +203,7 @@ function abrirVentanaImpresion(etiquetas) {
                 .detalle-medidas { font-size: 18px; margin-bottom: 2px; }
                 .detalle-flecha { font-size: 18px; margin-bottom: 2px; }
                 .codigo-texto { font-size: 16px; font-weight: bold; margin-top: 2px; }
-                svg { max-width: 90%; height: auto; }
+                svg { width: 100%; max-width: 100%; height: auto; overflow: visible; }
             }
         </style>
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"><\/script>
@@ -223,13 +223,13 @@ function abrirVentanaImpresion(etiquetas) {
         <script>
             JsBarcode("#barcode-${index}", "${item.codigo}", {
                 format: "CODE128",
-                width: 3,
-                height: 30,
+                width: 2,
+                height: 36,
                 displayValue: true,
-                fontSize: 38,
+                fontSize: 24,
                 fontOptions: "bold",
-                margin: 3,
-                textMargin: 3
+                margin: 0,
+                textMargin: 2
             });
         <\/script>
         `;
