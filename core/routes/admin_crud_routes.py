@@ -452,7 +452,7 @@ def register_admin_crud_routes(
             cantidad, msg = soft_delete_many(
                 db,
                 collection_origen="piezas",
-                filtro_doc={"codigo": {"$in": codigos}},
+                filtro_docs={"codigo": {"$in": codigos}},
                 deleted_by_user_id=session.get("user_id"),
                 deleted_by_user_name=session.get("nombre"),
                 deleted_by_ip=request.remote_addr,

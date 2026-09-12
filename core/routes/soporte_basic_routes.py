@@ -293,7 +293,7 @@ def register_soporte_basic_routes(
             cantidad, msg = soft_delete_many(
                 db,
                 collection_origen="piezas",
-                filtro_doc={"_id": {"$in": object_ids}},
+                filtro_docs={"_id": {"$in": object_ids}},
                 deleted_by_user_id=session.get("user_id"),
                 deleted_by_user_name=session.get("nombre"),
                 deleted_by_ip=request.remote_addr,
