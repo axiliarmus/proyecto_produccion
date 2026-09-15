@@ -193,6 +193,83 @@ def _rebalanced_set_objetivo(modo_doc, target_user_id, new_objetivo):
     return modo_doc
 
 
+def _merge_status_maps(primary, secondary):
+    merged = dict(primary or {})
+    for k, v in (secondary or {}).items():
+        if k not in merged:
+            merged[k] = v
+            continue
+        a = merged[k]
+        merged[k] = {
+            "empresa": a.get("empresa") or v.get("empresa") or "Sin Cliente",
+            "marco": a.get("marco") or v.get("marco") or "Sin Marco",
+            "tramo": a.get("tramo") or v.get("tramo") or "Sin Tramo",
+            "armadas": max(int(a.get("armadas") or 0), int(v.get("armadas") or 0)),
+            "rematadas": max(int(a.get("rematadas") or 0), int(v.get("rematadas") or 0)),
+        }
+    return merged
+
+
+def _count_producido_por_operador(db, empresa, marco, tramo, modo, ciclo):
+    match_base = {
+        "empresa": empresa,
+        "marco": marco,
+        "tramo": tramo,
+        "modo": modo,
+        "codigo_pieza": {"$regex": f"^{ciclo}"},
+    }
+
+    pipeline = [
+        {"$match": match_base},
+        {"$sort": {"fecha": -1}},
+        {"$group": {"_id": "$codigo_pieza", "user_id": {"$first": "$user_id"}}},
+        {"$group": {"_id": "$user_id", "count": {"$sum": 1}}},
+    ]
+
+    counts = {}
+    for col in (db.produccion, db.produccion_historica):
+        for row in col.aggregate(pipeline):
+            raw_user = row.get("_id")
+            user_key = ObjectId(raw_user) if ObjectId.is_valid(str(raw_user)) else raw_user
+            counts[user_key] = int(counts.get(user_key, 0) or 0) + int(row.get("count") or 0)
+    return counts
+
+
+def _build_asignaciones_repartidas(total, operadores, producido_por_operador):
+    total = max(0, int(total or 0))
+    n = len(operadores)
+    if n <= 0:
+        return []
+
+    producido_vals = []
+    for op in operadores:
+        uid = ObjectId(op["_id"]) if not isinstance(op["_id"], ObjectId) else op["_id"]
+        producido_vals.append(max(0, int(producido_por_operador.get(uid, 0) or 0)))
+
+    base_total_producido = sum(producido_vals)
+    if base_total_producido > total:
+        total = base_total_producido
+
+    remaining = max(total - base_total_producido, 0)
+    base = remaining // n
+    rem = remaining % n
+
+    asignaciones = []
+    for i, op in enumerate(operadores):
+        uid = ObjectId(op["_id"]) if not isinstance(op["_id"], ObjectId) else op["_id"]
+        producido = max(0, int(producido_por_operador.get(uid, 0) or 0))
+        extra = base + (1 if i < rem else 0)
+        asignaciones.append(
+            {
+                "user_id": uid,
+                "user_name": op.get("nombre") or op.get("usuario") or "Operador",
+                "objetivo": producido + extra,
+                "producido": producido,
+            }
+        )
+    return asignaciones
+
+
 def _modo_planificado(plan_doc, modo_key):
     modos = plan_doc.get("modos") or {}
     modo_doc = modos.get(modo_key) or {}
@@ -214,7 +291,10 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
     @app.route("/admin/planificacion", methods=["GET"])
     @login_required(["administrador", "soporte", "supervisor"])
     def admin_planificacion_home():
-        production_status_map = get_production_status_map(db, db.produccion, {})
+        production_status_map = _merge_status_maps(
+            get_production_status_map(db, db.produccion, {}),
+            get_production_status_map(db, db.produccion_historica, {}),
+        )
         piezas = list(db.piezas.find({}, {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0}))
         grupos = build_tarjetas_grupos(piezas, production_status_map, include_orphans=True)
 
@@ -410,12 +490,14 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             flash("No se encontraron operadores válidos.", "danger")
             return redirect(url_for("admin_planificacion_home", **grupo))
 
-        production_status_map = get_production_status_map(db, db.produccion, {})
+        production_status_map = _merge_status_maps(
+            get_production_status_map(db, db.produccion, {}),
+            get_production_status_map(db, db.produccion_historica, {}),
+        )
         piezas = list(db.piezas.find({}, {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0}))
         grupos = build_tarjetas_grupos(piezas, production_status_map, include_orphans=True)
 
-        pendientes_armador = {}
-        pendientes_rematador = {}
+        tramos_base = {}
         for g in grupos:
             if str(g.get("cliente")) != str(grupo.get("empresa")):
                 continue
@@ -427,26 +509,13 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                     total_tramo = int(t.get("total") or 0)
                     armadas = int(t.get("armadas") or 0)
                     rematadas = int(t.get("rematadas") or 0)
-                    pendientes_armador[tramo_key] = max(total_tramo - armadas, 0)
-                    pendientes_rematador[tramo_key] = max(total_tramo - rematadas, 0)
+                    tramos_base[tramo_key] = {
+                        "total": total_tramo,
+                        "armadas": armadas,
+                        "rematadas": rematadas,
+                    }
                 break
             break
-
-        pendientes = pendientes_armador if modo_key == "armador" else pendientes_rematador
-        tramos_doc = {}
-        total_global = 0
-        for tramo_key, total_tramo in pendientes.items():
-            total_tramo = max(0, int(total_tramo or 0))
-            if total_tramo <= 0:
-                continue
-            total_global += total_tramo
-            tramos_doc[tramo_key] = {
-                "total": total_tramo,
-                "asignaciones": _split_even(
-                    total_tramo,
-                    [{"_id": o["_id"], "nombre": o.get("nombre"), "usuario": o.get("usuario")} for o in operadores],
-                ),
-            }
 
         ciclo = _get_ciclo_actual(db)
         now = _now_utc()
@@ -466,6 +535,81 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             }
             res = db[COLLECTION_PLANIFICACIONES].insert_one(base)
             base["_id"] = res.inserted_id
+
+        prev_modo_doc = ((base.get("modos") or {}).get(modo_key) or {})
+        prev_tramos_doc = prev_modo_doc.get("tramos") or {}
+
+        pendientes = {}
+        for tramo_key, info in tramos_base.items():
+            total_tramo = int(info.get("total") or 0)
+            armadas = int(info.get("armadas") or 0)
+            rematadas = int(info.get("rematadas") or 0)
+            done = armadas if modo_key == "armador" else rematadas
+            pendientes[tramo_key] = max(total_tramo - done, 0)
+
+        tramos_doc = {}
+        total_global = 0
+        operadores_payload = [{"_id": o["_id"], "nombre": o.get("nombre"), "usuario": o.get("usuario")} for o in operadores]
+        selected_ids = {
+            (ObjectId(o["_id"]) if not isinstance(o["_id"], ObjectId) else o["_id"]) for o in operadores_payload
+        }
+
+        producido_db_cache = {}
+        for tramo_key, total_pendiente in pendientes.items():
+            total_pendiente = max(0, int(total_pendiente or 0))
+            tramo_key = str(tramo_key or "").strip()
+            if not tramo_key:
+                continue
+
+            prev_tramo = prev_tramos_doc.get(tramo_key) or {}
+            prev_total = int(prev_tramo.get("total") or 0)
+            prev_asignaciones = prev_tramo.get("asignaciones") or []
+            prev_producido = {}
+            for a in prev_asignaciones:
+                uid = a.get("user_id")
+                if not uid:
+                    continue
+                prev_producido[uid] = max(0, int(a.get("producido") or 0))
+
+            if prev_total > 0:
+                producido_unselected = sum(v for uid, v in prev_producido.items() if uid not in selected_ids)
+                producido_selected = sum(v for uid, v in prev_producido.items() if uid in selected_ids)
+                total_tramo_plan = max(prev_total - producido_unselected, 0)
+                if total_tramo_plan < producido_selected:
+                    total_tramo_plan = producido_selected
+                producido_por_operador = {uid: (prev_producido.get(uid, 0) or 0) for uid in selected_ids}
+            else:
+                base_info = tramos_base.get(tramo_key) or {}
+                empresa = str(grupo.get("empresa") or "")
+                marco = str(grupo.get("marco") or "")
+                tramo = str(tramo_key)
+                cache_key = (empresa, marco, tramo, modo_key, ciclo)
+                if cache_key not in producido_db_cache:
+                    producido_db_cache[cache_key] = _count_producido_por_operador(
+                        db,
+                        empresa=empresa,
+                        marco=marco,
+                        tramo=tramo,
+                        modo=modo_key,
+                        ciclo=ciclo,
+                    )
+                prod_counts = producido_db_cache[cache_key]
+                producido_por_operador = {uid: max(0, int(prod_counts.get(uid, 0) or 0)) for uid in selected_ids}
+                producido_selected = sum(int(v or 0) for v in producido_por_operador.values())
+                total_tramo_plan = max(producido_selected + total_pendiente, 0)
+
+            if total_tramo_plan <= 0:
+                continue
+
+            total_global += total_tramo_plan
+            tramos_doc[tramo_key] = {
+                "total": total_tramo_plan,
+                "asignaciones": _build_asignaciones_repartidas(
+                    total_tramo_plan,
+                    operadores_payload,
+                    producido_por_operador,
+                ),
+            }
 
         db[COLLECTION_PLANIFICACIONES].update_one(
             {"_id": base["_id"]},
