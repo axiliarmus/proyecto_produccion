@@ -291,11 +291,19 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
     @app.route("/admin/planificacion", methods=["GET"])
     @login_required(["administrador", "soporte", "supervisor"])
     def admin_planificacion_home():
+        ciclo = _get_ciclo_actual(db)
+        filtro_ciclo = {"codigo_pieza": {"$regex": f"^{ciclo}"}}
+
         production_status_map = _merge_status_maps(
-            get_production_status_map(db, db.produccion, {}),
-            get_production_status_map(db, db.produccion_historica, {}),
+            get_production_status_map(db, db.produccion, filtro_ciclo),
+            get_production_status_map(db, db.produccion_historica, filtro_ciclo),
         )
-        piezas = list(db.piezas.find({}, {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0}))
+        piezas = list(
+            db.piezas.find(
+                {"codigo": {"$regex": f"^{ciclo}"}},
+                {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0},
+            )
+        )
         grupos = build_tarjetas_grupos(piezas, production_status_map, include_orphans=True)
 
         filtro_marco = (request.args.get("f_marco") or "").strip()
@@ -309,8 +317,6 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             }
         )
         selected_active = bool(selected["empresa"] or selected["marco"])
-
-        ciclo = _get_ciclo_actual(db)
 
         plan_status = {}
         for p in db[COLLECTION_PLANIFICACIONES].find({"ciclo": ciclo}, {"grupo": 1, "modos": 1}):
@@ -477,6 +483,9 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             flash("Debes seleccionar un grupo (empresa/marco).", "warning")
             return redirect(url_for("admin_planificacion_home"))
 
+        ciclo = _get_ciclo_actual(db)
+        filtro_ciclo = {"codigo_pieza": {"$regex": f"^{ciclo}"}}
+
         user_ids = request.form.getlist("operadores[]")
         valid_ids = [ObjectId(uid) for uid in user_ids if ObjectId.is_valid(str(uid))]
         if not valid_ids:
@@ -491,10 +500,15 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             return redirect(url_for("admin_planificacion_home", **grupo))
 
         production_status_map = _merge_status_maps(
-            get_production_status_map(db, db.produccion, {}),
-            get_production_status_map(db, db.produccion_historica, {}),
+            get_production_status_map(db, db.produccion, filtro_ciclo),
+            get_production_status_map(db, db.produccion_historica, filtro_ciclo),
         )
-        piezas = list(db.piezas.find({}, {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0}))
+        piezas = list(
+            db.piezas.find(
+                {"codigo": {"$regex": f"^{ciclo}"}},
+                {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0},
+            )
+        )
         grupos = build_tarjetas_grupos(piezas, production_status_map, include_orphans=True)
 
         tramos_base = {}
@@ -517,7 +531,6 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                 break
             break
 
-        ciclo = _get_ciclo_actual(db)
         now = _now_utc()
 
         base = db[COLLECTION_PLANIFICACIONES].find_one({"ciclo": ciclo, **_group_filter(grupo)})
