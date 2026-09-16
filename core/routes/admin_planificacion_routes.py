@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from flask import flash, redirect, render_template, request, session, url_for
 
+from core.helpers.date_utils import now_cl, CL
+
 
 COLLECTION_PLANIFICACIONES = "planificaciones"
 
@@ -343,6 +345,101 @@ def _modo_planificado(plan_doc, modo_key):
     return False
 
 
+def _get_planificacion_piezas_y_grupos(db, get_production_status_map, build_tarjetas_grupos):
+    """
+    Obtiene las piezas y grupos activos para la planificacion del mes en curso,
+    excluyendo piezas y marcos archivados por el corte mensual.
+    """
+    today = now_cl().date()
+    start_month_cl = datetime(today.year, today.month, 1)
+    start_month_utc = start_month_cl.replace(tzinfo=CL).astimezone(timezone.utc)
+
+    # Ultimo corte registrado
+    last_corte = db.cortes.find_one(sort=[("fin", -1)])
+    last_corte_fin = last_corte.get("fin") if last_corte else None
+    if last_corte_fin and last_corte_fin.tzinfo is None:
+        last_corte_fin = last_corte_fin.replace(tzinfo=timezone.utc)
+
+    start_periodo_utc = start_month_utc
+    if last_corte_fin and last_corte_fin > start_periodo_utc:
+        start_periodo_utc = last_corte_fin
+
+    # Codigos archivados en historicos
+    codigos_piezas_hist = set(str(c) for c in db.piezas_historicas.distinct("codigo"))
+    codigos_prod_hist = set(str(c) for c in db.produccion_historica.distinct("codigo_pieza"))
+    all_codigos_archivados = codigos_piezas_hist | codigos_prod_hist
+
+    # Marcos archivados en cortes anteriores
+    marcos_archivados = {str(m).strip().lower() for m in db.piezas_historicas.distinct("marco") if m}
+    marcos_archivados |= {str(m).strip().lower() for m in db.produccion_historica.distinct("marco") if m}
+
+    # Marcos con produccion activa (no archivada)
+    marcos_en_produccion_activa = {
+        str(m).strip().lower() for m in db.produccion.distinct("marco") if m
+    }
+
+    piezas_crud = list(
+        db.piezas.find(
+            {},
+            {
+                "codigo": 1,
+                "empresa": 1,
+                "marco": 1,
+                "tramo": 1,
+                "created_at": 1,
+                "fecha_creacion": 1,
+                "corte_id": 1,
+                "_id": 0,
+            },
+        )
+    )
+
+    piezas_filtradas = []
+    for p in piezas_crud:
+        cod = str(p.get("codigo") or "").strip()
+        empresa = (p.get("empresa") or "").strip()
+        marco = (p.get("marco") or "").strip()
+        marco_lower = marco.lower()
+
+        if not empresa or not marco:
+            continue
+        if marco_lower in ("sin marco", "none") or empresa.lower() in ("sin cliente", "none"):
+            continue
+
+        if p.get("corte_id"):
+            continue
+        if cod in all_codigos_archivados:
+            continue
+
+        dt_creacion = p.get("created_at") or p.get("fecha_creacion")
+        if dt_creacion and dt_creacion.tzinfo is None:
+            dt_creacion = dt_creacion.replace(tzinfo=timezone.utc)
+
+        # Si el marco fue archivado en un corte anterior, solo permitir piezas creadas en el periodo activo
+        if marco_lower in marcos_archivados:
+            if not dt_creacion or dt_creacion < start_periodo_utc:
+                continue
+
+        es_produccion_activa = marco_lower in marcos_en_produccion_activa
+        es_creada_mes_en_curso = bool(dt_creacion and dt_creacion >= start_month_utc)
+
+        if dt_creacion and dt_creacion < start_month_utc:
+            if last_corte_fin and dt_creacion < last_corte_fin:
+                continue
+            if not es_produccion_activa:
+                continue
+
+        if not es_produccion_activa and not es_creada_mes_en_curso:
+            continue
+
+        piezas_filtradas.append(p)
+
+    # La planificacion solo utiliza el mapa de produccion activa (nunca produccion_historica)
+    status_map = get_production_status_map(db, db.produccion, {})
+    grupos = build_tarjetas_grupos(piezas_filtradas, status_map, include_orphans=False)
+    return piezas_filtradas, status_map, grupos
+
+
 def register_admin_planificacion_routes(app, db, login_required, get_production_status_map, build_tarjetas_grupos):
     @app.route("/admin/planificacion", methods=["GET"])
     @login_required(["administrador", "soporte", "supervisor"])
@@ -350,17 +447,9 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         ciclo = _get_ciclo_actual(db)
         filtro_ciclo = {"codigo_pieza": {"$regex": f"^{ciclo}"}}
 
-        production_status_map = _merge_status_maps(
-            get_production_status_map(db, db.produccion, {}),
-            get_production_status_map(db, db.produccion_historica, {}),
+        piezas, production_status_map, grupos = _get_planificacion_piezas_y_grupos(
+            db, get_production_status_map, build_tarjetas_grupos
         )
-        piezas = list(
-            db.piezas.find(
-                {},
-                {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0},
-            )
-        )
-        grupos = build_tarjetas_grupos(piezas, production_status_map, include_orphans=True)
 
         filtro_marco = (request.args.get("f_marco") or "").strip()
         filtro_operador = (request.args.get("f_operador") or "").strip()
@@ -373,6 +462,15 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             }
         )
         selected_active = bool(selected["empresa"] or selected["marco"])
+        if selected_active:
+            marco_en_grupos = any(
+                str(g.get("cliente")).lower() == str(selected.get("empresa")).lower()
+                and any(str(m.get("marco")).lower() == str(selected.get("marco")).lower() for m in g.get("marcos", []))
+                for g in grupos
+            )
+            if not marco_en_grupos:
+                flash("El marco seleccionado no está disponible en este mes o ya fue archivado por el corte.", "warning")
+                return redirect(url_for("admin_planificacion_home"))
 
         plan_status = {}
         for p in db[COLLECTION_PLANIFICACIONES].find({"ciclo": ciclo}, {"grupo": 1, "modos": 1}):
@@ -576,17 +674,18 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             flash("No se encontraron operadores válidos.", "danger")
             return redirect(url_for("admin_planificacion_home", **grupo))
 
-        production_status_map = _merge_status_maps(
-            get_production_status_map(db, db.produccion, {}),
-            get_production_status_map(db, db.produccion_historica, {}),
+        piezas, production_status_map, grupos = _get_planificacion_piezas_y_grupos(
+            db, get_production_status_map, build_tarjetas_grupos
         )
-        piezas = list(
-            db.piezas.find(
-                {},
-                {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0},
-            )
+
+        marco_en_grupos = any(
+            str(g.get("cliente")).lower() == str(grupo.get("empresa")).lower()
+            and any(str(m.get("marco")).lower() == str(grupo.get("marco")).lower() for m in g.get("marcos", []))
+            for g in grupos
         )
-        grupos = build_tarjetas_grupos(piezas, production_status_map, include_orphans=True)
+        if not marco_en_grupos:
+            flash("El marco seleccionado no está disponible en este mes o ya fue archivado por el corte.", "warning")
+            return redirect(url_for("admin_planificacion_home"))
 
         tramos_base = {}
         for g in grupos:
