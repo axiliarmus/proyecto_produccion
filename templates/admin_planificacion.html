@@ -114,37 +114,65 @@
 
         <div class="modal-header border-bottom border-secondary">
           <h5 class="modal-title">
-            <i class='bx bxs-hard-hat me-2'></i>Planificar Armador
+            <i class='bx bxs-hard-hat me-2'></i>Planificar Armador · {{ selected.empresa }} · {{ selected.marco }}
           </h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
           <div class="row g-3">
-            <div class="col-md-8">
-              <label class="form-label text-secondary small">Operadores</label>
+            <div class="col-md-7">
+              <label class="form-label text-secondary small fw-bold">Operadores disponibles</label>
               <div class="border border-secondary rounded p-2" style="max-height: 320px; overflow:auto;">
                 {% for op in operadores %}
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="operadores[]" value="{{ op._id }}"
-                         id="opA{{ op._id }}"
-                         {% if plan and (op._id in operador_ids_armador) %}checked{% endif %}>
-                  <label class="form-check-label" for="opA{{ op._id }}">
-                    {{ op.nombre or op.usuario }}
-                  </label>
+                {% set prod_arm = op.prod_armador_marco or 0 %}
+                <div class="form-check d-flex justify-content-between align-items-center py-1 border-bottom border-secondary border-opacity-25">
+                  <div>
+                    <input class="form-check-input" type="checkbox" name="operadores[]" value="{{ op._id }}"
+                           id="opA{{ op._id }}"
+                           {% if (plan and (op._id in operador_ids_armador)) or (not plan and prod_arm > 0) %}checked{% endif %}>
+                    <label class="form-check-label ms-1" for="opA{{ op._id }}">
+                      {{ op.nombre or op.usuario }}
+                    </label>
+                  </div>
+                  {% if prod_arm > 0 %}
+                    <span class="badge bg-primary" title="Piezas ya armadas por este operador en este marco">
+                      {{ prod_arm }} ya armada{% if prod_arm > 1 %}s{% endif %}
+                    </span>
+                  {% else %}
+                    <span class="badge bg-secondary opacity-50 small">0</span>
+                  {% endif %}
                 </div>
                 {% endfor %}
               </div>
               <div class="text-secondary small mt-2">
-                Cada tramo se divide automáticamente entre los operadores seleccionados.
+                <i class='bx bx-info-circle'></i> Las piezas se reparten parejo entre los seleccionados descontando lo ya realizado.
               </div>
             </div>
-            <div class="col-md-4">
-              <label class="form-label text-secondary small">Tramos (faltan armar)</label>
+            <div class="col-md-5">
+              <label class="form-label text-secondary small fw-bold">Producción del marco</label>
               <div class="border border-secondary rounded p-2" style="max-height: 320px; overflow:auto;">
+                <div class="p-2 mb-2 bg-dark rounded border border-secondary small">
+                  <div class="d-flex justify-content-between">
+                    <span class="text-secondary">Total piezas:</span>
+                    <span class="fw-bold text-white">{{ marco_resumen.total if marco_resumen else 0 }}</span>
+                  </div>
+                  <div class="d-flex justify-content-between">
+                    <span class="text-info">Ya armadas:</span>
+                    <span class="fw-bold text-info">{{ marco_resumen.armadas if marco_resumen else 0 }}</span>
+                  </div>
+                  <div class="d-flex justify-content-between">
+                    <span class="text-warning">Faltan armar:</span>
+                    <span class="fw-bold text-warning">{{ marco_resumen.faltan_arm if marco_resumen else 0 }}</span>
+                  </div>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">Detalle por tramo:</div>
                 {% for t in tramos_info %}
-                <div class="d-flex justify-content-between small">
-                  <span class="text-secondary">{{ t.tramo }}</span>
-                  <span class="text-white fw-bold">{{ t.faltan_arm }}</span>
+                <div class="d-flex justify-content-between align-items-center small py-1 border-bottom border-secondary border-opacity-25">
+                  <span class="text-white">{{ t.tramo }}</span>
+                  <div>
+                    <span class="badge bg-info me-1" title="Ya armadas">{{ t.armadas }} arm</span>
+                    <span class="badge bg-warning text-dark" title="Faltan">{{ t.faltan_arm }} restan</span>
+                  </div>
                 </div>
                 {% endfor %}
               </div>
@@ -154,7 +182,7 @@
         <div class="modal-footer border-top border-secondary">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-accent">
-            <i class='bx bx-save'></i> Guardar
+            <i class='bx bx-save'></i> Guardar Planificación
           </button>
         </div>
       </form>
@@ -173,37 +201,65 @@
 
         <div class="modal-header border-bottom border-secondary">
           <h5 class="modal-title">
-            <i class='bx bx-check-shield me-2'></i>Planificar Rematador
+            <i class='bx bx-check-shield me-2'></i>Planificar Rematador · {{ selected.empresa }} · {{ selected.marco }}
           </h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
           <div class="row g-3">
-            <div class="col-md-8">
-              <label class="form-label text-secondary small">Operadores</label>
+            <div class="col-md-7">
+              <label class="form-label text-secondary small fw-bold">Operadores disponibles</label>
               <div class="border border-secondary rounded p-2" style="max-height: 320px; overflow:auto;">
                 {% for op in operadores %}
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="operadores[]" value="{{ op._id }}"
-                         id="opR{{ op._id }}"
-                         {% if plan and (op._id in operador_ids_rematador) %}checked{% endif %}>
-                  <label class="form-check-label" for="opR{{ op._id }}">
-                    {{ op.nombre or op.usuario }}
-                  </label>
+                {% set prod_rem = op.prod_rematador_marco or 0 %}
+                <div class="form-check d-flex justify-content-between align-items-center py-1 border-bottom border-secondary border-opacity-25">
+                  <div>
+                    <input class="form-check-input" type="checkbox" name="operadores[]" value="{{ op._id }}"
+                           id="opR{{ op._id }}"
+                           {% if (plan and (op._id in operador_ids_rematador)) or (not plan and prod_rem > 0) %}checked{% endif %}>
+                    <label class="form-check-label ms-1" for="opR{{ op._id }}">
+                      {{ op.nombre or op.usuario }}
+                    </label>
+                  </div>
+                  {% if prod_rem > 0 %}
+                    <span class="badge bg-success" title="Piezas ya rematadas por este operador en este marco">
+                      {{ prod_rem }} ya rematada{% if prod_rem > 1 %}s{% endif %}
+                    </span>
+                  {% else %}
+                    <span class="badge bg-secondary opacity-50 small">0</span>
+                  {% endif %}
                 </div>
                 {% endfor %}
               </div>
               <div class="text-secondary small mt-2">
-                Cada tramo se divide automáticamente entre los operadores seleccionados.
+                <i class='bx bx-info-circle'></i> Las piezas se reparten parejo entre los seleccionados descontando lo ya realizado.
               </div>
             </div>
-            <div class="col-md-4">
-              <label class="form-label text-secondary small">Tramos (faltan rematar)</label>
+            <div class="col-md-5">
+              <label class="form-label text-secondary small fw-bold">Producción del marco</label>
               <div class="border border-secondary rounded p-2" style="max-height: 320px; overflow:auto;">
+                <div class="p-2 mb-2 bg-dark rounded border border-secondary small">
+                  <div class="d-flex justify-content-between">
+                    <span class="text-secondary">Total piezas:</span>
+                    <span class="fw-bold text-white">{{ marco_resumen.total if marco_resumen else 0 }}</span>
+                  </div>
+                  <div class="d-flex justify-content-between">
+                    <span class="text-success">Ya rematadas:</span>
+                    <span class="fw-bold text-success">{{ marco_resumen.rematadas if marco_resumen else 0 }}</span>
+                  </div>
+                  <div class="d-flex justify-content-between">
+                    <span class="text-warning">Faltan rematar:</span>
+                    <span class="fw-bold text-warning">{{ marco_resumen.faltan_rem if marco_resumen else 0 }}</span>
+                  </div>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">Detalle por tramo:</div>
                 {% for t in tramos_info %}
-                <div class="d-flex justify-content-between small">
-                  <span class="text-secondary">{{ t.tramo }}</span>
-                  <span class="text-white fw-bold">{{ t.faltan_rem }}</span>
+                <div class="d-flex justify-content-between align-items-center small py-1 border-bottom border-secondary border-opacity-25">
+                  <span class="text-white">{{ t.tramo }}</span>
+                  <div>
+                    <span class="badge bg-success me-1" title="Ya rematadas">{{ t.rematadas }} rem</span>
+                    <span class="badge bg-warning text-dark" title="Faltan">{{ t.faltan_rem }} restan</span>
+                  </div>
                 </div>
                 {% endfor %}
               </div>
@@ -213,7 +269,7 @@
         <div class="modal-footer border-top border-secondary">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-accent">
-            <i class='bx bx-save'></i> Guardar
+            <i class='bx bx-save'></i> Guardar Planificación
           </button>
         </div>
       </form>
@@ -234,17 +290,27 @@
       </div>
       <div class="modal-body p-2 p-md-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="badge badge-soft">Total: {{ plan.modos.armador.total if plan.modos and plan.modos.armador else 0 }}</span>
+          <span class="badge badge-soft">Total asignado: {{ plan.modos.armador.total if plan.modos and plan.modos.armador else 0 }}</span>
         </div>
 
         {% if plan.modos and plan.modos.armador and plan.modos.armador.tramos and plan.modos.armador.tramos|length > 0 %}
           {% for tramo_key, tramo_doc in plan.modos.armador.tramos.items() %}
             <div class="card bg-dark border-secondary mb-3">
               <div class="card-body py-2">
-                <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                   <div class="fw-bold text-white">Tramo {{ tramo_key }}</div>
-                  <span class="badge badge-soft">Total: {{ tramo_doc.total }}</span>
+                  <div>
+                    <span class="badge badge-soft">Total Asignado: {{ tramo_doc.total }}</span>
+                    {% if tramo_doc.total_tramo and tramo_doc.total_tramo != tramo_doc.total %}
+                      <span class="badge bg-secondary ms-1">Total Tramo: {{ tramo_doc.total_tramo }}</span>
+                    {% endif %}
+                  </div>
                 </div>
+                {% if tramo_doc.producido_unselected and tramo_doc.producido_unselected > 0 %}
+                  <div class="alert alert-info py-1 px-2 small mt-2 mb-0">
+                    <i class='bx bx-info-circle me-1'></i>{{ tramo_doc.producido_unselected }} pieza{% if tramo_doc.producido_unselected > 1 %}s realizadas{% else %} realizada{% endif %} por otros operadores no seleccionados en esta planificación.
+                  </div>
+                {% endif %}
               </div>
               <div class="table-responsive">
                 <table class="table table-dark table-striped table-sm align-middle mb-0">
@@ -316,17 +382,27 @@
       </div>
       <div class="modal-body p-2 p-md-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="badge badge-soft">Total: {{ plan.modos.rematador.total if plan.modos and plan.modos.rematador else 0 }}</span>
+          <span class="badge badge-soft">Total asignado: {{ plan.modos.rematador.total if plan.modos and plan.modos.rematador else 0 }}</span>
         </div>
 
         {% if plan.modos and plan.modos.rematador and plan.modos.rematador.tramos and plan.modos.rematador.tramos|length > 0 %}
           {% for tramo_key, tramo_doc in plan.modos.rematador.tramos.items() %}
             <div class="card bg-dark border-secondary mb-3">
               <div class="card-body py-2">
-                <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                   <div class="fw-bold text-white">Tramo {{ tramo_key }}</div>
-                  <span class="badge badge-soft">Total: {{ tramo_doc.total }}</span>
+                  <div>
+                    <span class="badge badge-soft">Total Asignado: {{ tramo_doc.total }}</span>
+                    {% if tramo_doc.total_tramo and tramo_doc.total_tramo != tramo_doc.total %}
+                      <span class="badge bg-secondary ms-1">Total Tramo: {{ tramo_doc.total_tramo }}</span>
+                    {% endif %}
+                  </div>
                 </div>
+                {% if tramo_doc.producido_unselected and tramo_doc.producido_unselected > 0 %}
+                  <div class="alert alert-info py-1 px-2 small mt-2 mb-0">
+                    <i class='bx bx-info-circle me-1'></i>{{ tramo_doc.producido_unselected }} pieza{% if tramo_doc.producido_unselected > 1 %}s realizadas{% else %} realizada{% endif %} por otros operadores no seleccionados en esta planificación.
+                  </div>
+                {% endif %}
               </div>
               <div class="table-responsive">
                 <table class="table table-dark table-striped table-sm align-middle mb-0">

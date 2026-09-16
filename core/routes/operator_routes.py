@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import re
 import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -496,22 +497,29 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
 
         plan_control = None
         if not es_historico:
-            empresa_plan = pieza_data.get("empresa") or "Sin Cliente"
-            marco_plan = pieza_data.get("marco") or "Sin Marco"
-            tramo_plan = pieza_data.get("tramo") or "Sin Tramo"
+            empresa_plan = str(pieza_data.get("empresa") or "Sin Cliente").strip()
+            marco_plan = str(pieza_data.get("marco") or "Sin Marco").strip()
+            tramo_plan = str(pieza_data.get("tramo") or "Sin Tramo").strip()
             conf = db.config.find_one({"key": "ciclo_actual"}) or {"value": "a"}
             ciclo = str(conf.get("value") or "a")
             plan = db.planificaciones.find_one(
                 {
                     "ciclo": ciclo,
-                    "grupo.empresa": empresa_plan,
-                    "grupo.marco": marco_plan,
+                    "grupo.empresa": re.compile(f"^{re.escape(empresa_plan)}$", re.IGNORECASE),
+                    "grupo.marco": re.compile(f"^{re.escape(marco_plan)}$", re.IGNORECASE),
                 }
             )
             if plan:
                 modo_doc = ((plan.get("modos") or {}).get(modo) or {})
                 tramos_doc = modo_doc.get("tramos") or {}
-                tramo_doc = tramos_doc.get(tramo_plan)
+                tramo_doc = None
+                matched_tramo_key = tramo_plan
+                for tk, tv in tramos_doc.items():
+                    if tk.lower() == tramo_plan.lower():
+                        tramo_doc = tv
+                        matched_tramo_key = tk
+                        break
+
                 if not tramo_doc:
                     plan = None
                 if plan:
@@ -524,7 +532,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                     user_oid = ObjectId(user_id) if ObjectId.is_valid(str(user_id)) else user_id
                     asignacion = None
                     for a in asignaciones:
-                        if a.get("user_id") == user_oid:
+                        if str(a.get("user_id")) == str(user_oid):
                             asignacion = a
                             break
                     if not asignacion:
@@ -543,7 +551,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                     plan_control = {
                         "plan_id": plan.get("_id"),
                         "modo": modo,
-                        "tramo": tramo_plan,
+                        "tramo": matched_tramo_key,
                         "user_oid": user_oid,
                         "objetivo": objetivo,
                         "units": unidades_plan,

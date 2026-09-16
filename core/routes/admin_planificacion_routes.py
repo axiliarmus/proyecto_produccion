@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 
 from bson import ObjectId
@@ -210,64 +211,119 @@ def _merge_status_maps(primary, secondary):
     return merged
 
 
-def _count_producido_por_operador(db, empresa, marco, tramo, modo, ciclo):
-    match_base = {
-        "empresa": empresa,
-        "marco": marco,
-        "tramo": tramo,
-        "modo": modo,
-        "codigo_pieza": {"$regex": f"^{ciclo}"},
-    }
+def _get_marco_production_stats(db, empresa, marco, modo=None):
+    empresa = (empresa or "").strip()
+    marco = (marco or "").strip()
+    match_base = {}
+    if empresa:
+        match_base["empresa"] = re.compile(f"^{re.escape(empresa)}$", re.IGNORECASE)
+    if marco:
+        match_base["marco"] = re.compile(f"^{re.escape(marco)}$", re.IGNORECASE)
+    if modo:
+        match_base["modo"] = modo
 
-    pipeline = [
-        {"$match": match_base},
-        {"$sort": {"fecha": -1}},
-        {"$group": {"_id": "$codigo_pieza", "user_id": {"$first": "$user_id"}}},
-        {"$group": {"_id": "$user_id", "count": {"$sum": 1}}},
-    ]
+    per_op_marco = {}
+    per_tramo_op = {}
+    total_per_tramo = {}
 
-    counts = {}
-    for col in (db.produccion, db.produccion_historica):
-        for row in col.aggregate(pipeline):
-            raw_user = row.get("_id")
-            user_key = ObjectId(raw_user) if ObjectId.is_valid(str(raw_user)) else raw_user
-            counts[user_key] = int(counts.get(user_key, 0) or 0) + int(row.get("count") or 0)
-    return counts
+    for doc in db.produccion.find(match_base, {"user_id": 1, "tramo": 1}):
+        raw_user = doc.get("user_id")
+        if not raw_user:
+            continue
+        user_key = ObjectId(raw_user) if ObjectId.is_valid(str(raw_user)) else raw_user
+        tramo_norm = str(doc.get("tramo") or "").strip()
+
+        per_op_marco[user_key] = per_op_marco.get(user_key, 0) + 1
+        per_tramo_op.setdefault(tramo_norm, {})
+        per_tramo_op[tramo_norm][user_key] = per_tramo_op[tramo_norm].get(user_key, 0) + 1
+        total_per_tramo[tramo_norm] = total_per_tramo.get(tramo_norm, 0) + 1
+
+    return per_op_marco, per_tramo_op, total_per_tramo
 
 
-def _build_asignaciones_repartidas(total, operadores, producido_por_operador):
-    total = max(0, int(total or 0))
+def _count_producido_por_operador(db, empresa, marco, tramo=None, modo=None, ciclo=None):
+    _, per_tramo_op, _ = _get_marco_production_stats(db, empresa, marco, modo=modo)
+    if not tramo:
+        return _[0] if isinstance(_, tuple) else _
+    tramo_clean = str(tramo or "").strip()
+    for tk, counts in per_tramo_op.items():
+        if tk.lower() == tramo_clean.lower():
+            return counts
+    return {}
+
+
+def _build_asignaciones_equitativas(total_target, operadores, producido_por_operador):
+    """
+    Distribución equitativa tipo water-filling:
+    - total_target: meta total a cubrir por los seleccionados (ej: total_tramo - unselected_producido).
+    - Cada operador parte desde lo que ya produjo (objetivo >= producido).
+    - El remanente a repartir se distribuye nivelando progresivamente a quienes menos llevan,
+      de modo que todos los seleccionados terminen con la misma cantidad final ('parejo').
+    """
     n = len(operadores)
     if n <= 0:
         return []
 
-    producido_vals = []
+    op_items = []
     for op in operadores:
-        uid = ObjectId(op["_id"]) if not isinstance(op["_id"], ObjectId) else op["_id"]
-        producido_vals.append(max(0, int(producido_por_operador.get(uid, 0) or 0)))
+        uid = ObjectId(op["_id"]) if ObjectId.is_valid(str(op.get("_id"))) else op.get("_id")
+        prod = int(producido_por_operador.get(uid, 0) or 0)
+        if prod == 0 and str(uid) in producido_por_operador:
+            prod = int(producido_por_operador.get(str(uid), 0) or 0)
+        name = op.get("nombre") or op.get("usuario") or "Operador"
+        op_items.append({"user_id": uid, "user_name": name, "producido": max(0, prod)})
 
-    base_total_producido = sum(producido_vals)
-    if base_total_producido > total:
-        total = base_total_producido
+    prods = [item["producido"] for item in op_items]
+    sum_prods = sum(prods)
+    target_sum = max(int(total_target or 0), sum_prods)
 
-    remaining = max(total - base_total_producido, 0)
-    base = remaining // n
-    rem = remaining % n
+    current = list(prods)
+    remaining = target_sum - sum_prods
+
+    while remaining > 0:
+        min_val = min(current)
+        min_indices = [i for i, val in enumerate(current) if val == min_val]
+        higher = [val for val in current if val > min_val]
+        next_val = min(higher) if higher else None
+
+        if next_val is not None:
+            gap = next_val - min_val
+            needed = gap * len(min_indices)
+            if remaining >= needed:
+                for idx in min_indices:
+                    current[idx] = next_val
+                remaining -= needed
+                continue
+
+        add_each = remaining // len(min_indices)
+        rem = remaining % len(min_indices)
+
+        if add_each > 0:
+            for idx in min_indices:
+                current[idx] += add_each
+            remaining -= add_each * len(min_indices)
+
+        for i in range(rem):
+            current[min_indices[i]] += 1
+            remaining -= 1
 
     asignaciones = []
-    for i, op in enumerate(operadores):
-        uid = ObjectId(op["_id"]) if not isinstance(op["_id"], ObjectId) else op["_id"]
-        producido = max(0, int(producido_por_operador.get(uid, 0) or 0))
-        extra = base + (1 if i < rem else 0)
+    for i, item in enumerate(op_items):
+        obj = current[i]
+        prod = item["producido"]
         asignaciones.append(
             {
-                "user_id": uid,
-                "user_name": op.get("nombre") or op.get("usuario") or "Operador",
-                "objetivo": producido + extra,
-                "producido": producido,
+                "user_id": item["user_id"],
+                "user_name": item["user_name"],
+                "objetivo": obj,
+                "producido": prod,
             }
         )
     return asignaciones
+
+
+def _build_asignaciones_repartidas(total, operadores, producido_por_operador):
+    return _build_asignaciones_equitativas(total, operadores, producido_por_operador)
 
 
 def _modo_planificado(plan_doc, modo_key):
@@ -295,12 +351,12 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         filtro_ciclo = {"codigo_pieza": {"$regex": f"^{ciclo}"}}
 
         production_status_map = _merge_status_maps(
-            get_production_status_map(db, db.produccion, filtro_ciclo),
-            get_production_status_map(db, db.produccion_historica, filtro_ciclo),
+            get_production_status_map(db, db.produccion, {}),
+            get_production_status_map(db, db.produccion_historica, {}),
         )
         piezas = list(
             db.piezas.find(
-                {"codigo": {"$regex": f"^{ciclo}"}},
+                {},
                 {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0},
             )
         )
@@ -378,6 +434,8 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         pendientes_rematador = {}
         operador_ids_armador = set()
         operador_ids_rematador = set()
+        prod_arm_op_marco = {}
+        prod_rem_op_marco = {}
         if selected_active:
             plan = db[COLLECTION_PLANIFICACIONES].find_one({"ciclo": ciclo, **_group_filter(selected)})
             if plan:
@@ -392,11 +450,19 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                                     operador_ids_armador.add(a["user_id"])
                                 else:
                                     operador_ids_rematador.add(a["user_id"])
+
+            prod_arm_op_marco, _, _ = _get_marco_production_stats(
+                db, selected["empresa"], selected["marco"], modo="armador"
+            )
+            prod_rem_op_marco, _, _ = _get_marco_production_stats(
+                db, selected["empresa"], selected["marco"], modo="rematador"
+            )
+
             for g in grupos:
-                if str(g.get("cliente")) != str(selected.get("empresa")):
+                if str(g.get("cliente")).lower() != str(selected.get("empresa")).lower():
                     continue
                 for m in g.get("marcos", []):
-                    if str(m.get("marco")) != str(selected.get("marco")):
+                    if str(m.get("marco")).lower() != str(selected.get("marco")).lower():
                         continue
                     for t in m.get("tramos", []):
                         tramo_key = str(t.get("tramo") or "")
@@ -420,10 +486,21 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                     break
                 break
 
+        marco_resumen = {
+            "total": sum(t.get("total", 0) for t in tramos_info),
+            "armadas": sum(t.get("armadas", 0) for t in tramos_info),
+            "rematadas": sum(t.get("rematadas", 0) for t in tramos_info),
+            "faltan_arm": sum(t.get("faltan_arm", 0) for t in tramos_info),
+            "faltan_rem": sum(t.get("faltan_rem", 0) for t in tramos_info),
+        }
+
         operadores = list(db.usuarios.find({"tipo": "operador"}, {"nombre": 1, "usuario": 1}).sort("nombre", 1))
         for op in operadores:
             if op.get("_id") is not None:
                 op["id_str"] = str(op["_id"])
+                uid = op["_id"]
+                op["prod_armador_marco"] = prod_arm_op_marco.get(uid, 0)
+                op["prod_rematador_marco"] = prod_rem_op_marco.get(uid, 0)
 
         role = session.get("role")
         can_edit_planificacion = False
@@ -451,6 +528,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             filtro_operador=filtro_operador,
             can_edit_planificacion=can_edit_planificacion,
             plan_status=plan_status,
+            marco_resumen=marco_resumen,
         )
 
     @app.route("/admin/planificacion/crear", methods=["POST"])
@@ -484,7 +562,6 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             return redirect(url_for("admin_planificacion_home"))
 
         ciclo = _get_ciclo_actual(db)
-        filtro_ciclo = {"codigo_pieza": {"$regex": f"^{ciclo}"}}
 
         user_ids = request.form.getlist("operadores[]")
         valid_ids = [ObjectId(uid) for uid in user_ids if ObjectId.is_valid(str(uid))]
@@ -500,12 +577,12 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             return redirect(url_for("admin_planificacion_home", **grupo))
 
         production_status_map = _merge_status_maps(
-            get_production_status_map(db, db.produccion, filtro_ciclo),
-            get_production_status_map(db, db.produccion_historica, filtro_ciclo),
+            get_production_status_map(db, db.produccion, {}),
+            get_production_status_map(db, db.produccion_historica, {}),
         )
         piezas = list(
             db.piezas.find(
-                {"codigo": {"$regex": f"^{ciclo}"}},
+                {},
                 {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0},
             )
         )
@@ -513,10 +590,10 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
 
         tramos_base = {}
         for g in grupos:
-            if str(g.get("cliente")) != str(grupo.get("empresa")):
+            if str(g.get("cliente")).lower() != str(grupo.get("empresa")).lower():
                 continue
             for m in g.get("marcos", []):
-                if str(m.get("marco")) != str(grupo.get("marco")):
+                if str(m.get("marco")).lower() != str(grupo.get("marco")).lower():
                     continue
                 for t in m.get("tramos", []):
                     tramo_key = str(t.get("tramo") or "")
@@ -552,13 +629,9 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         prev_modo_doc = ((base.get("modos") or {}).get(modo_key) or {})
         prev_tramos_doc = prev_modo_doc.get("tramos") or {}
 
-        pendientes = {}
-        for tramo_key, info in tramos_base.items():
-            total_tramo = int(info.get("total") or 0)
-            armadas = int(info.get("armadas") or 0)
-            rematadas = int(info.get("rematadas") or 0)
-            done = armadas if modo_key == "armador" else rematadas
-            pendientes[tramo_key] = max(total_tramo - done, 0)
+        _, prod_tramo_op, _ = _get_marco_production_stats(
+            db, grupo["empresa"], grupo["marco"], modo=modo_key
+        )
 
         tramos_doc = {}
         total_global = 0
@@ -567,61 +640,67 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             (ObjectId(o["_id"]) if not isinstance(o["_id"], ObjectId) else o["_id"]) for o in operadores_payload
         }
 
-        producido_db_cache = {}
-        for tramo_key, total_pendiente in pendientes.items():
-            total_pendiente = max(0, int(total_pendiente or 0))
+        for tramo_key, info in tramos_base.items():
             tramo_key = str(tramo_key or "").strip()
             if not tramo_key:
                 continue
 
+            total_tramo = int(info.get("total") or 0)
+
+            # Conteo de piezas producidas registradas en db.produccion para este tramo
+            prod_counts = {}
+            for tk, counts in prod_tramo_op.items():
+                if tk.lower() == tramo_key.lower():
+                    prod_counts = counts
+                    break
+
+            # Considerar también cualquier producción previa registrada en la planificación anterior
             prev_tramo = prev_tramos_doc.get(tramo_key) or {}
-            prev_total = int(prev_tramo.get("total") or 0)
-            prev_asignaciones = prev_tramo.get("asignaciones") or []
+            if not prev_tramo:
+                for pk, pv in prev_tramos_doc.items():
+                    if pk.lower() == tramo_key.lower():
+                        prev_tramo = pv
+                        break
             prev_producido = {}
-            for a in prev_asignaciones:
+            for a in (prev_tramo.get("asignaciones") or []):
                 uid = a.get("user_id")
-                if not uid:
-                    continue
-                prev_producido[uid] = max(0, int(a.get("producido") or 0))
+                if uid:
+                    uid = ObjectId(uid) if ObjectId.is_valid(str(uid)) else uid
+                    prev_producido[uid] = max(0, int(a.get("producido") or 0))
 
-            if prev_total > 0:
-                producido_unselected = sum(v for uid, v in prev_producido.items() if uid not in selected_ids)
-                producido_selected = sum(v for uid, v in prev_producido.items() if uid in selected_ids)
-                total_tramo_plan = max(prev_total - producido_unselected, 0)
-                if total_tramo_plan < producido_selected:
-                    total_tramo_plan = producido_selected
-                producido_por_operador = {uid: (prev_producido.get(uid, 0) or 0) for uid in selected_ids}
-            else:
-                base_info = tramos_base.get(tramo_key) or {}
-                empresa = str(grupo.get("empresa") or "")
-                marco = str(grupo.get("marco") or "")
-                tramo = str(tramo_key)
-                cache_key = (empresa, marco, tramo, modo_key, ciclo)
-                if cache_key not in producido_db_cache:
-                    producido_db_cache[cache_key] = _count_producido_por_operador(
-                        db,
-                        empresa=empresa,
-                        marco=marco,
-                        tramo=tramo,
-                        modo=modo_key,
-                        ciclo=ciclo,
-                    )
-                prod_counts = producido_db_cache[cache_key]
-                producido_por_operador = {uid: max(0, int(prod_counts.get(uid, 0) or 0)) for uid in selected_ids}
-                producido_selected = sum(int(v or 0) for v in producido_por_operador.values())
-                total_tramo_plan = max(producido_selected + total_pendiente, 0)
+            # Combinar la producción real de todos los operadores que hayan participado en este tramo
+            all_uids = set(prod_counts.keys()) | set(prev_producido.keys())
+            all_produced = {}
+            for uid in all_uids:
+                all_produced[uid] = max(int(prod_counts.get(uid, 0) or 0), int(prev_producido.get(uid, 0) or 0))
 
-            if total_tramo_plan <= 0:
+            # Operadores que ya produjeron piezas pero NO fueron seleccionados en esta planificación
+            producido_unselected = sum(prod for uid, prod in all_produced.items() if uid not in selected_ids)
+
+            # Producción de los operadores seleccionados
+            producido_selected = {uid: all_produced.get(uid, 0) for uid in selected_ids}
+
+            # El remanente a repartir entre los seleccionados es el total del tramo menos lo que ya hicieron otros
+            total_tramo_plan = max(0, total_tramo - producido_unselected)
+            sum_selected_prod = sum(producido_selected.values())
+            if total_tramo_plan < sum_selected_prod:
+                total_tramo_plan = sum_selected_prod
+
+            if total_tramo_plan <= 0 and total_tramo <= 0:
                 continue
+
+            asignaciones = _build_asignaciones_equitativas(
+                total_tramo_plan,
+                operadores_payload,
+                producido_selected,
+            )
 
             total_global += total_tramo_plan
             tramos_doc[tramo_key] = {
                 "total": total_tramo_plan,
-                "asignaciones": _build_asignaciones_repartidas(
-                    total_tramo_plan,
-                    operadores_payload,
-                    producido_por_operador,
-                ),
+                "total_tramo": total_tramo,
+                "producido_unselected": producido_unselected,
+                "asignaciones": asignaciones,
             }
 
         db[COLLECTION_PLANIFICACIONES].update_one(
@@ -635,7 +714,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             },
         )
 
-        flash("Planificación guardada (por marco, distribuida por tramo).", "success")
+        flash("Planificación guardada (distribuida equitativamente entre los operadores seleccionados).", "success")
         return redirect(url_for("admin_planificacion_home", **grupo))
 
     @app.route("/admin/planificacion/ajustar", methods=["POST"])
