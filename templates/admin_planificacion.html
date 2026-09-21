@@ -69,33 +69,86 @@
         <i class='bx bx-check-shield'></i> Planificar Rematador
       </button>
       {% if plan %}
+      {% set has_armador = plan.modos and plan.modos.armador and plan.modos.armador.tramos and (plan.modos.armador.tramos|length > 0) and (plan.modos.armador.total > 0) %}
+      {% set has_rematador = plan.modos and plan.modos.rematador and plan.modos.rematador.tramos and (plan.modos.rematador.tramos|length > 0) and (plan.modos.rematador.total > 0) %}
+      {% if has_armador %}
       <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalVerArmador">
         <i class='bx bx-show'></i> Ver Armado
       </button>
+      {% endif %}
+      {% if has_rematador %}
       <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalVerRematador">
         <i class='bx bx-show'></i> Ver Remate
       </button>
-      {% if session.get('role') == 'administrador' %}
-        <form method="POST" action="{{ url_for('admin_planificacion_eliminar') }}" class="d-inline"
-              onsubmit="return confirm('¿Eliminar esta planificación? La pieza quedará liberada para todos.')">
-          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-          <input type="hidden" name="empresa" value="{{ selected.empresa }}">
-          <input type="hidden" name="marco" value="{{ selected.marco }}">
-          <button class="btn btn-danger" type="submit">
-            <i class='bx bxs-trash'></i>
+      {% endif %}
+      {% if session.get('role') == 'administrador' and (has_armador or has_rematador) %}
+        <div class="dropdown d-inline">
+          <button class="btn btn-danger dropdown-toggle" type="button" id="dropEliminarPlan" data-bs-toggle="dropdown" aria-expanded="false" title="Eliminar planificación">
+            <i class='bx bxs-trash'></i> Eliminar
           </button>
-        </form>
+          <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow" aria-labelledby="dropEliminarPlan">
+            {% if has_armador %}
+            <li>
+              <form method="POST" action="{{ url_for('admin_planificacion_eliminar') }}"
+                    onsubmit="return confirm('¿Eliminar SOLO la planificación de ARMADOR? Las piezas quedarán liberadas para cualquier armador.')">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="empresa" value="{{ selected.empresa }}">
+                <input type="hidden" name="marco" value="{{ selected.marco }}">
+                <input type="hidden" name="modo" value="armador">
+                <button class="dropdown-item text-warning" type="submit">
+                  <i class='bx bxs-hard-hat me-1'></i> Eliminar solo Armador
+                </button>
+              </form>
+            </li>
+            {% endif %}
+            {% if has_rematador %}
+            <li>
+              <form method="POST" action="{{ url_for('admin_planificacion_eliminar') }}"
+                    onsubmit="return confirm('¿Eliminar SOLO la planificación de REMATADOR? Las piezas quedarán liberadas para cualquier rematador.')">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="empresa" value="{{ selected.empresa }}">
+                <input type="hidden" name="marco" value="{{ selected.marco }}">
+                <input type="hidden" name="modo" value="rematador">
+                <button class="dropdown-item text-warning" type="submit">
+                  <i class='bx bx-check-shield me-1'></i> Eliminar solo Rematador
+                </button>
+              </form>
+            </li>
+            {% endif %}
+            {% if has_armador and has_rematador %}
+            <li><hr class="dropdown-divider border-secondary"></li>
+            <li>
+              <form method="POST" action="{{ url_for('admin_planificacion_eliminar') }}"
+                    onsubmit="return confirm('¿Eliminar TODA la planificación (Armador y Rematador)?')">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="empresa" value="{{ selected.empresa }}">
+                <input type="hidden" name="marco" value="{{ selected.marco }}">
+                <input type="hidden" name="modo" value="todos">
+                <button class="dropdown-item text-danger fw-bold" type="submit">
+                  <i class='bx bxs-trash me-1'></i> Eliminar Todo (Ambos)
+                </button>
+              </form>
+            </li>
+            {% endif %}
+          </ul>
+        </div>
       {% endif %}
       {% endif %}
       {% else %}
       <span class="badge badge-soft">Vista de solo lectura</span>
       {% if plan %}
+      {% set has_armador = plan.modos and plan.modos.armador and plan.modos.armador.tramos and (plan.modos.armador.tramos|length > 0) and (plan.modos.armador.total > 0) %}
+      {% set has_rematador = plan.modos and plan.modos.rematador and plan.modos.rematador.tramos and (plan.modos.rematador.tramos|length > 0) and (plan.modos.rematador.total > 0) %}
+      {% if has_armador %}
       <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalVerArmador">
         <i class='bx bx-show'></i> Ver Armado
       </button>
+      {% endif %}
+      {% if has_rematador %}
       <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalVerRematador">
         <i class='bx bx-show'></i> Ver Remate
       </button>
+      {% endif %}
       {% endif %}
       {% endif %}
     </div>
@@ -154,7 +207,7 @@
                 <div class="p-2 mb-2 bg-dark rounded border border-secondary small">
                   <div class="d-flex justify-content-between">
                     <span class="text-secondary">Total piezas:</span>
-                    <span class="fw-bold text-white">{{ marco_resumen.total if marco_resumen else 0 }}</span>
+                    <span class="fw-bold text-white">{{ marco_resumen.total if marco_resumen else 0 }} ({{ (marco_resumen.total * 2) if marco_resumen else 0 }} armados)</span>
                   </div>
                   <div class="d-flex justify-content-between">
                     <span class="text-info">Ya armadas:</span>
@@ -364,7 +417,21 @@
           <div class="text-secondary">Sin asignaciones de armador.</div>
         {% endif %}
       </div>
-      <div class="modal-footer border-top border-secondary">
+      <div class="modal-footer border-top border-secondary justify-content-between">
+        {% if session.get('role') == 'administrador' and plan and plan.modos and plan.modos.armador and plan.modos.armador.tramos and (plan.modos.armador.tramos|length > 0) and (plan.modos.armador.total > 0) %}
+          <form method="POST" action="{{ url_for('admin_planificacion_eliminar') }}"
+                onsubmit="return confirm('¿Eliminar la planificación de ARMADOR para este marco? Los cupos se borrarán y quedará liberado.')">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="empresa" value="{{ selected.empresa }}">
+            <input type="hidden" name="marco" value="{{ selected.marco }}">
+            <input type="hidden" name="modo" value="armador">
+            <button class="btn btn-danger" type="submit">
+              <i class='bx bxs-trash me-1'></i> Eliminar Plan Armador
+            </button>
+          </form>
+        {% else %}
+          <div></div>
+        {% endif %}
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
       </div>
     </div>
@@ -456,7 +523,21 @@
           <div class="text-secondary">Sin asignaciones de rematador.</div>
         {% endif %}
       </div>
-      <div class="modal-footer border-top border-secondary">
+      <div class="modal-footer border-top border-secondary justify-content-between">
+        {% if session.get('role') == 'administrador' and plan and plan.modos and plan.modos.rematador and plan.modos.rematador.tramos and (plan.modos.rematador.tramos|length > 0) and (plan.modos.rematador.total > 0) %}
+          <form method="POST" action="{{ url_for('admin_planificacion_eliminar') }}"
+                onsubmit="return confirm('¿Eliminar la planificación de REMATADOR para este marco? Los cupos se borrarán y quedará liberado.')">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="empresa" value="{{ selected.empresa }}">
+            <input type="hidden" name="marco" value="{{ selected.marco }}">
+            <input type="hidden" name="modo" value="rematador">
+            <button class="btn btn-danger" type="submit">
+              <i class='bx bxs-trash me-1'></i> Eliminar Plan Rematador
+            </button>
+          </form>
+        {% else %}
+          <div></div>
+        {% endif %}
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
       </div>
     </div>

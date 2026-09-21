@@ -549,10 +549,10 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                                 else:
                                     operador_ids_rematador.add(a["user_id"])
 
-            prod_arm_op_marco, _, _ = _get_marco_production_stats(
+            prod_arm_op_marco, _, prod_arm_total_per_tramo = _get_marco_production_stats(
                 db, selected["empresa"], selected["marco"], modo="armador"
             )
-            prod_rem_op_marco, _, _ = _get_marco_production_stats(
+            prod_rem_op_marco, _, prod_rem_total_per_tramo = _get_marco_production_stats(
                 db, selected["empresa"], selected["marco"], modo="rematador"
             )
 
@@ -564,17 +564,20 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                         continue
                     for t in m.get("tramos", []):
                         tramo_key = str(t.get("tramo") or "")
-                        total = int(t.get("total") or 0)
-                        armadas = int(t.get("armadas") or 0)
-                        rematadas = int(t.get("rematadas") or 0)
-                        faltan_arm = max(total - armadas, 0)
-                        faltan_rem = max(total - rematadas, 0)
+                        total_piezas = int(t.get("total") or 0)
+                        armadas_reales = int(prod_arm_total_per_tramo.get(tramo_key, 0))
+                        rematadas_reales = int(prod_rem_total_per_tramo.get(tramo_key, 0))
+                        # En armado se requieren 2 armados por pieza
+                        total_armados_tramo = total_piezas * 2
+                        faltan_arm = max(total_armados_tramo - armadas_reales, 0)
+                        faltan_rem = max(total_piezas - rematadas_reales, 0)
                         tramos_info.append(
                             {
                                 "tramo": tramo_key,
-                                "total": total,
-                                "armadas": armadas,
-                                "rematadas": rematadas,
+                                "total": total_piezas,
+                                "total_armados": total_armados_tramo,
+                                "armadas": armadas_reales,
+                                "rematadas": rematadas_reales,
                                 "faltan_arm": faltan_arm,
                                 "faltan_rem": faltan_rem,
                             }
@@ -586,6 +589,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
 
         marco_resumen = {
             "total": sum(t.get("total", 0) for t in tramos_info),
+            "total_armados": sum(t.get("total_armados", 0) for t in tramos_info),
             "armadas": sum(t.get("armadas", 0) for t in tramos_info),
             "rematadas": sum(t.get("rematadas", 0) for t in tramos_info),
             "faltan_arm": sum(t.get("faltan_arm", 0) for t in tramos_info),
@@ -779,13 +783,17 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             # Producción de los operadores seleccionados
             producido_selected = {uid: all_produced.get(uid, 0) for uid in selected_ids}
 
-            # El remanente a repartir entre los seleccionados es el total del tramo menos lo que ya hicieron otros
-            total_tramo_plan = max(0, total_tramo - producido_unselected)
+            # En armado se requieren 2 armados por cada pieza
+            factor_modo = 2 if modo_key == "armador" else 1
+            total_tramo_meta = total_tramo * factor_modo
+
+            # El remanente a repartir entre los seleccionados es la meta total menos lo que ya hicieron otros
+            total_tramo_plan = max(0, total_tramo_meta - producido_unselected)
             sum_selected_prod = sum(producido_selected.values())
             if total_tramo_plan < sum_selected_prod:
                 total_tramo_plan = sum_selected_prod
 
-            if total_tramo_plan <= 0 and total_tramo <= 0:
+            if total_tramo_plan <= 0 and total_tramo_meta <= 0:
                 continue
 
             asignaciones = _build_asignaciones_equitativas(
@@ -797,7 +805,8 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             total_global += total_tramo_plan
             tramos_doc[tramo_key] = {
                 "total": total_tramo_plan,
-                "total_tramo": total_tramo,
+                "total_tramo": total_tramo_meta,
+                "total_piezas": total_tramo,
                 "producido_unselected": producido_unselected,
                 "asignaciones": asignaciones,
             }
@@ -874,15 +883,40 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
     def admin_planificacion_eliminar():
         empresa = request.form.get("empresa") or ""
         marco = request.form.get("marco") or ""
+        modo = (request.form.get("modo") or "").strip().lower()
         grupo = _normalize_grupo({"empresa": empresa, "marco": marco, "tramo": ""})
 
         try:
             ciclo = _get_ciclo_actual(db)
-            res = db[COLLECTION_PLANIFICACIONES].delete_one({"ciclo": ciclo, **_group_filter(grupo)})
-            if res.deleted_count == 1:
-                flash("Planificación eliminada. La pieza queda liberada para todos.", "success")
-            else:
+            filter_query = {"ciclo": ciclo, **_group_filter(grupo)}
+            plan = db[COLLECTION_PLANIFICACIONES].find_one(filter_query)
+
+            if not plan:
                 flash("No se encontró planificación para eliminar.", "warning")
+                return redirect(url_for("admin_planificacion_home", **grupo))
+
+            if modo in ("armador", "rematador"):
+                otro_modo = "rematador" if modo == "armador" else "armador"
+                otro_activo = _modo_planificado(plan, otro_modo)
+
+                if otro_activo:
+                    db[COLLECTION_PLANIFICACIONES].update_one(
+                        {"_id": plan["_id"]},
+                        {
+                            "$set": {
+                                f"modos.{modo}": {"total": 0, "tramos": {}},
+                                "updated_at": _now_utc(),
+                            }
+                        },
+                    )
+                    nombre_modo = "Armador" if modo == "armador" else "Rematador"
+                    flash(f"Planificación de {nombre_modo} eliminada. La etapa de {nombre_modo.lower()} queda liberada para todos.", "success")
+                else:
+                    db[COLLECTION_PLANIFICACIONES].delete_one({"_id": plan["_id"]})
+                    flash("Planificación eliminada completamente. La pieza queda liberada para todos.", "success")
+            else:
+                db[COLLECTION_PLANIFICACIONES].delete_one({"_id": plan["_id"]})
+                flash("Planificación eliminada completamente. La pieza queda liberada para todos.", "success")
         except Exception as exc:
             flash(f"Error al eliminar planificación: {str(exc)}", "danger")
         return redirect(url_for("admin_planificacion_home", **grupo))
