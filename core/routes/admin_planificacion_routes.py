@@ -909,7 +909,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                             }
                         },
                     )
-                    nombre_modo = "Armador" if modo == "armador" else "Rematador"
+                    nombre_modo = "Armado" if modo == "armador" else "Remate"
                     flash(f"Planificación de {nombre_modo} eliminada. La etapa de {nombre_modo.lower()} queda liberada para todos.", "success")
                 else:
                     db[COLLECTION_PLANIFICACIONES].delete_one({"_id": plan["_id"]})
