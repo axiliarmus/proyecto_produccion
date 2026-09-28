@@ -229,18 +229,81 @@ def _get_marco_production_stats(db, empresa, marco, modo=None):
     total_per_tramo = {}
 
     for doc in db.produccion.find(match_base, {"user_id": 1, "tramo": 1}):
+        tramo_norm = str(doc.get("tramo") or "").strip()
+        total_per_tramo[tramo_norm] = total_per_tramo.get(tramo_norm, 0) + 1
+
         raw_user = doc.get("user_id")
         if not raw_user:
             continue
         user_key = ObjectId(raw_user) if ObjectId.is_valid(str(raw_user)) else raw_user
-        tramo_norm = str(doc.get("tramo") or "").strip()
 
         per_op_marco[user_key] = per_op_marco.get(user_key, 0) + 1
         per_tramo_op.setdefault(tramo_norm, {})
         per_tramo_op[tramo_norm][user_key] = per_tramo_op[tramo_norm].get(user_key, 0) + 1
-        total_per_tramo[tramo_norm] = total_per_tramo.get(tramo_norm, 0) + 1
 
     return per_op_marco, per_tramo_op, total_per_tramo
+
+
+def _get_tramo_count(total_map, tramo_key):
+    """Obtiene el conteo de un tramo de forma insensible a mayúsculas/minúsculas y espacios."""
+    tramo_clean = str(tramo_key or "").strip().lower()
+    for tk, val in (total_map or {}).items():
+        if str(tk or "").strip().lower() == tramo_clean:
+            return int(val or 0)
+    return 0
+
+
+def _sync_plan_producido(db, plan_doc):
+    """
+    Sincroniza los contadores 'producido' de cada asignación en la planificación
+    con los registros reales existentes en db.produccion.
+    Evita que contadores congelados o desfasados bloqueen el cupo de los operadores.
+    """
+    if not plan_doc:
+        return plan_doc
+
+    grupo = plan_doc.get("grupo") or {}
+    empresa = grupo.get("empresa", "")
+    marco = grupo.get("marco", "")
+    plan_id = plan_doc.get("_id")
+    modos = plan_doc.get("modos") or {}
+    needs_update = False
+
+    for modo_key in ("armador", "rematador"):
+        modo_doc = modos.get(modo_key) or {}
+        tramos_doc = modo_doc.get("tramos") or {}
+        _, per_tramo_op, _ = _get_marco_production_stats(db, empresa, marco, modo=modo_key)
+
+        for tramo_key, tramo_data in tramos_doc.items():
+            tramo_counts = {}
+            tramo_clean = str(tramo_key or "").strip().lower()
+            for tk, counts in per_tramo_op.items():
+                if str(tk or "").strip().lower() == tramo_clean:
+                    tramo_counts = counts
+                    break
+
+            asignaciones = tramo_data.get("asignaciones") or []
+            for a in asignaciones:
+                uid = a.get("user_id")
+                if not uid:
+                    continue
+                user_oid = ObjectId(uid) if ObjectId.is_valid(str(uid)) else uid
+                real_prod = tramo_counts.get(user_oid, 0)
+                if real_prod == 0 and str(user_oid) in tramo_counts:
+                    real_prod = tramo_counts.get(str(user_oid), 0)
+
+                old_prod = int(a.get("producido") or 0)
+                if old_prod != real_prod:
+                    a["producido"] = real_prod
+                    needs_update = True
+
+    if needs_update and plan_id:
+        db[COLLECTION_PLANIFICACIONES].update_one(
+            {"_id": plan_id},
+            {"$set": {"modos": modos}}
+        )
+
+    return plan_doc
 
 
 def _count_producido_por_operador(db, empresa, marco, tramo=None, modo=None, ciclo=None):
@@ -537,6 +600,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         if selected_active:
             plan = db[COLLECTION_PLANIFICACIONES].find_one({"ciclo": ciclo, **_group_filter(selected)})
             if plan:
+                plan = _sync_plan_producido(db, plan)
                 modos = plan.get("modos") or {}
                 for modo_key in ("armador", "rematador"):
                     modo_doc = modos.get(modo_key) or {}
@@ -565,8 +629,8 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                     for t in m.get("tramos", []):
                         tramo_key = str(t.get("tramo") or "")
                         total_piezas = int(t.get("total") or 0)
-                        armadas_reales = int(prod_arm_total_per_tramo.get(tramo_key, 0))
-                        rematadas_reales = int(prod_rem_total_per_tramo.get(tramo_key, 0))
+                        armadas_reales = _get_tramo_count(prod_arm_total_per_tramo, tramo_key)
+                        rematadas_reales = _get_tramo_count(prod_rem_total_per_tramo, tramo_key)
                         # En armado se requieren 2 armados por pieza
                         total_armados_tramo = total_piezas * 2
                         faltan_arm = max(total_armados_tramo - armadas_reales, 0)
@@ -764,18 +828,11 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                     if pk.lower() == tramo_key.lower():
                         prev_tramo = pv
                         break
-            prev_producido = {}
-            for a in (prev_tramo.get("asignaciones") or []):
-                uid = a.get("user_id")
-                if uid:
-                    uid = ObjectId(uid) if ObjectId.is_valid(str(uid)) else uid
-                    prev_producido[uid] = max(0, int(a.get("producido") or 0))
-
-            # Combinar la producción real de todos los operadores que hayan participado en este tramo
-            all_uids = set(prod_counts.keys()) | set(prev_producido.keys())
+            # La fuente de la verdad para la producción es db.produccion
+            all_uids = set(prod_counts.keys())
             all_produced = {}
             for uid in all_uids:
-                all_produced[uid] = max(int(prod_counts.get(uid, 0) or 0), int(prev_producido.get(uid, 0) or 0))
+                all_produced[uid] = int(prod_counts.get(uid, 0) or 0)
 
             # Operadores que ya produjeron piezas pero NO fueron seleccionados en esta planificación
             producido_unselected = sum(prod for uid, prod in all_produced.items() if uid not in selected_ids)

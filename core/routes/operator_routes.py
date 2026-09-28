@@ -488,12 +488,20 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             flash(f"❌ No existe una pieza con código {codigo_pieza}", "danger")
             return redirect(url_for("operador_home"))
 
+        codigos_lookup = [codigo_pieza, str(codigo_pieza)]
+        if str(codigo_pieza).isdigit():
+            codigos_lookup.append(int(codigo_pieza))
+        if pieza_data.get("codigo"):
+            codigos_lookup.append(pieza_data.get("codigo"))
+            codigos_lookup.append(str(pieza_data.get("codigo")))
+        codigos_lookup = list(dict.fromkeys(codigos_lookup))
+
         if es_historico:
             collection_prod = db.produccion_historica
-            filtro_base = {"codigo_pieza": codigo_pieza, "corte_id": corte_id_historico}
+            filtro_base = {"codigo_pieza": {"$in": codigos_lookup}, "corte_id": corte_id_historico}
         else:
             collection_prod = db.produccion
-            filtro_base = {"codigo_pieza": codigo_pieza}
+            filtro_base = {"codigo_pieza": {"$in": codigos_lookup}}
 
         plan_control = None
         if not es_historico:
@@ -542,6 +550,31 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
 
                     objetivo = int(asignacion.get("objetivo") or 0)
                     producido = int(asignacion.get("producido") or 0)
+
+                    # Verificar conteo real en produccion para evitar bloqueos por desfase de contadores
+                    real_producido = collection_prod.count_documents({
+                        "empresa": re.compile(f"^{re.escape(empresa_plan)}$", re.IGNORECASE),
+                        "marco": re.compile(f"^{re.escape(marco_plan)}$", re.IGNORECASE),
+                        "tramo": re.compile(f"^{re.escape(matched_tramo_key)}$", re.IGNORECASE),
+                        "modo": modo,
+                        "$or": [{"user_id": str(user_oid)}, {"user_id": user_oid}],
+                    })
+                    if real_producido != producido:
+                        producido = real_producido
+                        asignacion["producido"] = real_producido
+                        try:
+                            db.planificaciones.update_one(
+                                {"_id": plan.get("_id")},
+                                {
+                                    "$set": {
+                                        f"modos.{modo}.tramos.{matched_tramo_key}.asignaciones.$[a].producido": real_producido
+                                    }
+                                },
+                                array_filters=[{"a.user_id": user_oid}],
+                            )
+                        except Exception:
+                            pass
+
                     unidades_plan = 2 if (modo == "armador" and bool(session.get("armado_solo"))) else 1
                     if producido + unidades_plan > objetivo:
                         release_submission_guard()
@@ -757,18 +790,31 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                     ],
                 )
                 if upd.modified_count <= 0:
-                    db.produccion.delete_many({"_id": {"$in": inserted_ids}})
-                    release_submission_guard()
-                    flash("⛔ No se pudo actualizar el cupo de planificación para este registro.", "warning")
-                    return redirect(url_for("operador_home"))
-                if upd.modified_count != 1:
+                    # Si no modificó por desfase previo en $lte, sincronizamos al total real exacto
                     try:
-                        db.produccion.delete_one({"_id": res_ins.inserted_id})
+                        conteo_actual_total = collection_prod.count_documents({
+                            "empresa": re.compile(f"^{re.escape(pieza_data.get('empresa', ''))}$", re.IGNORECASE),
+                            "marco": re.compile(f"^{re.escape(pieza_data.get('marco', ''))}$", re.IGNORECASE),
+                            "tramo": re.compile(f"^{re.escape(plan_control['tramo'])}$", re.IGNORECASE),
+                            "modo": plan_control["modo"],
+                            "$or": [{"user_id": str(plan_control["user_oid"])}, {"user_id": plan_control["user_oid"]}],
+                        })
+                        upd_rescue = db.planificaciones.update_one(
+                            {"_id": plan_control["plan_id"]},
+                            {
+                                "$set": {
+                                    f"modos.{plan_control['modo']}.tramos.{plan_control['tramo']}.asignaciones.$[a].producido": conteo_actual_total
+                                }
+                            },
+                            array_filters=[{"a.user_id": plan_control["user_oid"]}],
+                        )
+                        if upd_rescue.matched_count <= 0:
+                            raise RuntimeError("No se encontró la asignación para rescatar cupo")
                     except Exception:
-                        pass
-                    release_submission_guard()
-                    flash("⛔ No se pudo aplicar el cupo de planificación (posible concurrencia). Intenta nuevamente.", "warning")
-                    return redirect(url_for("operador_home"))
+                        db.produccion.delete_many({"_id": {"$in": inserted_ids}})
+                        release_submission_guard()
+                        flash("⛔ No se pudo actualizar el cupo de planificación para este registro.", "warning")
+                        return redirect(url_for("operador_home"))
             flash(f"✔ Pieza {codigo_pieza} registrada correctamente como {modo}", "success")
 
         release_submission_guard()
