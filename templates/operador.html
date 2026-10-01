@@ -100,7 +100,7 @@
                 <div class="card bg-dark text-light border-secondary mb-3">
                   <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                      <div class="fw-bold">{{ it.empresa }} · {{ it.marco }}</div>
+                      <div class="fw-bold">{{ it.empresa }} · {{ it.marco }}{% if it.ciclo %} <span class="badge bg-secondary ms-1">Lote {{ it.ciclo|upper }}</span>{% endif %}</div>
                       <span class="badge bg-warning text-dark">
                         Restantes {{ it.total_restante }} / {{ it.total_objetivo }}
                       </span>
@@ -150,7 +150,7 @@
                 <div class="card bg-dark text-light border-secondary mb-3">
                   <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                      <div class="fw-bold">{{ it.empresa }} · {{ it.marco }}</div>
+                      <div class="fw-bold">{{ it.empresa }} · {{ it.marco }}{% if it.ciclo %} <span class="badge bg-secondary ms-1">Lote {{ it.ciclo|upper }}</span>{% endif %}</div>
                       <span class="badge bg-success">
                         Restantes {{ it.total_restante }} / {{ it.total_objetivo }}
                       </span>

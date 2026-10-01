@@ -65,6 +65,48 @@ def _build_submission_guard_id(user_id, modo, box, codigo_pieza, cuerda_interna_
     return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
 
 
+def _verificar_y_limpiar_planificacion_completada(db, plan_id):
+    """
+    Verifica si una planificación ha cumplido el 100% de sus objetivos en todos
+    los tramos y modos configurados. Si se completó, se elimina automáticamente
+    para mantener el sistema limpio y liberar cupos.
+    """
+    if not plan_id:
+        return False
+    try:
+        plan_oid = ObjectId(plan_id) if ObjectId.is_valid(str(plan_id)) else plan_id
+        plan = db.planificaciones.find_one({"_id": plan_oid})
+        if not plan:
+            return False
+        modos = plan.get("modos") or {}
+        tiene_asignaciones = False
+        esta_completo = True
+        for modo_key in ("armador", "rematador"):
+            modo_doc = modos.get(modo_key) or {}
+            tramos = modo_doc.get("tramos") or {}
+            for tramo_key, tramo_doc in tramos.items():
+                asignaciones = tramo_doc.get("asignaciones") or []
+                if not asignaciones:
+                    continue
+                tiene_asignaciones = True
+                for a in asignaciones:
+                    obj = int(a.get("objetivo") or 0)
+                    prod = int(a.get("producido") or 0)
+                    if prod < obj:
+                        esta_completo = False
+                        break
+                if not esta_completo:
+                    break
+            if not esta_completo:
+                break
+        if tiene_asignaciones and esta_completo:
+            db.planificaciones.delete_one({"_id": plan_oid})
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def register_operator_routes(app, db, login_required, normalize_page, paginate_list, get_tunnel_url):
     """Registra rutas del dominio operador."""
 
@@ -247,15 +289,15 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
         planificaciones = {"armador": [], "rematador": []}
         try:
             user_oid = ObjectId(user_id) if ObjectId.is_valid(str(user_id)) else user_id
-            conf = db.config.find_one({"key": "ciclo_actual"}) or {"value": "a"}
-            ciclo = str(conf.get("value") or "a")
-            planes = list(db.planificaciones.find({"ciclo": ciclo}))
+            # Consultar todas las planificaciones activas (incluyendo de ciclos anteriores pendientes)
+            planes = list(db.planificaciones.find({}))
 
             agrupado = {"armador": {}, "rematador": {}}
             for plan in planes:
                 grupo = plan.get("grupo") or {}
                 empresa = str(grupo.get("empresa") or "")
                 marco = str(grupo.get("marco") or "")
+                ciclo_plan = str(plan.get("ciclo") or "").lower()
                 modos = plan.get("modos") or {}
                 for modo_key in ("armador", "rematador"):
                     modo_doc = modos.get(modo_key) or {}
@@ -267,11 +309,12 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                             obj = int(a.get("objetivo") or 0)
                             prod = int(a.get("producido") or 0)
                             rest = max(obj - prod, 0)
-                            k = (empresa, marco)
+                            k = (empresa, marco, ciclo_plan)
                             if k not in agrupado[modo_key]:
                                 agrupado[modo_key][k] = {
                                     "empresa": empresa,
                                     "marco": marco,
+                                    "ciclo": ciclo_plan,
                                     "modo": modo_key,
                                     "total_objetivo": 0,
                                     "total_producido": 0,
@@ -294,7 +337,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                 items = list(agrupado[modo_key].values())
                 for it in items:
                     it["tramos"].sort(key=lambda x: x.get("tramo"))
-                items.sort(key=lambda x: (x.get("empresa") or "", x.get("marco") or ""))
+                items.sort(key=lambda x: (x.get("empresa") or "", x.get("marco") or "", x.get("ciclo") or ""))
                 planificaciones[modo_key] = items
         except Exception:
             planificaciones = {"armador": [], "rematador": []}
@@ -504,94 +547,131 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             filtro_base = {"codigo_pieza": {"$in": codigos_lookup}}
 
         plan_control = None
-        if not es_historico:
-            empresa_plan = str(pieza_data.get("empresa") or "Sin Cliente").strip()
-            marco_plan = str(pieza_data.get("marco") or "Sin Marco").strip()
-            tramo_plan = str(pieza_data.get("tramo") or "Sin Tramo").strip()
-            conf = db.config.find_one({"key": "ciclo_actual"}) or {"value": "a"}
-            ciclo = str(conf.get("value") or "a")
+        empresa_plan = str(pieza_data.get("empresa") or "Sin Cliente").strip()
+        marco_plan = str(pieza_data.get("marco") or "Sin Marco").strip()
+        tramo_plan = str(pieza_data.get("tramo") or "Sin Tramo").strip()
+
+        # Determinar el ciclo de la pieza a partir de su código o datos
+        m_ciclo = re.match(r"^([a-zA-Z]+)", str(codigo_pieza).strip())
+        ciclo_pieza = m_ciclo.group(1).lower() if m_ciclo else None
+        if not ciclo_pieza and pieza_data.get("ciclo"):
+            ciclo_pieza = str(pieza_data.get("ciclo")).lower()
+
+        # Buscar planificacion correspondiente al ciclo de la pieza o ciclo actual
+        plan = None
+        if ciclo_pieza:
             plan = db.planificaciones.find_one(
                 {
-                    "ciclo": ciclo,
+                    "ciclo": ciclo_pieza,
                     "grupo.empresa": re.compile(f"^{re.escape(empresa_plan)}$", re.IGNORECASE),
                     "grupo.marco": re.compile(f"^{re.escape(marco_plan)}$", re.IGNORECASE),
                 }
             )
+        if not plan:
+            conf = db.config.find_one({"key": "ciclo_actual"}) or {"value": "a"}
+            ciclo_actual = str(conf.get("value") or "a")
+            plan = db.planificaciones.find_one(
+                {
+                    "ciclo": ciclo_actual,
+                    "grupo.empresa": re.compile(f"^{re.escape(empresa_plan)}$", re.IGNORECASE),
+                    "grupo.marco": re.compile(f"^{re.escape(marco_plan)}$", re.IGNORECASE),
+                }
+            )
+        if not plan:
+            plan = db.planificaciones.find_one(
+                {
+                    "grupo.empresa": re.compile(f"^{re.escape(empresa_plan)}$", re.IGNORECASE),
+                    "grupo.marco": re.compile(f"^{re.escape(marco_plan)}$", re.IGNORECASE),
+                }
+            )
+
+        if plan:
+            modo_doc = ((plan.get("modos") or {}).get(modo) or {})
+            tramos_doc = modo_doc.get("tramos") or {}
+            tramo_doc = None
+            matched_tramo_key = tramo_plan
+            for tk, tv in tramos_doc.items():
+                if tk.lower() == tramo_plan.lower():
+                    tramo_doc = tv
+                    matched_tramo_key = tk
+                    break
+
+            if not tramo_doc:
+                plan = None
             if plan:
-                modo_doc = ((plan.get("modos") or {}).get(modo) or {})
-                tramos_doc = modo_doc.get("tramos") or {}
-                tramo_doc = None
-                matched_tramo_key = tramo_plan
-                for tk, tv in tramos_doc.items():
-                    if tk.lower() == tramo_plan.lower():
-                        tramo_doc = tv
-                        matched_tramo_key = tk
-                        break
-
-                if not tramo_doc:
+                asignaciones = tramo_doc.get("asignaciones") or []
+                total_modo = int(tramo_doc.get("total") or 0)
+                if total_modo <= 0 or not asignaciones:
                     plan = None
-                if plan:
-                    asignaciones = tramo_doc.get("asignaciones") or []
-                    total_modo = int(tramo_doc.get("total") or 0)
-                    if total_modo <= 0 or not asignaciones:
-                        plan = None
 
-                if plan:
-                    user_oid = ObjectId(user_id) if ObjectId.is_valid(str(user_id)) else user_id
-                    asignacion = None
-                    for a in asignaciones:
-                        if str(a.get("user_id")) == str(user_oid):
-                            asignacion = a
-                            break
-                    if not asignacion:
-                        release_submission_guard()
-                        flash("❌ Esta pieza está planificada y no tienes permiso para registrarla.", "danger")
-                        return redirect(url_for("operador_home"))
+            if plan:
+                user_oid = ObjectId(user_id) if ObjectId.is_valid(str(user_id)) else user_id
+                asignacion = None
+                for a in asignaciones:
+                    if str(a.get("user_id")) == str(user_oid):
+                        asignacion = a
+                        break
+                if not asignacion:
+                    release_submission_guard()
+                    flash("❌ Esta pieza está planificada y no tienes permiso para registrarla.", "danger")
+                    return redirect(url_for("operador_home"))
 
-                    objetivo = int(asignacion.get("objetivo") or 0)
-                    producido = int(asignacion.get("producido") or 0)
+                objetivo = int(asignacion.get("objetivo") or 0)
+                producido = int(asignacion.get("producido") or 0)
 
-                    # Verificar conteo real en produccion para evitar bloqueos por desfase de contadores
-                    real_producido = collection_prod.count_documents({
-                        "empresa": re.compile(f"^{re.escape(empresa_plan)}$", re.IGNORECASE),
-                        "marco": re.compile(f"^{re.escape(marco_plan)}$", re.IGNORECASE),
-                        "tramo": re.compile(f"^{re.escape(matched_tramo_key)}$", re.IGNORECASE),
-                        "modo": modo,
-                        "$or": [{"user_id": str(user_oid)}, {"user_id": user_oid}],
-                    })
-                    if real_producido != producido:
-                        producido = real_producido
-                        asignacion["producido"] = real_producido
-                        try:
-                            db.planificaciones.update_one(
-                                {"_id": plan.get("_id")},
-                                {
-                                    "$set": {
-                                        f"modos.{modo}.tramos.{matched_tramo_key}.asignaciones.$[a].producido": real_producido
-                                    }
-                                },
-                                array_filters=[{"a.user_id": user_oid}],
-                            )
-                        except Exception:
-                            pass
+                # Conteo real en produccion activa e historica para evitar desfase de contadores
+                filtro_real = {
+                    "empresa": re.compile(f"^{re.escape(empresa_plan)}$", re.IGNORECASE),
+                    "marco": re.compile(f"^{re.escape(marco_plan)}$", re.IGNORECASE),
+                    "tramo": re.compile(f"^{re.escape(matched_tramo_key)}$", re.IGNORECASE),
+                    "modo": modo,
+                    "$or": [{"user_id": str(user_oid)}, {"user_id": user_oid}],
+                }
+                if ciclo_pieza:
+                    filtro_real["codigo_pieza"] = {"$regex": f"^{ciclo_pieza}", "$options": "i"}
 
-                    unidades_plan = 2 if (modo == "armador" and bool(session.get("armado_solo"))) else 1
-                    if producido + unidades_plan > objetivo:
-                        release_submission_guard()
-                        flash("⛔ Ya completaste tu cupo asignado para esta planificación.", "warning")
-                        return redirect(url_for("operador_home"))
+                real_producido = db.produccion.count_documents(filtro_real) + db.produccion_historica.count_documents(filtro_real)
+                if real_producido != producido:
+                    producido = real_producido
+                    asignacion["producido"] = real_producido
+                    try:
+                        db.planificaciones.update_one(
+                            {"_id": plan.get("_id")},
+                            {
+                                "$set": {
+                                    f"modos.{modo}.tramos.{matched_tramo_key}.asignaciones.$[a].producido": real_producido
+                                }
+                            },
+                            array_filters=[{"a.user_id": user_oid}],
+                        )
+                    except Exception:
+                        pass
 
-                    plan_control = {
-                        "plan_id": plan.get("_id"),
-                        "modo": modo,
-                        "tramo": matched_tramo_key,
-                        "user_oid": user_oid,
-                        "objetivo": objetivo,
-                        "units": unidades_plan,
-                    }
+                unidades_plan = 2 if (modo == "armador" and bool(session.get("armado_solo"))) else 1
+                if producido + unidades_plan > objetivo:
+                    release_submission_guard()
+                    flash("⛔ Ya completaste tu cupo asignado para esta planificación.", "warning")
+                    return redirect(url_for("operador_home"))
 
-        armado_count = collection_prod.count_documents({**filtro_base, "modo": "armador"})
-        remate_count = collection_prod.count_documents({**filtro_base, "modo": "rematador"})
+                plan_control = {
+                    "plan_id": plan.get("_id"),
+                    "modo": modo,
+                    "tramo": matched_tramo_key,
+                    "user_oid": user_oid,
+                    "objetivo": objetivo,
+                    "units": unidades_plan,
+                    "ciclo_pieza": ciclo_pieza,
+                }
+
+        # Conteo unificado de armados y remates (produccion activa + historica)
+        armado_count = (
+            db.produccion.count_documents({**filtro_base, "modo": "armador"})
+            + db.produccion_historica.count_documents({**filtro_base, "modo": "armador"})
+        )
+        remate_count = (
+            db.produccion.count_documents({**filtro_base, "modo": "rematador"})
+            + db.produccion_historica.count_documents({**filtro_base, "modo": "rematador"})
+        )
         # #region debug-point B:counts
         _debug_report_operator_armado(
             "B",
@@ -745,76 +825,86 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             )
 
         if es_historico:
-            registro["corte_id"] = corte_id_historico
-            try:
-                db.produccion_historica.insert_one(registro)
-            except Exception:
-                release_submission_guard()
-                flash("❌ No se pudo registrar la pieza. Intenta nuevamente.", "danger")
-                return redirect(url_for("operador_home"))
-            flash(f"✔ Pieza {codigo_pieza} registrada en ARCHIVO HISTÓRICO como {modo} (Corte cerrado)", "warning")
-        else:
-            try:
-                res_ins = db.produccion.insert_one(registro)
-                inserted_ids = [res_ins.inserted_id]
-                if modo == "armador" and registro_armado_solo:
-                    registro_2 = dict(registro)
-                    registro_2["armado_solo_extra"] = True
-                    registro_2["armado_solo_parent_id"] = res_ins.inserted_id
-                    registro_2["fecha"] = datetime.utcnow()
-                    try:
-                        res_ins_2 = db.produccion.insert_one(registro_2)
-                        inserted_ids.append(res_ins_2.inserted_id)
-                    except Exception:
-                        db.produccion.delete_one({"_id": res_ins.inserted_id})
-                        raise
-            except Exception:
-                release_submission_guard()
-                flash("❌ No se pudo registrar la pieza. Intenta nuevamente.", "danger")
-                return redirect(url_for("operador_home"))
-            if plan_control and plan_control.get("plan_id"):
-                inc_units = int(plan_control.get("units") or 1)
-                objetivo = int(plan_control.get("objetivo") or 0)
-                upd = db.planificaciones.update_one(
-                    {"_id": plan_control["plan_id"]},
+            registro["pieza_historica"] = True
+            if corte_id_historico:
+                registro["corte_id_origen"] = corte_id_historico
+
+        try:
+            res_ins = db.produccion.insert_one(registro)
+            inserted_ids = [res_ins.inserted_id]
+            if modo == "armador" and registro_armado_solo:
+                registro_2 = dict(registro)
+                registro_2["armado_solo_extra"] = True
+                registro_2["armado_solo_parent_id"] = res_ins.inserted_id
+                registro_2["fecha"] = datetime.utcnow()
+                try:
+                    res_ins_2 = db.produccion.insert_one(registro_2)
+                    inserted_ids.append(res_ins_2.inserted_id)
+                except Exception:
+                    db.produccion.delete_one({"_id": res_ins.inserted_id})
+                    raise
+        except Exception:
+            release_submission_guard()
+            flash("❌ No se pudo registrar la pieza. Intenta nuevamente.", "danger")
+            return redirect(url_for("operador_home"))
+
+        if plan_control and plan_control.get("plan_id"):
+            inc_units = int(plan_control.get("units") or 1)
+            objetivo = int(plan_control.get("objetivo") or 0)
+            upd = db.planificaciones.update_one(
+                {"_id": plan_control["plan_id"]},
+                {
+                    "$inc": {
+                        f"modos.{plan_control['modo']}.tramos.{plan_control['tramo']}.asignaciones.$[a].producido": inc_units
+                    }
+                },
+                array_filters=[
                     {
-                        "$inc": {
-                            f"modos.{plan_control['modo']}.tramos.{plan_control['tramo']}.asignaciones.$[a].producido": inc_units
-                        }
-                    },
-                    array_filters=[
+                        "a.user_id": plan_control["user_oid"],
+                        "a.producido": {"$lte": objetivo - inc_units},
+                    }
+                ],
+            )
+            if upd.modified_count <= 0:
+                # Si no modificó por desfase previo en $lte, sincronizamos al total real exacto
+                try:
+                    filtro_rescue = {
+                        "empresa": re.compile(f"^{re.escape(pieza_data.get('empresa', ''))}$", re.IGNORECASE),
+                        "marco": re.compile(f"^{re.escape(pieza_data.get('marco', ''))}$", re.IGNORECASE),
+                        "tramo": re.compile(f"^{re.escape(plan_control['tramo'])}$", re.IGNORECASE),
+                        "modo": plan_control["modo"],
+                        "$or": [{"user_id": str(plan_control["user_oid"])}, {"user_id": plan_control["user_oid"]}],
+                    }
+                    if plan_control.get("ciclo_pieza"):
+                        filtro_rescue["codigo_pieza"] = {"$regex": f"^{plan_control['ciclo_pieza']}", "$options": "i"}
+
+                    conteo_actual_total = (
+                        db.produccion.count_documents(filtro_rescue)
+                        + db.produccion_historica.count_documents(filtro_rescue)
+                    )
+                    upd_rescue = db.planificaciones.update_one(
+                        {"_id": plan_control["plan_id"]},
                         {
-                            "a.user_id": plan_control["user_oid"],
-                            "a.producido": {"$lte": objetivo - inc_units},
-                        }
-                    ],
-                )
-                if upd.modified_count <= 0:
-                    # Si no modificó por desfase previo en $lte, sincronizamos al total real exacto
-                    try:
-                        conteo_actual_total = collection_prod.count_documents({
-                            "empresa": re.compile(f"^{re.escape(pieza_data.get('empresa', ''))}$", re.IGNORECASE),
-                            "marco": re.compile(f"^{re.escape(pieza_data.get('marco', ''))}$", re.IGNORECASE),
-                            "tramo": re.compile(f"^{re.escape(plan_control['tramo'])}$", re.IGNORECASE),
-                            "modo": plan_control["modo"],
-                            "$or": [{"user_id": str(plan_control["user_oid"])}, {"user_id": plan_control["user_oid"]}],
-                        })
-                        upd_rescue = db.planificaciones.update_one(
-                            {"_id": plan_control["plan_id"]},
-                            {
-                                "$set": {
-                                    f"modos.{plan_control['modo']}.tramos.{plan_control['tramo']}.asignaciones.$[a].producido": conteo_actual_total
-                                }
-                            },
-                            array_filters=[{"a.user_id": plan_control["user_oid"]}],
-                        )
-                        if upd_rescue.matched_count <= 0:
-                            raise RuntimeError("No se encontró la asignación para rescatar cupo")
-                    except Exception:
-                        db.produccion.delete_many({"_id": {"$in": inserted_ids}})
-                        release_submission_guard()
-                        flash("⛔ No se pudo actualizar el cupo de planificación para este registro.", "warning")
-                        return redirect(url_for("operador_home"))
+                            "$set": {
+                                f"modos.{plan_control['modo']}.tramos.{plan_control['tramo']}.asignaciones.$[a].producido": conteo_actual_total
+                            }
+                        },
+                        array_filters=[{"a.user_id": plan_control["user_oid"]}],
+                    )
+                    if upd_rescue.matched_count <= 0:
+                        raise RuntimeError("No se encontró la asignación para rescatar cupo")
+                except Exception:
+                    db.produccion.delete_many({"_id": {"$in": inserted_ids}})
+                    release_submission_guard()
+                    flash("⛔ No se pudo actualizar el cupo de planificación para este registro.", "warning")
+                    return redirect(url_for("operador_home"))
+
+            # AUTO-ELIMINACIÓN DE PLANIFICACIÓN SI SE COMPLETÓ AL 100%
+            _verificar_y_limpiar_planificacion_completada(db, plan_control["plan_id"])
+
+        if es_historico:
+            flash(f"✔ Pieza {codigo_pieza} (mes anterior) registrada correctamente en producción actual como {modo}", "success")
+        else:
             flash(f"✔ Pieza {codigo_pieza} registrada correctamente como {modo}", "success")
 
         release_submission_guard()

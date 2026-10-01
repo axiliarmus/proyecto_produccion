@@ -213,7 +213,7 @@ def _merge_status_maps(primary, secondary):
     return merged
 
 
-def _get_marco_production_stats(db, empresa, marco, modo=None):
+def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None):
     empresa = (empresa or "").strip()
     marco = (marco or "").strip()
     match_base = {}
@@ -223,6 +223,8 @@ def _get_marco_production_stats(db, empresa, marco, modo=None):
         match_base["marco"] = re.compile(f"^{re.escape(marco)}$", re.IGNORECASE)
     if modo:
         match_base["modo"] = modo
+    if ciclo:
+        match_base["codigo_pieza"] = {"$regex": f"^{ciclo}", "$options": "i"}
 
     per_op_marco = {}
     per_tramo_op = {}
@@ -241,6 +243,21 @@ def _get_marco_production_stats(db, empresa, marco, modo=None):
         per_tramo_op.setdefault(tramo_norm, {})
         per_tramo_op[tramo_norm][user_key] = per_tramo_op[tramo_norm].get(user_key, 0) + 1
 
+    # Si hay ciclo especificado, también sumar registros históricos de ese ciclo
+    if ciclo:
+        for doc in db.produccion_historica.find(match_base, {"user_id": 1, "tramo": 1}):
+            tramo_norm = str(doc.get("tramo") or "").strip()
+            total_per_tramo[tramo_norm] = total_per_tramo.get(tramo_norm, 0) + 1
+
+            raw_user = doc.get("user_id")
+            if not raw_user:
+                continue
+            user_key = ObjectId(raw_user) if ObjectId.is_valid(str(raw_user)) else raw_user
+
+            per_op_marco[user_key] = per_op_marco.get(user_key, 0) + 1
+            per_tramo_op.setdefault(tramo_norm, {})
+            per_tramo_op[tramo_norm][user_key] = per_tramo_op[tramo_norm].get(user_key, 0) + 1
+
     return per_op_marco, per_tramo_op, total_per_tramo
 
 
@@ -256,8 +273,9 @@ def _get_tramo_count(total_map, tramo_key):
 def _sync_plan_producido(db, plan_doc):
     """
     Sincroniza los contadores 'producido' de cada asignación en la planificación
-    con los registros reales existentes en db.produccion.
+    con los registros reales existentes en db.produccion y db.produccion_historica.
     Evita que contadores congelados o desfasados bloqueen el cupo de los operadores.
+    Si la planificación ya está 100% completada, se elimina automáticamente.
     """
     if not plan_doc:
         return plan_doc
@@ -266,13 +284,17 @@ def _sync_plan_producido(db, plan_doc):
     empresa = grupo.get("empresa", "")
     marco = grupo.get("marco", "")
     plan_id = plan_doc.get("_id")
+    ciclo_plan = str(plan_doc.get("ciclo") or "").strip().lower()
     modos = plan_doc.get("modos") or {}
     needs_update = False
+
+    tiene_asignaciones = False
+    esta_completo = True
 
     for modo_key in ("armador", "rematador"):
         modo_doc = modos.get(modo_key) or {}
         tramos_doc = modo_doc.get("tramos") or {}
-        _, per_tramo_op, _ = _get_marco_production_stats(db, empresa, marco, modo=modo_key)
+        _, per_tramo_op, _ = _get_marco_production_stats(db, empresa, marco, modo=modo_key, ciclo=ciclo_plan)
 
         for tramo_key, tramo_data in tramos_doc.items():
             tramo_counts = {}
@@ -283,6 +305,9 @@ def _sync_plan_producido(db, plan_doc):
                     break
 
             asignaciones = tramo_data.get("asignaciones") or []
+            if not asignaciones:
+                continue
+            tiene_asignaciones = True
             for a in asignaciones:
                 uid = a.get("user_id")
                 if not uid:
@@ -297,11 +322,20 @@ def _sync_plan_producido(db, plan_doc):
                     a["producido"] = real_prod
                     needs_update = True
 
+                obj = int(a.get("objetivo") or 0)
+                if a["producido"] < obj:
+                    esta_completo = False
+
     if needs_update and plan_id:
         db[COLLECTION_PLANIFICACIONES].update_one(
             {"_id": plan_id},
             {"$set": {"modos": modos}}
         )
+
+    # Si se determinó que está 100% completada, auto-eliminarla
+    if tiene_asignaciones and esta_completo and plan_id:
+        db[COLLECTION_PLANIFICACIONES].delete_one({"_id": plan_id})
+        return None
 
     return plan_doc
 

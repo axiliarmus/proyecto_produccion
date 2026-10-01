@@ -206,7 +206,39 @@ def register_admin_dashboard_routes(app, db, login_required):
 
                 db.produccion.delete_many(filtro)
                 db.piezas.delete_many({})
-                db.planificaciones.delete_many({})
+
+                # Evaluar y limpiar solo las planificaciones que ya estén 100% completadas.
+                # Las planificaciones con saldo o piezas pendientes se mantienen activas.
+                planes_activos = list(db.planificaciones.find({}))
+                planes_eliminados = 0
+                planes_mantenidos = 0
+                for plan in planes_activos:
+                    modos = plan.get("modos") or {}
+                    tiene_asignaciones = False
+                    esta_completo = True
+                    for modo_key in ("armador", "rematador"):
+                        modo_doc = modos.get(modo_key) or {}
+                        tramos = modo_doc.get("tramos") or {}
+                        for tramo_key, tramo_doc in tramos.items():
+                            asignaciones = tramo_doc.get("asignaciones") or []
+                            if not asignaciones:
+                                continue
+                            tiene_asignaciones = True
+                            for a in asignaciones:
+                                obj = int(a.get("objetivo") or 0)
+                                prod = int(a.get("producido") or 0)
+                                if prod < obj:
+                                    esta_completo = False
+                                    break
+                            if not esta_completo:
+                                break
+                        if not esta_completo:
+                            break
+                    if not tiene_asignaciones or esta_completo:
+                        db.planificaciones.delete_one({"_id": plan["_id"]})
+                        planes_eliminados += 1
+                    else:
+                        planes_mantenidos += 1
 
                 conf = db.config.find_one({"key": "ciclo_actual"}) or {"key": "ciclo_actual", "value": "a"}
                 letra = conf.get("value", "a")
@@ -218,7 +250,10 @@ def register_admin_dashboard_routes(app, db, login_required):
                     nueva = "a"
                 db.config.update_one({"key": "ciclo_actual"}, {"$set": {"value": nueva}}, upsert=True)
 
-                flash(f"✅ Corte realizado. {count} registros archivados.", "success")
+                mensaje = f"✅ Corte realizado. {count} registros archivados. Tabla de piezas limpiada."
+                if planes_mantenidos > 0:
+                    mensaje += f" Se conservaron {planes_mantenidos} planificación(es) con cupos pendientes para completar."
+                flash(mensaje, "success")
             else:
                 flash("No se encontraron registros para el mes seleccionado.", "info")
         except Exception as exc:
