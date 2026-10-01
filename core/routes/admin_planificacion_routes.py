@@ -224,7 +224,11 @@ def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None, inclu
     if modo:
         match_base["modo"] = modo
     if ciclo:
-        match_base["codigo_pieza"] = {"$regex": f"^{ciclo}", "$options": "i"}
+        match_base["$or"] = [
+            {"codigo_pieza": re.compile(f"^{re.escape(ciclo)}", re.IGNORECASE)},
+            {"codigo_pieza": re.compile(r"^\d+")},
+            {"codigo_pieza": re.compile(r"^[^a-zA-Z]")}
+        ]
 
     per_op_marco = {}
     per_tramo_op = {}
@@ -505,23 +509,24 @@ def _get_planificacion_piezas_y_grupos(db, get_production_status_map, build_tarj
 
         if p.get("corte_id"):
             continue
-        if cod in all_codigos_archivados:
-            continue
 
         dt_creacion = p.get("created_at") or p.get("fecha_creacion")
         if dt_creacion and dt_creacion.tzinfo is None:
             dt_creacion = dt_creacion.replace(tzinfo=timezone.utc)
 
-        # Si el marco fue archivado en un corte anterior, solo permitir piezas creadas en el periodo activo
-        if marco_lower in marcos_archivados:
-            if not dt_creacion or dt_creacion < start_periodo_utc:
-                continue
-
         es_produccion_activa = marco_lower in marcos_en_produccion_activa
         es_creada_mes_en_curso = bool(dt_creacion and dt_creacion >= start_month_utc)
 
+        if cod in all_codigos_archivados and not es_produccion_activa and not es_creada_mes_en_curso:
+            continue
+
+        # Si el marco fue archivado en un corte anterior, permitir si tiene produccion activa o fue creado en el periodo
+        if marco_lower in marcos_archivados and not es_produccion_activa:
+            if not dt_creacion or dt_creacion < start_periodo_utc:
+                continue
+
         if dt_creacion and dt_creacion < start_month_utc:
-            if last_corte_fin and dt_creacion < last_corte_fin:
+            if last_corte_fin and dt_creacion < last_corte_fin and not es_produccion_activa:
                 continue
             if not es_produccion_activa:
                 continue

@@ -36,14 +36,25 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
             if not pieza_activa_db and query_int:
                 pieza_activa_db = db.piezas.find_one(query_int)
 
-            if pieza_activa_db:
-                prod_recs = list(db.produccion.find({"codigo_pieza": str(pieza_activa_db.get("codigo"))}).sort("fecha", -1))
-                for record in prod_recs:
-                    if record.get("fecha"):
-                        record["fecha"] = to_cl(record.get("fecha"))
+            prod_query = [{"codigo_pieza": codigo}, {"codigo_pieza": str(codigo)}]
+            if codigo.isdigit():
+                prod_query.append({"codigo_pieza": int(codigo)})
+            prod_recs = list(db.produccion.find({"$or": prod_query}).sort("fecha", -1))
+            for record in prod_recs:
+                if record.get("fecha"):
+                    record["fecha"] = to_cl(record.get("fecha"))
 
+            if pieza_activa_db or prod_recs:
+                data_activa = pieza_activa_db or {
+                    "codigo": codigo,
+                    "empresa": prod_recs[0].get("empresa", "Sin Cliente") if prod_recs else "Sin Cliente",
+                    "marco": prod_recs[0].get("marco", "Sin Marco") if prod_recs else "Sin Marco",
+                    "tramo": prod_recs[0].get("tramo", "Sin Tramo") if prod_recs else "Sin Tramo",
+                    "kilo_pieza": prod_recs[0].get("kilo_pieza", 0) if prod_recs else 0,
+                    "tipo_precio": prod_recs[0].get("tipo_precio", "metro") if prod_recs else "metro",
+                }
                 pieza_activa = {
-                    "data": pieza_activa_db,
+                    "data": data_activa,
                     "produccion": prod_recs,
                     "estado_actual": "En Proceso" if prod_recs else "Sin Producción",
                 }
@@ -247,13 +258,15 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
             if not codigo:
                 return {"success": False, "message": "Código vacío"}, 400
 
-            patron_regex = f"^{re.escape(codigo)}$"
-            filtro_regex = {"$regex": patron_regex, "$options": "i"}
+            filtro_regex = re.compile(f"^{re.escape(codigo)}$", re.IGNORECASE)
 
             if db.picking.find_one({"codigo": filtro_regex}):
                 return {"success": False, "message": f"Pieza {codigo} YA fue escaneada previamente"}, 400
 
             pieza = db.piezas.find_one({"codigo": filtro_regex})
+            if not pieza:
+                pieza = db.piezas_historicas.find_one({"codigo": filtro_regex}, sort=[("_id", -1)])
+
             last_prod_active = db.produccion.find_one({"codigo_pieza": filtro_regex}, sort=[("fecha", -1)])
             last_prod_hist = db.produccion_historica.find_one({"codigo_pieza": filtro_regex}, sort=[("fecha", -1)])
 
@@ -273,7 +286,7 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
                         "empresa": last_prod.get("empresa", "Desconocido"),
                         "marco": last_prod.get("marco", "Desconocido"),
                         "tramo": last_prod.get("tramo", "Desconocido"),
-                        "kilo_pieza": last_prod.get("peso_calculado", 0),
+                        "kilo_pieza": last_prod.get("kilo_pieza", 0) or last_prod.get("peso_calculado", 0),
                     }
                 else:
                     return {"success": False, "message": f"Pieza {codigo} no encontrada en sistema ni históricos"}, 404

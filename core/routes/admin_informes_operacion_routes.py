@@ -1,3 +1,4 @@
+from bson import ObjectId
 from flask import flash, redirect, render_template, request, url_for
 
 from core.helpers.date_utils import apply_date_range_filter, to_cl
@@ -111,7 +112,10 @@ def register_admin_informes_operacion_routes(
             )
 
         if operador_sel and operador_sel != "todos":
-            filtro["user_id"] = operador_sel
+            u_cond = [{"user_id": str(operador_sel)}]
+            if ObjectId.is_valid(str(operador_sel)):
+                u_cond.append({"user_id": ObjectId(str(operador_sel))})
+            filtro["$or"] = u_cond
         if fecha_inicio or fecha_fin:
             apply_date_range_filter(filtro, fecha_inicio, fecha_fin)
 
@@ -125,6 +129,9 @@ def register_admin_informes_operacion_routes(
                     "modo": 1,
                     "marco": 1,
                     "tramo": 1,
+                    "kilo_pieza": 1,
+                    "tipo_precio": 1,
+                    "precio_unitario": 1,
                     "_id": 0,
                 },
             ).sort("fecha", -1)
@@ -160,7 +167,10 @@ def register_admin_informes_operacion_routes(
         filtro = {}
 
         if operador_sel and operador_sel != "todos":
-            filtro["user_id"] = operador_sel
+            u_cond = [{"user_id": str(operador_sel)}]
+            if ObjectId.is_valid(str(operador_sel)):
+                u_cond.append({"user_id": ObjectId(str(operador_sel))})
+            filtro["$or"] = u_cond
         if fecha_inicio or fecha_fin:
             apply_date_range_filter(filtro, fecha_inicio, fecha_fin)
 
@@ -174,6 +184,9 @@ def register_admin_informes_operacion_routes(
                     "modo": 1,
                     "marco": 1,
                     "tramo": 1,
+                    "kilo_pieza": 1,
+                    "tipo_precio": 1,
+                    "precio_unitario": 1,
                     "_id": 0,
                 },
             ).sort("fecha", -1)

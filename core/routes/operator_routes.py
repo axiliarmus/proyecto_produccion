@@ -127,7 +127,10 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
 
         fecha_inicio = request.args.get("fecha_inicio")
         fecha_fin = request.args.get("fecha_fin")
-        filtro = {"user_id": user_id}
+        user_cond = [{"user_id": str(user_id)}]
+        if ObjectId.is_valid(str(user_id)):
+            user_cond.append({"user_id": ObjectId(str(user_id))})
+        filtro = {"$or": user_cond}
 
         start_cl = None
         end_cl = None
@@ -198,6 +201,17 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                 else:
                     peso = float(pieza.get("kilo_pieza") or 0)
                     tipo_precio = pieza.get("tipo_precio", "metro")
+                if peso == 0:
+                    if (None, codigo) not in cache_piezas_hist:
+                        pieza_hist = db.piezas_historicas.find_one({"codigo": codigo}, sort=[("_id", -1)])
+                        if not pieza_hist and codigo.isdigit():
+                            pieza_hist = db.piezas_historicas.find_one({"codigo": int(codigo)}, sort=[("_id", -1)])
+                        cache_piezas_hist[(None, codigo)] = pieza_hist
+                    pieza_doc = cache_piezas_hist.get((None, codigo))
+                    if pieza_doc:
+                        peso = float(pieza_doc.get("kilo_pieza") or 0)
+                        if not tipo_precio or tipo_precio == "metro":
+                            tipo_precio = pieza_doc.get("tipo_precio", "metro")
             else:
                 if "kilo_pieza" in pieza:
                     try:
@@ -304,7 +318,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                     tramos_doc = modo_doc.get("tramos") or {}
                     for tramo_key, tramo_doc in tramos_doc.items():
                         for a in (tramo_doc.get("asignaciones") or []):
-                            if a.get("user_id") != user_oid:
+                            if str(a.get("user_id")) != str(user_oid):
                                 continue
                             obj = int(a.get("objetivo") or 0)
                             prod = int(a.get("producido") or 0)
@@ -539,12 +553,12 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             codigos_lookup.append(str(pieza_data.get("codigo")))
         codigos_lookup = list(dict.fromkeys(codigos_lookup))
 
-        if es_historico:
-            collection_prod = db.produccion_historica
-            filtro_base = {"codigo_pieza": {"$in": codigos_lookup}, "corte_id": corte_id_historico}
-        else:
-            collection_prod = db.produccion
-            filtro_base = {"codigo_pieza": {"$in": codigos_lookup}}
+        filtro_prod_activa = {"codigo_pieza": {"$in": codigos_lookup}}
+        filtro_prod_hist = (
+            {"codigo_pieza": {"$in": codigos_lookup}, "corte_id": corte_id_historico}
+            if (es_historico and corte_id_historico)
+            else {"codigo_pieza": {"$in": codigos_lookup}}
+        )
 
         plan_control = None
         empresa_plan = str(pieza_data.get("empresa") or "Sin Cliente").strip()
@@ -628,7 +642,10 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                     "$or": [{"user_id": str(user_oid)}, {"user_id": user_oid}],
                 }
                 if ciclo_pieza:
-                    filtro_real["codigo_pieza"] = {"$regex": f"^{ciclo_pieza}", "$options": "i"}
+                    filtro_real["$or"] = [
+                        {"codigo_pieza": re.compile(f"^{re.escape(ciclo_pieza)}", re.IGNORECASE)},
+                        {"codigo_pieza": re.compile(r"^\d+")},
+                    ]
 
                 real_producido = db.produccion.count_documents(filtro_real) + db.produccion_historica.count_documents(filtro_real)
                 if real_producido != producido:
@@ -665,12 +682,12 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
 
         # Conteo unificado de armados y remates (produccion activa + historica)
         armado_count = (
-            db.produccion.count_documents({**filtro_base, "modo": "armador"})
-            + db.produccion_historica.count_documents({**filtro_base, "modo": "armador"})
+            db.produccion.count_documents({**filtro_prod_activa, "modo": "armador"})
+            + db.produccion_historica.count_documents({**filtro_prod_hist, "modo": "armador"})
         )
         remate_count = (
-            db.produccion.count_documents({**filtro_base, "modo": "rematador"})
-            + db.produccion_historica.count_documents({**filtro_base, "modo": "rematador"})
+            db.produccion.count_documents({**filtro_prod_activa, "modo": "rematador"})
+            + db.produccion_historica.count_documents({**filtro_prod_hist, "modo": "rematador"})
         )
         # #region debug-point B:counts
         _debug_report_operator_armado(
@@ -876,7 +893,10 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                         "$or": [{"user_id": str(plan_control["user_oid"])}, {"user_id": plan_control["user_oid"]}],
                     }
                     if plan_control.get("ciclo_pieza"):
-                        filtro_rescue["codigo_pieza"] = {"$regex": f"^{plan_control['ciclo_pieza']}", "$options": "i"}
+                        filtro_rescue["$or"] = [
+                            {"codigo_pieza": re.compile(f"^{re.escape(plan_control['ciclo_pieza'])}", re.IGNORECASE)},
+                            {"codigo_pieza": re.compile(r"^\d+")},
+                        ]
 
                     conteo_actual_total = (
                         db.produccion.count_documents(filtro_rescue)

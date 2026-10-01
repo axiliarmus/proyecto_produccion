@@ -63,22 +63,24 @@ def register_admin_dashboard_routes(app, db, login_required):
         kilos_hoy = calcular_kilos(prod_hoy)
         kilos_mes = calcular_kilos(prod_mes)
 
-        total_p = len(all_piezas)
         pipeline_estado = [{"$sort": {"fecha": 1}}, {"$group": {"_id": "$codigo_pieza", "ultimo_modo": {"$last": "$modo"}}}]
         estados_prod = list(db.produccion.aggregate(pipeline_estado))
 
         codigos_totales = set(mapa_piezas.keys())
+        for estado in estados_prod:
+            codigos_totales.add(str(estado["_id"]))
+
         real_rematado = 0
         real_armado = 0
 
         for estado in estados_prod:
-            if estado["_id"] in codigos_totales:
-                if estado["ultimo_modo"] == "rematador":
-                    real_rematado += 1
-                else:
-                    real_armado += 1
+            if estado["ultimo_modo"] == "rematador":
+                real_rematado += 1
+            else:
+                real_armado += 1
 
-        real_sin_prod = total_p - (real_rematado + real_armado)
+        total_p = max(len(codigos_totales), len(all_piezas))
+        real_sin_prod = max(0, total_p - (real_rematado + real_armado))
         stats_piezas = {
             "sin_produccion": max(0, real_sin_prod),
             "armado": real_armado,

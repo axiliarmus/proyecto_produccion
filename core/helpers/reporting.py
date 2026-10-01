@@ -64,6 +64,25 @@ def build_piezas_map(db, codigos, collection=None):
     for pieza in collection.find({"codigo": {"$in": lookup_values}}):
         for key in build_codigo_lookup_keys(pieza.get("codigo")):
             piezas_map[key] = pieza
+
+    # Si hay piezas faltantes (archivadas en cortes anteriores), buscarlas en db.piezas_historicas
+    missing_codes = []
+    for c in lookup_values:
+        matched = False
+        for k in build_codigo_lookup_keys(c):
+            if k in piezas_map:
+                matched = True
+                break
+        if not matched:
+            missing_codes.append(c)
+
+    if missing_codes:
+        missing_lookup = build_codigo_query_values(missing_codes)
+        for pieza in db.piezas_historicas.find({"codigo": {"$in": missing_lookup}}).sort("_id", -1):
+            for key in build_codigo_lookup_keys(pieza.get("codigo")):
+                if key not in piezas_map:
+                    piezas_map[key] = pieza
+
     return piezas_map
 
 

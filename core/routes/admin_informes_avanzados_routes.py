@@ -317,7 +317,14 @@ def register_admin_informes_avanzados_routes(
                 if pieza_info:
                     break
             if not pieza_info:
-                continue
+                pieza_info = {
+                    "codigo": codigo,
+                    "empresa": prod.get("empresa") or "Sin Cliente",
+                    "marco": prod.get("marco") or "Sin Marco",
+                    "tramo": prod.get("tramo") or "Sin Tramo",
+                    "kilo_pieza": float(prod.get("kilo_pieza", 0) or 0),
+                    "tipo_precio": prod.get("tipo_precio", "metro") or "metro",
+                }
 
             peso = float(pieza_info.get("kilo_pieza", 0))
             user_info = users_map.get(usuario_nombre, {})
@@ -424,7 +431,20 @@ def register_admin_informes_avanzados_routes(
             if not pieza_info and str(codigo).isdigit():
                 pieza_info = map_piezas.get(int(codigo))
             if not pieza_info:
-                continue
+                pieza_hist = db.piezas_historicas.find_one({"codigo": codigo}, sort=[("_id", -1)])
+                if not pieza_hist and str(codigo).isdigit():
+                    pieza_hist = db.piezas_historicas.find_one({"codigo": int(codigo)}, sort=[("_id", -1)])
+                if pieza_hist:
+                    pieza_info = pieza_hist
+                else:
+                    pieza_info = {
+                        "codigo": codigo,
+                        "empresa": prod.get("empresa") or "Sin Cliente",
+                        "marco": prod.get("marco") or "Sin Marco",
+                        "tramo": prod.get("tramo") or "Sin Tramo",
+                        "kilo_pieza": float(prod.get("kilo_pieza", 0) or 0),
+                        "tipo_precio": prod.get("tipo_precio", "metro") or "metro",
+                    }
 
             peso = float(pieza_info.get("kilo_pieza", 0))
             user_info = users_map.get(prod.get("usuario"), {})
