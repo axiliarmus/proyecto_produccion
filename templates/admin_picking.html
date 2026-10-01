@@ -60,6 +60,11 @@
                     ❌ Piezas Rechazadas <span class="badge bg-danger ms-1" id="rejectedCountBadge">0</span>
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link text-info" id="hist-tab" data-bs-toggle="tab" data-bs-target="#hist-tab-pane" type="button" role="tab">
+                    📋 Historial de Pickings <span class="badge bg-info text-dark ms-1" id="histCountBadge">{{ historial|length if historial else 0 }}</span>
+                </button>
+            </li>
         </ul>
 
         <div class="tab-content" id="myTabContent">
@@ -79,6 +84,84 @@
                     <div class="text-center py-5 text-secondary">
                         <i class='bx bx-check-circle fs-1 mb-3'></i>
                         <p>No hay piezas rechazadas.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL HISTORIAL -->
+            <div class="tab-pane fade" id="hist-tab-pane" role="tabpanel">
+                <div class="card bg-dark text-white border-secondary mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0 fw-bold"><i class='bx bx-history text-info'></i> Sesiones de Picking Anteriores</h6>
+                            <small class="text-secondary">Últimos registros guardados</small>
+                        </div>
+                        {% if not historial or historial|length == 0 %}
+                            <div class="text-center py-5 text-secondary">
+                                <i class='bx bx-archive fs-1 mb-3'></i>
+                                <p>Aún no hay pickings guardados en el historial.</p>
+                                <small>Cuando reinicies un conteo con piezas escaneadas, se guardará automáticamente aquí.</small>
+                            </div>
+                        {% else %}
+                            <div class="table-responsive">
+                                <table class="table table-dark table-hover table-sm align-middle mb-0">
+                                    <thead>
+                                        <tr class="text-secondary small">
+                                            <th>Fecha y Hora</th>
+                                            <th>Nombre / Referencia</th>
+                                            <th>Usuario</th>
+                                            <th class="text-center">Total</th>
+                                            <th class="text-center">Armadas</th>
+                                            <th class="text-center">Validadas</th>
+                                            <th class="text-center">Rechazadas</th>
+                                            <th class="text-end">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for h in historial %}
+                                        <tr>
+                                            <td class="text-nowrap small text-light">
+                                                {{ h.fecha_cl.strftime('%d/%m/%Y %H:%M') if h.fecha_cl else '-' }}
+                                            </td>
+                                            <td>
+                                                <strong class="text-white">{{ h.nombre }}</strong>
+                                                {% if h.nota %}
+                                                    <small class="d-block text-secondary text-truncate" style="max-width: 220px;">{{ h.nota }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td class="small text-secondary">{{ h.usuario or '-' }}</td>
+                                            <td class="text-center"><span class="badge bg-primary fs-7">{{ h.total }}</span></td>
+                                            <td class="text-center"><span class="badge bg-warning text-dark">{{ h.armadas }}</span></td>
+                                            <td class="text-center"><span class="badge bg-success">{{ h.validadas }}</span></td>
+                                            <td class="text-center">
+                                                {% if h.rechazadas and h.rechazadas > 0 %}
+                                                    <span class="badge bg-danger">{{ h.rechazadas }}</span>
+                                                {% else %}
+                                                    <span class="text-muted small">0</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-end text-nowrap">
+                                                <button class="btn btn-sm btn-outline-info me-1" onclick="verDetalleHistorial('{{ h._id }}')" title="Ver Detalle de Piezas">
+                                                    <i class='bx bx-show'></i> Detalle
+                                                </button>
+                                                <a href="{{ url_for('exportar_picking_historial_excel', hist_id=h._id) }}" class="btn btn-sm btn-outline-success me-1" title="Descargar Excel">
+                                                    <i class='bx bx-download'></i>
+                                                </a>
+                                                {% if session.get('role') == 'administrador' %}
+                                                <form method="POST" action="{{ url_for('eliminar_picking_historial', hist_id=h._id) }}" class="d-inline" onsubmit="return confirm('¿Eliminar este registro histórico?')">
+                                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar del historial">
+                                                        <i class='bx bx-trash'></i>
+                                                    </button>
+                                                </form>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -132,6 +215,115 @@
       <div class="modal-body text-center">
         <div id="reader" style="width: 100%;"></div>
         <p class="mt-2 text-muted small">Apunta la cámara al código de barras de la pieza</p>
+      </div>
+    </div>
+  </div>
+<!-- Modal Detalle Picking Histórico -->
+<div class="modal fade" id="modalDetalleHistorial" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-white border-info">
+      <div class="modal-header border-secondary">
+        <div>
+            <h5 class="modal-title mb-0" id="histModalTitle"><i class='bx bx-archive text-info'></i> Detalle de Picking</h5>
+            <small class="text-secondary" id="histModalSubtitle"></small>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Tarjetas de métricas -->
+        <div class="row g-3 mb-4">
+            <div class="col-sm-3 col-6">
+                <div class="admin-card bg-black border-secondary text-center py-2">
+                    <span class="text-secondary small">Total Piezas</span>
+                    <h3 class="mb-0 text-white" id="histStatTotal">0</h3>
+                </div>
+            </div>
+            <div class="col-sm-3 col-6">
+                <div class="admin-card bg-black border-secondary text-center py-2">
+                    <span class="text-secondary small">Armadas</span>
+                    <h3 class="mb-0 text-warning" id="histStatArmadas">0</h3>
+                </div>
+            </div>
+            <div class="col-sm-3 col-6">
+                <div class="admin-card bg-black border-secondary text-center py-2">
+                    <span class="text-secondary small">Validadas</span>
+                    <h3 class="mb-0 text-success" id="histStatValidadas">0</h3>
+                </div>
+            </div>
+            <div class="col-sm-3 col-6">
+                <div class="admin-card bg-black border-secondary text-center py-2">
+                    <span class="text-secondary small">Rechazadas</span>
+                    <h3 class="mb-0 text-danger" id="histStatRechazadas">0</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Desglose por Marcos / Tramos -->
+        <div id="histGroupsContainer" class="mb-4"></div>
+
+        <!-- Tabla con buscador de piezas escaneadas -->
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+            <h6 class="text-white mb-0">Piezas Escaneadas (<span id="histPiecesCount">0</span>)</h6>
+            <div class="input-group input-group-sm" style="max-width: 280px;">
+                <span class="input-group-text bg-black border-secondary text-secondary"><i class='bx bx-search'></i></span>
+                <input type="text" id="histPiecesFilter" class="form-control bg-black text-white border-secondary" placeholder="Buscar código, cliente, marco...">
+            </div>
+        </div>
+        <div class="table-responsive" style="max-height: 380px;">
+            <table class="table table-dark table-sm table-striped table-hover mb-0" id="histPiecesTable">
+                <thead class="sticky-top bg-dark border-secondary">
+                    <tr class="text-secondary small">
+                        <th>#</th>
+                        <th>Código</th>
+                        <th>Cliente</th>
+                        <th>Marco</th>
+                        <th>Tramo</th>
+                        <th>Estado</th>
+                        <th>Calidad</th>
+                        <th>Usuario</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody id="histPiecesTbody"></tbody>
+            </table>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <a id="histExcelBtn" href="#" class="btn btn-outline-success">
+            <i class='bx bx-download'></i> Exportar a Excel
+        </a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Confirmar Reset Picking -->
+<div class="modal fade" id="modalResetPicking" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-white border-danger">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title"><i class='bx bx-archive-in text-danger'></i> Guardar Picking y Reiniciar Conteo</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-secondary small mb-3">
+          El conteo actual (<strong class="text-white" id="resetModalPiecesCount">0 piezas</strong>) se guardará automáticamente en el <strong>Historial de Pickings</strong> para que puedas consultarlo o descargarlo en Excel cuando lo necesites.
+        </p>
+        <div class="mb-3">
+          <label class="form-label small text-secondary">Nombre o Identificador del Picking</label>
+          <input type="text" id="resetPickingNombre" class="form-control bg-black text-white border-secondary" placeholder="Ej: Carga Camión 1, Despacho Cliente X...">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-secondary">Nota u Observaciones (Opcional)</label>
+          <textarea id="resetPickingNota" class="form-control bg-black text-white border-secondary" rows="2" placeholder="Detalles de la carga, chofer, lote, etc."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" onclick="confirmarResetPicking()">
+          <i class='bx bx-check'></i> Guardar e Iniciar Nuevo Picking
+        </button>
       </div>
     </div>
   </div>
@@ -537,25 +729,218 @@ function showLastScanned(pieza, estado) {
 }
 
 function resetPicking() {
-    if(confirm("¿Estás seguro de borrar todo el conteo actual?")) {
-        fetch('/api/picking/reset', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-        })
+    const totalCount = state.scannedCodes.size;
+    if (totalCount === 0) {
+        if (confirm("El conteo actual está en 0. ¿Deseas reiniciar la pantalla de escaneo?")) {
+            state.scannedCodes.clear();
+            state.data = {};
+            state.rejectedDetails = [];
+            updateUI();
+            lastScannedCard.classList.add('d-none');
+        }
+        return;
+    }
+
+    const modalEl = document.getElementById('modalResetPicking');
+    document.getElementById('resetModalPiecesCount').textContent = `${totalCount} piezas`;
+    const now = new Date();
+    const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth()+1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    document.getElementById('resetPickingNombre').value = `Picking ${formattedDate}`;
+    document.getElementById('resetPickingNota').value = '';
+    const bsModal = new bootstrap.Modal(modalEl);
+    bsModal.show();
+}
+
+function confirmarResetPicking() {
+    const nombre = document.getElementById('resetPickingNombre').value.trim();
+    const nota = document.getElementById('resetPickingNota').value.trim();
+    const modalEl = document.getElementById('modalResetPicking');
+    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+
+    fetch('/api/picking/reset', {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}' 
+        },
+        body: JSON.stringify({ nombre: nombre, nota: nota })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(modalInstance) modalInstance.hide();
+        if(data.success) {
+            state.scannedCodes.clear();
+            state.data = {};
+            state.rejectedDetails = [];
+            updateUI();
+            lastScannedCard.classList.add('d-none');
+            // Recargar para actualizar la lista histórica
+            window.location.reload();
+        } else {
+            alert("Error al reiniciar: " + data.message);
+        }
+    })
+    .catch(err => {
+        alert("Error de conexión al reiniciar: " + err);
+    });
+}
+
+let currentHistPieces = [];
+
+function verDetalleHistorial(histId) {
+    const modalEl = document.getElementById('modalDetalleHistorial');
+    const bsModal = new bootstrap.Modal(modalEl);
+
+    document.getElementById('histModalTitle').innerHTML = "<i class='bx bx-loader-alt bx-spin text-info'></i> Cargando picking...";
+    document.getElementById('histModalSubtitle').textContent = "";
+    document.getElementById('histStatTotal').textContent = "...";
+    document.getElementById('histStatArmadas').textContent = "...";
+    document.getElementById('histStatValidadas').textContent = "...";
+    document.getElementById('histStatRechazadas').textContent = "...";
+    document.getElementById('histGroupsContainer').innerHTML = "<div class='text-center text-secondary py-3'>Cargando resumen...</div>";
+    document.getElementById('histPiecesTbody').innerHTML = "<tr><td colspan='9' class='text-center py-3 text-secondary'>Cargando piezas...</td></tr>";
+
+    bsModal.show();
+
+    fetch(`/api/picking/historial/${histId}`)
         .then(res => res.json())
-        .then(data => {
-            if(data.success) {
-                state.scannedCodes.clear();
-                state.data = {};
-                state.rejectedDetails = [];
-                updateUI();
-                lastScannedCard.classList.add('d-none');
-            } else {
-                alert("Error al reiniciar: " + data.message);
+        .then(res => {
+            if(!res.success) {
+                alert("Error al cargar detalle: " + res.message);
+                return;
             }
+            const h = res.data;
+            document.getElementById('histModalTitle').innerHTML = `<i class='bx bx-archive text-info'></i> ${h.nombre}`;
+            document.getElementById('histModalSubtitle').textContent = `Cerrado el ${h.fecha_cierre_str || ''} por ${h.usuario || 'Usuario'}${h.nota ? ' · Nota: ' + h.nota : ''}`;
+            document.getElementById('histStatTotal').textContent = h.total || 0;
+            document.getElementById('histStatArmadas').textContent = h.armadas || 0;
+            document.getElementById('histStatValidadas').textContent = h.validadas || 0;
+            document.getElementById('histStatRechazadas').textContent = h.rechazadas || 0;
+            document.getElementById('histExcelBtn').href = `/admin/picking/historial/${h._id}/export`;
+
+            // Renderizar desglose por grupos
+            renderHistGroups(h.resumen_grupos || {});
+
+            // Renderizar lista de piezas
+            currentHistPieces = h.piezas || [];
+            document.getElementById('histPiecesCount').textContent = currentHistPieces.length;
+            renderHistPiecesTable(currentHistPieces);
+        })
+        .catch(err => {
+            alert("Error al obtener detalle del picking: " + err);
+        });
+}
+
+function renderHistGroups(grupos) {
+    const container = document.getElementById('histGroupsContainer');
+    container.innerHTML = '';
+    const clients = Object.keys(grupos);
+    if(clients.length === 0) {
+        container.innerHTML = '<div class="text-secondary small">No hay desglose por grupos disponible.</div>';
+        return;
+    }
+
+    let html = '<div class="accordion" id="histGroupsAccordion">';
+    clients.forEach((client, idx) => {
+        const marcos = grupos[client];
+        html += `
+        <div class="accordion-item bg-dark text-white border-secondary mb-2">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed bg-dark text-white shadow-none py-2" type="button" data-bs-toggle="collapse" data-bs-target="#histCol${idx}">
+                    <strong>${client}</strong>
+                </button>
+            </h2>
+            <div id="histCol${idx}" class="accordion-collapse collapse" data-bs-parent="#histGroupsAccordion">
+                <div class="accordion-body bg-black py-2">
+        `;
+        Object.keys(marcos).forEach(marco => {
+            html += `<h6 class="text-info mt-2 mb-1 small">${marco}</h6>`;
+            html += `
+            <table class="table table-dark table-sm table-bordered mb-2">
+                <thead>
+                    <tr class="text-secondary small">
+                        <th>Tramo</th>
+                        <th class="text-center">Armadas</th>
+                        <th class="text-center">Validadas</th>
+                        <th class="text-center">Rechazadas</th>
+                        <th class="text-center">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+            const tramos = marcos[marco];
+            Object.keys(tramos).forEach(tramo => {
+                const info = tramos[tramo];
+                html += `
+                <tr>
+                    <td>${tramo}</td>
+                    <td class="text-center"><span class="badge bg-warning text-dark">${info.armado || 0}</span></td>
+                    <td class="text-center"><span class="badge bg-success">${info.validado || 0}</span></td>
+                    <td class="text-center">${info.rechazado > 0 ? `<span class="badge bg-danger">${info.rechazado}</span>` : '<span class="text-muted">0</span>'}</td>
+                    <td class="text-center fw-bold">${info.total || 0}</td>
+                </tr>
+                `;
+            });
+            html += '</tbody></table>';
+        });
+        html += '</div></div></div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderHistPiecesTable(pieces) {
+    const tbody = document.getElementById('histPiecesTbody');
+    if(!pieces || pieces.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-secondary py-3">No hay piezas escaneadas que coincidan.</td></tr>';
+        return;
+    }
+    let html = '';
+    pieces.forEach((p, index) => {
+        let badgeEstado = '<span class="badge bg-secondary">Sin Prod.</span>';
+        if(p.estado === 'Armado') badgeEstado = '<span class="badge bg-warning text-dark">Armado</span>';
+        else if(p.estado === 'Rematado') badgeEstado = '<span class="badge bg-primary">Rematado</span>';
+
+        let badgeCalidad = '<span class="text-muted small">-</span>';
+        if(p.calidad === 'aprobado') badgeCalidad = '<span class="badge bg-success">Aprobado</span>';
+        else if(p.calidad === 'rechazado') badgeCalidad = '<span class="badge bg-danger">Rechazado</span>';
+
+        html += `
+        <tr>
+            <td class="text-secondary small">${index + 1}</td>
+            <td class="fw-bold text-white">${p.codigo}</td>
+            <td class="small text-light">${p.empresa || '-'}</td>
+            <td class="small text-light">${p.marco || '-'}</td>
+            <td class="small text-light">${p.tramo || '-'}</td>
+            <td>${badgeEstado}</td>
+            <td>${badgeCalidad}</td>
+            <td class="small text-secondary">${p.usuario || '-'}</td>
+            <td class="small text-secondary text-nowrap">${p.fecha_str || '-'}</td>
+        </tr>
+        `;
+    });
+    tbody.innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const filterInput = document.getElementById('histPiecesFilter');
+    if (filterInput) {
+        filterInput.addEventListener('input', function(e) {
+            const q = e.target.value.toLowerCase().trim();
+            if(!q) {
+                renderHistPiecesTable(currentHistPieces);
+                return;
+            }
+            const filtered = currentHistPieces.filter(p => 
+                (p.codigo && String(p.codigo).toLowerCase().includes(q)) ||
+                (p.empresa && String(p.empresa).toLowerCase().includes(q)) ||
+                (p.marco && String(p.marco).toLowerCase().includes(q)) ||
+                (p.tramo && String(p.tramo).toLowerCase().includes(q))
+            );
+            renderHistPiecesTable(filtered);
         });
     }
-}
+});
 
 // EVENTOS MANUALES
 manualBtn.addEventListener('click', () => {

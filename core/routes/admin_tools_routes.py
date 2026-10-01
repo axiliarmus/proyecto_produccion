@@ -224,11 +224,17 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
             else:
                 data[empresa][marco][tramo]["sin_prod"] += 1
 
+        historial = list(db.picking_historial.find({}, {"piezas": 0}).sort("fecha_cierre", -1).limit(50))
+        for h in historial:
+            if h.get("fecha_cierre"):
+                h["fecha_cl"] = to_cl(h.get("fecha_cierre"))
+
         return render_template(
             "admin_picking.html",
             initial_data=data,
             scanned_codes=list(scanned_codes),
             initial_rejected=rejected_details,
+            historial=historial,
         )
 
     @app.route("/api/picking/scan", methods=["POST"])
@@ -370,7 +376,148 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
     @login_required(["administrador", "soporte", "supervisor"])
     def api_picking_reset():
         try:
+            payload = request.get_json(silent=True) or {}
+            nombre_sesion = (payload.get("nombre") or "").strip()
+            nota = (payload.get("nota") or "").strip()
+
+            registros = list(db.picking.find().sort("fecha", 1))
+            historial_id = None
+
+            if registros:
+                now_dt = datetime.now(timezone.utc)
+                now_cl_dt = to_cl(now_dt)
+                default_nombre = f"Picking {now_cl_dt.strftime('%d/%m/%Y %H:%M')}"
+                if not nombre_sesion:
+                    nombre_sesion = default_nombre
+
+                total_piezas = len(registros)
+                total_armadas = sum(1 for r in registros if r.get("estado") == "Armado")
+                total_rematadas = sum(1 for r in registros if r.get("estado") == "Rematado")
+                total_validadas = sum(
+                    1
+                    for r in registros
+                    if r.get("calidad") == "aprobado"
+                    or (r.get("estado") == "Rematado" and r.get("calidad") != "rechazado")
+                )
+                total_rechazadas = sum(1 for r in registros if r.get("calidad") == "rechazado")
+                total_sin_prod = sum(1 for r in registros if r.get("estado") not in ("Armado", "Rematado"))
+
+                resumen_grupos = {}
+                piezas_detalle = []
+                for r in registros:
+                    emp = r.get("empresa") or "Sin Cliente"
+                    mrc = r.get("marco") or "Sin Marco"
+                    trm = r.get("tramo") or "Sin Tramo"
+                    est = r.get("estado") or "Sin Producción"
+                    cal = r.get("calidad")
+                    cod = r.get("codigo")
+
+                    resumen_grupos.setdefault(emp, {}).setdefault(mrc, {}).setdefault(
+                        trm, {"armado": 0, "validado": 0, "rechazado": 0, "sin_prod": 0, "total": 0}
+                    )
+                    resumen_grupos[emp][mrc][trm]["total"] += 1
+                    if est == "Armado":
+                        resumen_grupos[emp][mrc][trm]["armado"] += 1
+                    elif est == "Rematado":
+                        if cal == "rechazado":
+                            resumen_grupos[emp][mrc][trm]["rechazado"] += 1
+                        else:
+                            resumen_grupos[emp][mrc][trm]["validado"] += 1
+                    else:
+                        resumen_grupos[emp][mrc][trm]["sin_prod"] += 1
+
+                    piezas_detalle.append(
+                        {
+                            "codigo": cod,
+                            "empresa": emp,
+                            "marco": mrc,
+                            "tramo": trm,
+                            "estado": est,
+                            "calidad": cal,
+                            "fecha": r.get("fecha"),
+                            "usuario": r.get("usuario"),
+                        }
+                    )
+
+                hist_doc = {
+                    "nombre": nombre_sesion,
+                    "nota": nota,
+                    "fecha_cierre": now_dt,
+                    "usuario": session.get("nombre") or session.get("usuario") or "Usuario",
+                    "usuario_id": session.get("user_id"),
+                    "total": total_piezas,
+                    "armadas": total_armadas,
+                    "rematadas": total_rematadas,
+                    "validadas": total_validadas,
+                    "rechazadas": total_rechazadas,
+                    "sin_prod": total_sin_prod,
+                    "resumen_grupos": resumen_grupos,
+                    "piezas": piezas_detalle,
+                }
+                res_ins = db.picking_historial.insert_one(hist_doc)
+                historial_id = str(res_ins.inserted_id)
+
             db.picking.delete_many({})
-            return {"success": True}
+            return {"success": True, "saved_to_history": bool(historial_id), "historial_id": historial_id}
         except Exception as exc:
             return {"success": False, "message": str(exc)}, 500
+
+    @app.route("/api/picking/historial/<hist_id>", methods=["GET"])
+    @login_required(["administrador", "soporte", "supervisor"])
+    def api_picking_historial_detalle(hist_id):
+        try:
+            if not ObjectId.is_valid(hist_id):
+                return {"success": False, "message": "ID inválido"}, 400
+            hist = db.picking_historial.find_one({"_id": ObjectId(hist_id)})
+            if not hist:
+                return {"success": False, "message": "Picking no encontrado"}, 404
+
+            hist["_id"] = str(hist["_id"])
+            if hist.get("fecha_cierre"):
+                hist["fecha_cierre_str"] = to_cl(hist["fecha_cierre"]).strftime("%d/%m/%Y %H:%M")
+            for p in hist.get("piezas", []):
+                if p.get("fecha"):
+                    p["fecha_str"] = to_cl(p["fecha"]).strftime("%d/%m/%Y %H:%M")
+
+            return {"success": True, "data": hist}
+        except Exception as exc:
+            return {"success": False, "message": str(exc)}, 500
+
+    @app.route("/admin/picking/historial/<hist_id>/export", methods=["GET"])
+    @login_required(["administrador", "soporte", "supervisor"])
+    def exportar_picking_historial_excel(hist_id):
+        if not ObjectId.is_valid(hist_id):
+            flash("ID de picking inválido", "danger")
+            return redirect(url_for("admin_picking"))
+
+        hist = db.picking_historial.find_one({"_id": ObjectId(hist_id)})
+        if not hist:
+            flash("Picking histórico no encontrado", "danger")
+            return redirect(url_for("admin_picking"))
+
+        piezas = hist.get("piezas", [])
+        data_excel = []
+        for p in piezas:
+            data_excel.append(
+                {
+                    "Código": p.get("codigo", ""),
+                    "Cliente": p.get("empresa", ""),
+                    "Marco": p.get("marco", ""),
+                    "Tramo": p.get("tramo", ""),
+                    "Estado": p.get("estado", ""),
+                    "Calidad": p.get("calidad", "") or ("Aprobado" if p.get("estado") == "Rematado" else ""),
+                    "Usuario": p.get("usuario", ""),
+                    "Fecha": to_cl(p.get("fecha")).strftime("%d/%m/%Y %H:%M") if p.get("fecha") else "",
+                }
+            )
+
+        nombre_archivo = f"picking_{hist.get('nombre', 'sesion')}".replace(" ", "_").replace("/", "-")
+        return send_excel_file(data_excel, "DetallePicking", f"{nombre_archivo}.xlsx")
+
+    @app.route("/admin/picking/historial/<hist_id>/eliminar", methods=["POST"])
+    @login_required(["administrador"])
+    def eliminar_picking_historial(hist_id):
+        if ObjectId.is_valid(hist_id):
+            db.picking_historial.delete_one({"_id": ObjectId(hist_id)})
+            flash("Registro histórico de picking eliminado.", "success")
+        return redirect(url_for("admin_picking"))

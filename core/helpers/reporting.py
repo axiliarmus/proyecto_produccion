@@ -92,6 +92,7 @@ def ensure_mongo_indexes(db):
         (db.cortes, [("inicio", -1)], "idx_cortes_inicio"),
         (db.picking, [("codigo", 1)], "idx_picking_codigo"),
         (db.picking, [("fecha", -1)], "idx_picking_fecha"),
+        (db.picking_historial, [("fecha_cierre", -1)], "idx_picking_historial_fecha"),
         (db.operator_submission_guards, [("expireAt", 1)], "idx_operator_submit_guard_expire"),
     ]
 
