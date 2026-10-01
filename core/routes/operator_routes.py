@@ -517,23 +517,31 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             return redirect(url_for("operador_home"))
 
 
-        pieza_data = db.piezas.find_one({"codigo": codigo_pieza})
-        if not pieza_data and codigo_pieza.isdigit():
+        codigo_clean = str(codigo_pieza).strip()
+        pieza_data = db.piezas.find_one({"codigo": codigo_clean})
+        if not pieza_data and codigo_clean.isdigit():
             try:
-                pieza_data = db.piezas.find_one({"codigo": int(codigo_pieza)})
+                pieza_data = db.piezas.find_one({"codigo": int(codigo_clean)})
             except Exception:
                 pass
+        if not pieza_data:
+            pieza_data = db.piezas.find_one({"codigo": re.compile(f"^{re.escape(codigo_clean)}$", re.IGNORECASE)})
 
         es_historico = False
         corte_id_historico = None
 
         if not pieza_data:
-            pieza_historica = db.piezas_historicas.find_one({"codigo": codigo_pieza}, sort=[("_id", -1)])
-            if not pieza_historica and codigo_pieza.isdigit():
+            pieza_historica = db.piezas_historicas.find_one({"codigo": codigo_clean}, sort=[("_id", -1)])
+            if not pieza_historica and codigo_clean.isdigit():
                 try:
-                    pieza_historica = db.piezas_historicas.find_one({"codigo": int(codigo_pieza)}, sort=[("_id", -1)])
+                    pieza_historica = db.piezas_historicas.find_one({"codigo": int(codigo_clean)}, sort=[("_id", -1)])
                 except Exception:
                     pass
+            if not pieza_historica:
+                pieza_historica = db.piezas_historicas.find_one(
+                    {"codigo": re.compile(f"^{re.escape(codigo_clean)}$", re.IGNORECASE)},
+                    sort=[("_id", -1)]
+                )
 
             if pieza_historica:
                 pieza_data = pieza_historica
@@ -545,20 +553,30 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             flash(f"❌ No existe una pieza con código {codigo_pieza}", "danger")
             return redirect(url_for("operador_home"))
 
-        codigos_lookup = [codigo_pieza, str(codigo_pieza)]
-        if str(codigo_pieza).isdigit():
-            codigos_lookup.append(int(codigo_pieza))
+        codigos_lookup = [codigo_pieza, str(codigo_pieza), codigo_clean]
+        if str(codigo_clean).isdigit():
+            codigos_lookup.append(int(codigo_clean))
         if pieza_data.get("codigo"):
             codigos_lookup.append(pieza_data.get("codigo"))
             codigos_lookup.append(str(pieza_data.get("codigo")))
         codigos_lookup = list(dict.fromkeys(codigos_lookup))
 
         filtro_prod_activa = {"codigo_pieza": {"$in": codigos_lookup}}
-        filtro_prod_hist = (
-            {"codigo_pieza": {"$in": codigos_lookup}, "corte_id": corte_id_historico}
-            if (es_historico and corte_id_historico)
-            else {"codigo_pieza": {"$in": codigos_lookup}}
-        )
+        if es_historico and corte_id_historico:
+            corte_cond = [{"corte_id": corte_id_historico}]
+            if isinstance(corte_id_historico, ObjectId):
+                corte_cond.append({"corte_id": str(corte_id_historico)})
+            else:
+                try:
+                    corte_cond.append({"corte_id": ObjectId(str(corte_id_historico))})
+                except Exception:
+                    pass
+            filtro_prod_hist = {
+                "codigo_pieza": {"$in": codigos_lookup},
+                "$or": corte_cond,
+            }
+        else:
+            filtro_prod_hist = {"codigo_pieza": {"$in": codigos_lookup}}
 
         plan_control = None
         empresa_plan = str(pieza_data.get("empresa") or "Sin Cliente").strip()
@@ -626,59 +644,84 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                         asignacion = a
                         break
                 if not asignacion:
-                    release_submission_guard()
-                    flash("❌ Esta pieza está planificada y no tienes permiso para registrarla.", "danger")
-                    return redirect(url_for("operador_home"))
+                    if es_historico:
+                        # Piezas que quedaron en el corte: permitir ingresarlas libremente sin bloquear al operador
+                        plan = None
+                    else:
+                        release_submission_guard()
+                        flash("❌ Esta pieza está planificada y no tienes permiso para registrarla.", "danger")
+                        return redirect(url_for("operador_home"))
 
-                objetivo = int(asignacion.get("objetivo") or 0)
-                producido = int(asignacion.get("producido") or 0)
+                if plan:
+                    objetivo = int(asignacion.get("objetivo") or 0)
+                    producido = int(asignacion.get("producido") or 0)
 
-                # Conteo real en produccion activa e historica para evitar desfase de contadores
-                filtro_real = {
-                    "empresa": re.compile(f"^{re.escape(empresa_plan)}$", re.IGNORECASE),
-                    "marco": re.compile(f"^{re.escape(marco_plan)}$", re.IGNORECASE),
-                    "tramo": re.compile(f"^{re.escape(matched_tramo_key)}$", re.IGNORECASE),
-                    "modo": modo,
-                    "$or": [{"user_id": str(user_oid)}, {"user_id": user_oid}],
-                }
-                if ciclo_pieza:
-                    filtro_real["$or"] = [
-                        {"codigo_pieza": re.compile(f"^{re.escape(ciclo_pieza)}", re.IGNORECASE)},
-                        {"codigo_pieza": re.compile(r"^\d+")},
+                    user_conds = [{"user_id": str(user_oid)}, {"user_id": user_oid}]
+                    match_conds_real = [
+                        {"empresa": re.compile(f"^{re.escape(empresa_plan)}$", re.IGNORECASE)},
+                        {"marco": re.compile(f"^{re.escape(marco_plan)}$", re.IGNORECASE)},
+                        {"tramo": re.compile(f"^{re.escape(matched_tramo_key)}$", re.IGNORECASE)},
+                        {"modo": modo},
+                        {"$or": user_conds},
                     ]
+                    if ciclo_pieza:
+                        match_conds_real.append({
+                            "$or": [
+                                {"codigo_pieza": re.compile(f"^{re.escape(ciclo_pieza)}", re.IGNORECASE)},
+                                {"codigo_pieza": re.compile(r"^\d+")},
+                                {"codigo_pieza": re.compile(r"^[^a-zA-Z]")},
+                            ]
+                        })
+                    filtro_real = {"$and": match_conds_real}
 
-                real_producido = db.produccion.count_documents(filtro_real) + db.produccion_historica.count_documents(filtro_real)
-                if real_producido != producido:
-                    producido = real_producido
-                    asignacion["producido"] = real_producido
-                    try:
-                        db.planificaciones.update_one(
-                            {"_id": plan.get("_id")},
-                            {
-                                "$set": {
-                                    f"modos.{modo}.tramos.{matched_tramo_key}.asignaciones.$[a].producido": real_producido
-                                }
-                            },
-                            array_filters=[{"a.user_id": user_oid}],
-                        )
-                    except Exception:
-                        pass
+                    real_producido = db.produccion.count_documents(filtro_real)
+                    if es_historico and corte_id_historico:
+                        corte_cond = [{"corte_id": corte_id_historico}]
+                        if isinstance(corte_id_historico, ObjectId):
+                            corte_cond.append({"corte_id": str(corte_id_historico)})
+                        else:
+                            try:
+                                corte_cond.append({"corte_id": ObjectId(str(corte_id_historico))})
+                            except Exception:
+                                pass
+                        filtro_real_hist = {"$and": match_conds_real + [{"$or": corte_cond}]}
+                        real_producido += db.produccion_historica.count_documents(filtro_real_hist)
 
-                unidades_plan = 2 if (modo == "armador" and bool(session.get("armado_solo"))) else 1
-                if producido + unidades_plan > objetivo:
-                    release_submission_guard()
-                    flash("⛔ Ya completaste tu cupo asignado para esta planificación.", "warning")
-                    return redirect(url_for("operador_home"))
+                    if real_producido != producido:
+                        producido = real_producido
+                        asignacion["producido"] = real_producido
+                        try:
+                            db.planificaciones.update_one(
+                                {"_id": plan.get("_id")},
+                                {
+                                    "$set": {
+                                        f"modos.{modo}.tramos.{matched_tramo_key}.asignaciones.$[a].producido": real_producido
+                                    }
+                                },
+                                array_filters=[{"a.user_id": user_oid}],
+                            )
+                        except Exception:
+                            pass
 
-                plan_control = {
-                    "plan_id": plan.get("_id"),
-                    "modo": modo,
-                    "tramo": matched_tramo_key,
-                    "user_oid": user_oid,
-                    "objetivo": objetivo,
-                    "units": unidades_plan,
-                    "ciclo_pieza": ciclo_pieza,
-                }
+                    unidades_plan = 2 if (modo == "armador" and bool(session.get("armado_solo"))) else 1
+                    if producido + unidades_plan > objetivo:
+                        if es_historico:
+                            # Si es pieza que quedó en el corte anterior y el cupo está cubierto, permitir ingreso
+                            plan_control = None
+                        else:
+                            release_submission_guard()
+                            flash("⛔ Ya completaste tu cupo asignado para esta planificación.", "warning")
+                            return redirect(url_for("operador_home"))
+                    else:
+                        plan_control = {
+                            "plan_id": plan.get("_id"),
+                            "modo": modo,
+                            "tramo": matched_tramo_key,
+                            "user_oid": user_oid,
+                            "objetivo": objetivo,
+                            "units": unidades_plan,
+                            "ciclo_pieza": ciclo_pieza,
+                        }
 
         # Conteo unificado de armados y remates (produccion activa + historica)
         armado_count = (
@@ -700,7 +743,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                 "es_historico": es_historico,
                 "corte_id_historico": str(corte_id_historico or ""),
                 "collection": "produccion_historica" if es_historico else "produccion",
-                "filtro_base": filtro_base,
+                "filtro_base": filtro_prod_activa,
                 "armado_count": armado_count,
                 "remate_count": remate_count,
                 "pieza_codigo": str(pieza_data.get("codigo")),
@@ -885,23 +928,36 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             if upd.modified_count <= 0:
                 # Si no modificó por desfase previo en $lte, sincronizamos al total real exacto
                 try:
-                    filtro_rescue = {
-                        "empresa": re.compile(f"^{re.escape(pieza_data.get('empresa', ''))}$", re.IGNORECASE),
-                        "marco": re.compile(f"^{re.escape(pieza_data.get('marco', ''))}$", re.IGNORECASE),
-                        "tramo": re.compile(f"^{re.escape(plan_control['tramo'])}$", re.IGNORECASE),
-                        "modo": plan_control["modo"],
-                        "$or": [{"user_id": str(plan_control["user_oid"])}, {"user_id": plan_control["user_oid"]}],
-                    }
+                    user_conds_rescue = [{"user_id": str(plan_control["user_oid"])}, {"user_id": plan_control["user_oid"]}]
+                    match_conds_rescue = [
+                        {"empresa": re.compile(f"^{re.escape(pieza_data.get('empresa', ''))}$", re.IGNORECASE)},
+                        {"marco": re.compile(f"^{re.escape(pieza_data.get('marco', ''))}$", re.IGNORECASE)},
+                        {"tramo": re.compile(f"^{re.escape(plan_control['tramo'])}$", re.IGNORECASE)},
+                        {"modo": plan_control["modo"]},
+                        {"$or": user_conds_rescue},
+                    ]
                     if plan_control.get("ciclo_pieza"):
-                        filtro_rescue["$or"] = [
-                            {"codigo_pieza": re.compile(f"^{re.escape(plan_control['ciclo_pieza'])}", re.IGNORECASE)},
-                            {"codigo_pieza": re.compile(r"^\d+")},
-                        ]
+                        match_conds_rescue.append({
+                            "$or": [
+                                {"codigo_pieza": re.compile(f"^{re.escape(plan_control['ciclo_pieza'])}", re.IGNORECASE)},
+                                {"codigo_pieza": re.compile(r"^\d+")},
+                                {"codigo_pieza": re.compile(r"^[^a-zA-Z]")},
+                            ]
+                        })
+                    filtro_rescue = {"$and": match_conds_rescue}
 
-                    conteo_actual_total = (
-                        db.produccion.count_documents(filtro_rescue)
-                        + db.produccion_historica.count_documents(filtro_rescue)
-                    )
+                    conteo_actual_total = db.produccion.count_documents(filtro_rescue)
+                    if es_historico and corte_id_historico:
+                        corte_cond = [{"corte_id": corte_id_historico}]
+                        if isinstance(corte_id_historico, ObjectId):
+                            corte_cond.append({"corte_id": str(corte_id_historico)})
+                        else:
+                            try:
+                                corte_cond.append({"corte_id": ObjectId(str(corte_id_historico))})
+                            except Exception:
+                                pass
+                        filtro_rescue_hist = {"$and": match_conds_rescue + [{"$or": corte_cond}]}
+                        conteo_actual_total += db.produccion_historica.count_documents(filtro_rescue_hist)
                     upd_rescue = db.planificaciones.update_one(
                         {"_id": plan_control["plan_id"]},
                         {

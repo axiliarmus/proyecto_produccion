@@ -213,7 +213,7 @@ def _merge_status_maps(primary, secondary):
     return merged
 
 
-def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None, include_historica=True):
+def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None, include_historica=False, corte_id=None):
     empresa = (empresa or "").strip()
     marco = (marco or "").strip()
     match_base = {}
@@ -247,9 +247,21 @@ def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None, inclu
         per_tramo_op.setdefault(tramo_norm, {})
         per_tramo_op[tramo_norm][user_key] = per_tramo_op[tramo_norm].get(user_key, 0) + 1
 
-    # También sumar registros históricos (del corte o ciclo)
-    if include_historica or ciclo:
-        for doc in db.produccion_historica.find(match_base, {"user_id": 1, "tramo": 1}):
+    # Solo sumar registros históricos si se solicita explícitamente (ej: marcos de corte anterior pendientes)
+    if include_historica:
+        match_hist = dict(match_base)
+        if corte_id:
+            corte_cond = [{"corte_id": corte_id}]
+            if isinstance(corte_id, ObjectId):
+                corte_cond.append({"corte_id": str(corte_id)})
+            else:
+                try:
+                    corte_cond.append({"corte_id": ObjectId(str(corte_id))})
+                except Exception:
+                    pass
+            match_hist["$or"] = corte_cond
+
+        for doc in db.produccion_historica.find(match_hist, {"user_id": 1, "tramo": 1}):
             tramo_norm = str(doc.get("tramo") or "").strip()
             total_per_tramo[tramo_norm] = total_per_tramo.get(tramo_norm, 0) + 1
 
@@ -263,6 +275,7 @@ def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None, inclu
             per_tramo_op[tramo_norm][user_key] = per_tramo_op[tramo_norm].get(user_key, 0) + 1
 
     return per_op_marco, per_tramo_op, total_per_tramo
+
 
 
 def _get_tramo_count(total_map, tramo_key):
@@ -295,10 +308,16 @@ def _sync_plan_producido(db, plan_doc):
     tiene_asignaciones = False
     esta_completo = True
 
+    is_plan_corte_ant = bool(plan_doc.get("es_corte_anterior") or plan_doc.get("corte_id"))
+    corte_id_plan = plan_doc.get("corte_id")
+
     for modo_key in ("armador", "rematador"):
         modo_doc = modos.get(modo_key) or {}
         tramos_doc = modo_doc.get("tramos") or {}
-        _, per_tramo_op, _ = _get_marco_production_stats(db, empresa, marco, modo=modo_key, ciclo=ciclo_plan)
+        _, per_tramo_op, _ = _get_marco_production_stats(
+            db, empresa, marco, modo=modo_key, ciclo=ciclo_plan,
+            include_historica=is_plan_corte_ant, corte_id=corte_id_plan
+        )
 
         for tramo_key, tramo_data in tramos_doc.items():
             tramo_counts = {}
@@ -514,24 +533,14 @@ def _get_planificacion_piezas_y_grupos(db, get_production_status_map, build_tarj
         if dt_creacion and dt_creacion.tzinfo is None:
             dt_creacion = dt_creacion.replace(tzinfo=timezone.utc)
 
-        es_produccion_activa = marco_lower in marcos_en_produccion_activa
         es_creada_mes_en_curso = bool(dt_creacion and dt_creacion >= start_month_utc)
 
-        if cod in all_codigos_archivados and not es_produccion_activa and not es_creada_mes_en_curso:
+        # Si el código ya fue archivado en un corte y no es una pieza creada en el mes en curso, excluirla
+        if cod in all_codigos_archivados and not es_creada_mes_en_curso:
             continue
 
-        # Si el marco fue archivado en un corte anterior, permitir si tiene produccion activa o fue creado en el periodo
-        if marco_lower in marcos_archivados and not es_produccion_activa:
-            if not dt_creacion or dt_creacion < start_periodo_utc:
-                continue
-
-        if dt_creacion and dt_creacion < start_month_utc:
-            if last_corte_fin and dt_creacion < last_corte_fin and not es_produccion_activa:
-                continue
-            if not es_produccion_activa:
-                continue
-
-        if not es_produccion_activa and not es_creada_mes_en_curso:
+        # Si tiene fecha de creación y fue antes del último corte cerrado, excluirla
+        if dt_creacion and last_corte_fin and dt_creacion < last_corte_fin and not es_creada_mes_en_curso:
             continue
 
         piezas_filtradas.append(p)
@@ -583,8 +592,12 @@ def _get_planificacion_grupos_completos(db, get_production_status_map, build_tar
         if not all_tramo_keys:
             continue
 
-        _, _, arm_totals = _get_marco_production_stats(db, empresa, marco, modo="armador", include_historica=True)
-        _, _, rem_totals = _get_marco_production_stats(db, empresa, marco, modo="rematador", include_historica=True)
+        _, _, arm_totals = _get_marco_production_stats(
+            db, empresa, marco, modo="armador", include_historica=True, corte_id=plan_sync.get("corte_id")
+        )
+        _, _, rem_totals = _get_marco_production_stats(
+            db, empresa, marco, modo="rematador", include_historica=True, corte_id=plan_sync.get("corte_id")
+        )
 
         tramos_list = []
         for tramo_k in all_tramo_keys:
@@ -757,11 +770,24 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                                     else:
                                         operador_ids_rematador.add(a["user_id"])
 
+            is_corte_anterior = False
+            for g in grupos:
+                if str(g.get("cliente")).lower() != str(selected.get("empresa")).lower():
+                    continue
+                for m in g.get("marcos", []):
+                    if str(m.get("marco")).lower() == str(selected.get("marco")).lower() and m.get("es_corte_anterior"):
+                        is_corte_anterior = True
+                        break
+
             prod_arm_op_marco, _, prod_arm_total_per_tramo = _get_marco_production_stats(
-                db, selected["empresa"], selected["marco"], modo="armador", ciclo=plan.get("ciclo") if plan else None, include_historica=True
+                db, selected["empresa"], selected["marco"], modo="armador",
+                ciclo=plan.get("ciclo") if plan else None, include_historica=is_corte_anterior,
+                corte_id=plan.get("corte_id") if plan else None
             )
             prod_rem_op_marco, _, prod_rem_total_per_tramo = _get_marco_production_stats(
-                db, selected["empresa"], selected["marco"], modo="rematador", ciclo=plan.get("ciclo") if plan else None, include_historica=True
+                db, selected["empresa"], selected["marco"], modo="rematador",
+                ciclo=plan.get("ciclo") if plan else None, include_historica=is_corte_anterior,
+                corte_id=plan.get("corte_id") if plan else None
             )
 
             for g in grupos:
@@ -770,8 +796,6 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                 for m in g.get("marcos", []):
                     if str(m.get("marco")).lower() != str(selected.get("marco")).lower():
                         continue
-                    if m.get("es_corte_anterior"):
-                        is_corte_anterior = True
                     for t in m.get("tramos", []):
                         tramo_key = str(t.get("tramo") or "")
                         total_piezas = int(t.get("total") or 0)
@@ -945,8 +969,17 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         prev_modo_doc = ((base.get("modos") or {}).get(modo_key) or {})
         prev_tramos_doc = prev_modo_doc.get("tramos") or {}
 
+        is_corte_anterior_crear = any(
+            m.get("es_corte_anterior")
+            for g in grupos
+            if str(g.get("cliente")).lower() == str(grupo.get("empresa")).lower()
+            for m in g.get("marcos", [])
+            if str(m.get("marco")).lower() == str(grupo.get("marco")).lower()
+        )
+
         _, prod_tramo_op, _ = _get_marco_production_stats(
-            db, grupo["empresa"], grupo["marco"], modo=modo_key, include_historica=True
+            db, grupo["empresa"], grupo["marco"], modo=modo_key,
+            include_historica=is_corte_anterior_crear, corte_id=base.get("corte_id")
         )
 
         tramos_doc = {}
