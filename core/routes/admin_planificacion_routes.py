@@ -32,8 +32,8 @@ def _normalize_grupo(raw):
 
 def _group_filter(grupo):
     return {
-        "grupo.empresa": grupo.get("empresa", ""),
-        "grupo.marco": grupo.get("marco", ""),
+        "grupo.empresa": re.compile(f"^{re.escape(grupo.get('empresa', ''))}$", re.IGNORECASE),
+        "grupo.marco": re.compile(f"^{re.escape(grupo.get('marco', ''))}$", re.IGNORECASE),
     }
 
 
@@ -213,7 +213,7 @@ def _merge_status_maps(primary, secondary):
     return merged
 
 
-def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None):
+def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None, include_historica=True):
     empresa = (empresa or "").strip()
     marco = (marco or "").strip()
     match_base = {}
@@ -243,8 +243,8 @@ def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None):
         per_tramo_op.setdefault(tramo_norm, {})
         per_tramo_op[tramo_norm][user_key] = per_tramo_op[tramo_norm].get(user_key, 0) + 1
 
-    # Si hay ciclo especificado, también sumar registros históricos de ese ciclo
-    if ciclo:
+    # También sumar registros históricos (del corte o ciclo)
+    if include_historica or ciclo:
         for doc in db.produccion_historica.find(match_base, {"user_id": 1, "tramo": 1}):
             tramo_norm = str(doc.get("tramo") or "").strip()
             total_per_tramo[tramo_norm] = total_per_tramo.get(tramo_norm, 0) + 1
@@ -537,6 +537,107 @@ def _get_planificacion_piezas_y_grupos(db, get_production_status_map, build_tarj
     return piezas_filtradas, status_map, grupos
 
 
+def _get_planificacion_grupos_completos(db, get_production_status_map, build_tarjetas_grupos):
+    """
+    Obtiene las piezas y grupos para la planificación:
+    1) Piezas y grupos activos del mes en curso.
+    2) Incluye marcos que tengan planificaciones activas pendientes de cortes anteriores
+       para que no desaparezcan y puedan ser visualizadas, modificadas o eliminadas.
+    """
+    piezas, production_status_map, grupos = _get_planificacion_piezas_y_grupos(
+        db, get_production_status_map, build_tarjetas_grupos
+    )
+
+    marcos_en_grupos = set()
+    for g in grupos:
+        cliente_clean = str(g.get("cliente") or "").strip().lower()
+        for m in g.get("marcos", []):
+            marco_clean = str(m.get("marco") or "").strip().lower()
+            marcos_en_grupos.add((cliente_clean, marco_clean))
+
+    planes_activos = list(db[COLLECTION_PLANIFICACIONES].find({}))
+    for plan in planes_activos:
+        plan_sync = _sync_plan_producido(db, plan)
+        if not plan_sync:
+            continue
+
+        grupo_info = plan_sync.get("grupo") or {}
+        empresa = str(grupo_info.get("empresa") or "").strip()
+        marco = str(grupo_info.get("marco") or "").strip()
+        if not empresa or not marco:
+            continue
+
+        key = (empresa.lower(), marco.lower())
+        if key in marcos_en_grupos:
+            continue
+
+        modos = plan_sync.get("modos") or {}
+        tramos_arm = (modos.get("armador") or {}).get("tramos") or {}
+        tramos_rem = (modos.get("rematador") or {}).get("tramos") or {}
+        all_tramo_keys = sorted(set(tramos_arm.keys()) | set(tramos_rem.keys()))
+        if not all_tramo_keys:
+            continue
+
+        _, _, arm_totals = _get_marco_production_stats(db, empresa, marco, modo="armador", include_historica=True)
+        _, _, rem_totals = _get_marco_production_stats(db, empresa, marco, modo="rematador", include_historica=True)
+
+        tramos_list = []
+        for tramo_k in all_tramo_keys:
+            t_arm = tramos_arm.get(tramo_k) or {}
+            t_rem = tramos_rem.get(tramo_k) or {}
+            tot_piezas = int(t_arm.get("total_piezas") or t_rem.get("total_piezas") or 0)
+            if tot_piezas <= 0:
+                rgx_emp = re.compile(f"^{re.escape(empresa)}$", re.IGNORECASE)
+                rgx_mrc = re.compile(f"^{re.escape(marco)}$", re.IGNORECASE)
+                rgx_trm = re.compile(f"^{re.escape(tramo_k)}$", re.IGNORECASE)
+                match_p = {"empresa": rgx_emp, "marco": rgx_mrc, "tramo": rgx_trm}
+                tot_piezas = db.piezas.count_documents(match_p)
+                if tot_piezas <= 0:
+                    tot_piezas = db.piezas_historicas.count_documents(match_p)
+            if tot_piezas <= 0:
+                tot_piezas = max(int(t_arm.get("total") or 0) // 2, int(t_rem.get("total") or 0), 1)
+
+            arm_reales = _get_tramo_count(arm_totals, tramo_k)
+            rem_reales = _get_tramo_count(rem_totals, tramo_k)
+            faltan_rem = max(tot_piezas - rem_reales, 0)
+
+            tramos_list.append({
+                "tramo": tramo_k,
+                "total": tot_piezas,
+                "armadas": min(arm_reales // 2, tot_piezas),
+                "rematadas": min(rem_reales, tot_piezas),
+                "en_armado": max((arm_reales // 2) - rem_reales, 0),
+                "pendientes": faltan_rem,
+            })
+
+        nuevo_marco = {
+            "marco": marco,
+            "es_corte_anterior": True,
+            "ciclo_plan": plan_sync.get("ciclo", ""),
+            "tramos": tramos_list,
+        }
+
+        cliente_existente = None
+        for g in grupos:
+            if str(g.get("cliente") or "").strip().lower() == empresa.lower():
+                cliente_existente = g
+                break
+
+        if cliente_existente:
+            cliente_existente["marcos"].append(nuevo_marco)
+            cliente_existente["marcos"] = sorted(cliente_existente["marcos"], key=lambda item: str(item["marco"]))
+        else:
+            grupos.append({
+                "cliente": empresa,
+                "marcos": [nuevo_marco],
+            })
+            grupos = sorted(grupos, key=lambda item: str(item["cliente"]))
+
+        marcos_en_grupos.add(key)
+
+    return piezas, production_status_map, grupos
+
+
 def register_admin_planificacion_routes(app, db, login_required, get_production_status_map, build_tarjetas_grupos):
     @app.route("/admin/planificacion", methods=["GET"])
     @login_required(["administrador", "soporte", "supervisor"])
@@ -544,7 +645,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         ciclo = _get_ciclo_actual(db)
         filtro_ciclo = {"codigo_pieza": {"$regex": f"^{ciclo}"}}
 
-        piezas, production_status_map, grupos = _get_planificacion_piezas_y_grupos(
+        piezas, production_status_map, grupos = _get_planificacion_grupos_completos(
             db, get_production_status_map, build_tarjetas_grupos
         )
 
@@ -570,7 +671,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                 return redirect(url_for("admin_planificacion_home"))
 
         plan_status = {}
-        for p in db[COLLECTION_PLANIFICACIONES].find({"ciclo": ciclo}, {"grupo": 1, "modos": 1}):
+        for p in db[COLLECTION_PLANIFICACIONES].find({}, {"grupo": 1, "modos": 1}):
             grupo_p = p.get("grupo") or {}
             empresa_p = str(grupo_p.get("empresa") or "")
             marco_p = str(grupo_p.get("marco") or "")
@@ -584,7 +685,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         if filtro_operador and ObjectId.is_valid(filtro_operador):
             user_oid = ObjectId(filtro_operador)
             marcos_permitidos = set()
-            for plan_doc in db[COLLECTION_PLANIFICACIONES].find({"ciclo": ciclo}):
+            for plan_doc in db[COLLECTION_PLANIFICACIONES].find({}):
                 grupo = plan_doc.get("grupo") or {}
                 empresa = str(grupo.get("empresa") or "")
                 marco = str(grupo.get("marco") or "")
@@ -631,27 +732,31 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         operador_ids_rematador = set()
         prod_arm_op_marco = {}
         prod_rem_op_marco = {}
+        is_corte_anterior = False
         if selected_active:
             plan = db[COLLECTION_PLANIFICACIONES].find_one({"ciclo": ciclo, **_group_filter(selected)})
+            if not plan:
+                plan = db[COLLECTION_PLANIFICACIONES].find_one(_group_filter(selected))
             if plan:
                 plan = _sync_plan_producido(db, plan)
-                modos = plan.get("modos") or {}
-                for modo_key in ("armador", "rematador"):
-                    modo_doc = modos.get(modo_key) or {}
-                    tramos_doc = modo_doc.get("tramos") or {}
-                    for _, tramo_doc in tramos_doc.items():
-                        for a in (tramo_doc.get("asignaciones") or []):
-                            if a.get("user_id"):
-                                if modo_key == "armador":
-                                    operador_ids_armador.add(a["user_id"])
-                                else:
-                                    operador_ids_rematador.add(a["user_id"])
+                if plan:
+                    modos = plan.get("modos") or {}
+                    for modo_key in ("armador", "rematador"):
+                        modo_doc = modos.get(modo_key) or {}
+                        tramos_doc = modo_doc.get("tramos") or {}
+                        for _, tramo_doc in tramos_doc.items():
+                            for a in (tramo_doc.get("asignaciones") or []):
+                                if a.get("user_id"):
+                                    if modo_key == "armador":
+                                        operador_ids_armador.add(a["user_id"])
+                                    else:
+                                        operador_ids_rematador.add(a["user_id"])
 
             prod_arm_op_marco, _, prod_arm_total_per_tramo = _get_marco_production_stats(
-                db, selected["empresa"], selected["marco"], modo="armador"
+                db, selected["empresa"], selected["marco"], modo="armador", ciclo=plan.get("ciclo") if plan else None, include_historica=True
             )
             prod_rem_op_marco, _, prod_rem_total_per_tramo = _get_marco_production_stats(
-                db, selected["empresa"], selected["marco"], modo="rematador"
+                db, selected["empresa"], selected["marco"], modo="rematador", ciclo=plan.get("ciclo") if plan else None, include_historica=True
             )
 
             for g in grupos:
@@ -660,6 +765,8 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                 for m in g.get("marcos", []):
                     if str(m.get("marco")).lower() != str(selected.get("marco")).lower():
                         continue
+                    if m.get("es_corte_anterior"):
+                        is_corte_anterior = True
                     for t in m.get("tramos", []):
                         tramo_key = str(t.get("tramo") or "")
                         total_piezas = int(t.get("total") or 0)
@@ -729,6 +836,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             can_edit_planificacion=can_edit_planificacion,
             plan_status=plan_status,
             marco_resumen=marco_resumen,
+            is_corte_anterior=is_corte_anterior,
         )
 
     @app.route("/admin/planificacion/crear", methods=["POST"])
@@ -776,7 +884,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             flash("No se encontraron operadores válidos.", "danger")
             return redirect(url_for("admin_planificacion_home", **grupo))
 
-        piezas, production_status_map, grupos = _get_planificacion_piezas_y_grupos(
+        piezas, production_status_map, grupos = _get_planificacion_grupos_completos(
             db, get_production_status_map, build_tarjetas_grupos
         )
 
@@ -813,6 +921,8 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
 
         base = db[COLLECTION_PLANIFICACIONES].find_one({"ciclo": ciclo, **_group_filter(grupo)})
         if not base:
+            base = db[COLLECTION_PLANIFICACIONES].find_one(_group_filter(grupo))
+        if not base:
             base = {
                 "ciclo": ciclo,
                 "grupo": grupo,
@@ -831,7 +941,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         prev_tramos_doc = prev_modo_doc.get("tramos") or {}
 
         _, prod_tramo_op, _ = _get_marco_production_stats(
-            db, grupo["empresa"], grupo["marco"], modo=modo_key
+            db, grupo["empresa"], grupo["marco"], modo=modo_key, include_historica=True
         )
 
         tramos_doc = {}
@@ -981,6 +1091,8 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             ciclo = _get_ciclo_actual(db)
             filter_query = {"ciclo": ciclo, **_group_filter(grupo)}
             plan = db[COLLECTION_PLANIFICACIONES].find_one(filter_query)
+            if not plan:
+                plan = db[COLLECTION_PLANIFICACIONES].find_one(_group_filter(grupo))
 
             if not plan:
                 flash("No se encontró planificación para eliminar.", "warning")
