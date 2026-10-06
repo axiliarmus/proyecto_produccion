@@ -5,6 +5,11 @@ from flask import render_template, session
 from core.helpers.date_utils import CL, now_cl
 
 
+def _get_ciclo_actual(db):
+    conf = db.config.find_one({"key": "ciclo_actual"}) or {"value": "a"}
+    return str(conf.get("value") or "a")
+
+
 def register_admin_informes_routes(app, db, login_required, get_production_status_map, build_tarjetas_grupos):
     """Registra rutas aisladas del menú e informes resumidos."""
 
@@ -16,8 +21,12 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
     @app.route("/admin/informes/piezas/tarjetas", methods=["GET"])
     @login_required(["administrador", "supervisor", "soporte", "cliente"])
     def informe_piezas_tarjetas():
-        production_status_map = get_production_status_map(db, db.produccion, {})
-        piezas = list(db.piezas.find({}, {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0}))
+        ciclo = _get_ciclo_actual(db)
+        filtro_ciclo_piezas = {"codigo": {"$regex": f"^{ciclo}"}}
+        filtro_ciclo_produccion = {"codigo_pieza": {"$regex": f"^{ciclo}"}}
+
+        production_status_map = get_production_status_map(db, db.produccion, filtro_ciclo_produccion)
+        piezas = list(db.piezas.find(filtro_ciclo_piezas, {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0}))
         grupos = build_tarjetas_grupos(piezas, production_status_map, include_orphans=True)
         return render_template("informe_piezas_tarjetas.html", grupos=grupos)
 
