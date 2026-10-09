@@ -1,6 +1,7 @@
 from bson import ObjectId
 from flask import flash, redirect, render_template, request, url_for
 
+from core.helpers.codigo import build_codigo_query_values
 from core.helpers.date_utils import apply_date_range_filter, to_cl
 
 
@@ -19,6 +20,19 @@ def register_admin_informes_avanzados_routes(
     send_excel_file,
 ):
     """Registra informes avanzados de valor, estado y tarjetas archivadas."""
+
+    def merge_status_maps(*maps):
+        merged = {}
+        for current_map in maps:
+            for codigo_key, payload in (current_map or {}).items():
+                existing = merged.get(codigo_key)
+                if not existing:
+                    merged[codigo_key] = dict(payload)
+                    continue
+
+                existing["armadas"] = max(int(existing.get("armadas") or 0), int(payload.get("armadas") or 0))
+                existing["rematadas"] = max(int(existing.get("rematadas") or 0), int(payload.get("rematadas") or 0))
+        return merged
 
     @app.route("/admin/archivados/valor-operador", methods=["GET", "POST"])
     @login_required(["administrador", "soporte"])
@@ -222,33 +236,14 @@ def register_admin_informes_avanzados_routes(
     @login_required(["administrador", "soporte", "supervisor"])
     def archivados_piezas_cliente():
         corte_nombre = request.args.get("corte_nombre")
-        filtro_prod = {}
         filtro_piezas = {}
         if corte_nombre:
             corte = db.cortes.find_one({"nombre": corte_nombre})
             if corte:
                 corte_id = corte.get("_id")
-                corte_inicio = corte.get("inicio")
-                corte_fin = corte.get("fin")
-
-                filtro_hibrido_prod = []
-                if corte_id:
-                    filtro_hibrido_prod.append({"corte_id": corte_id})
-                if corte_inicio and corte_fin:
-                    filtro_hibrido_prod.append({"fecha": {"$gte": corte_inicio, "$lt": corte_fin}})
-
-                if filtro_hibrido_prod:
-                    if len(filtro_hibrido_prod) > 1:
-                        filtro_prod["$or"] = filtro_hibrido_prod
-                    else:
-                        filtro_prod.update(filtro_hibrido_prod[0])
-                elif corte_id:
-                    filtro_prod["corte_id"] = corte_id
-
                 if corte_id:
                     filtro_piezas = {"corte_id": corte_id}
 
-        production_status_map = get_production_status_map(db, db.produccion_historica, filtro_prod)
         piezas = []
         if filtro_piezas:
             piezas = list(
@@ -257,7 +252,19 @@ def register_admin_informes_avanzados_routes(
                 )
             )
 
+        production_status_map = {}
+        if piezas:
+            codigos = [pieza.get("codigo") for pieza in piezas if pieza.get("codigo") not in (None, "")]
+            codigo_values = build_codigo_query_values(codigos)
+            if codigo_values:
+                filtro_codigos = {"codigo_pieza": {"$in": codigo_values}}
+                production_status_map = merge_status_maps(
+                    get_production_status_map(db, db.produccion_historica, filtro_codigos),
+                    get_production_status_map(db, db.produccion, filtro_codigos),
+                )
+
         if not piezas:
+            production_status_map = get_production_status_map(db, db.produccion_historica, {})
             piezas = list(db.piezas.find({}, {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0}))
 
         grupos = build_tarjetas_grupos(piezas, production_status_map, include_orphans=False)

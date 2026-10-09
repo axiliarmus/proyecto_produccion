@@ -202,6 +202,7 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
         data = {}
         scanned_codes = set()
         rejected_details = []
+        current_items = []
 
         for registro in registros:
             empresa = registro.get("empresa")
@@ -212,6 +213,18 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
             code = registro.get("codigo")
 
             scanned_codes.add(code)
+            current_items.append(
+                {
+                    "id": str(registro.get("_id")),
+                    "codigo": code,
+                    "empresa": empresa,
+                    "marco": marco,
+                    "tramo": tramo,
+                    "estado": estado,
+                    "calidad": calidad,
+                    "fecha": to_cl(registro.get("fecha")).strftime("%d/%m/%Y %H:%M") if registro.get("fecha") else "",
+                }
+            )
 
             if empresa not in data:
                 data[empresa] = {}
@@ -245,6 +258,7 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
             initial_data=data,
             scanned_codes=list(scanned_codes),
             initial_rejected=rejected_details,
+            initial_items=current_items,
             historial=historial,
         )
 
@@ -316,7 +330,23 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
                     "fecha": datetime.now(timezone.utc),
                     "usuario": session.get("nombre"),
                 }
-                db.picking.insert_one(scan_entry)
+                res_scan = db.picking.insert_one(scan_entry)
+                scan_entry["_id"] = res_scan.inserted_id
+            elif calidad_status in ("aprobado", "rechazado"):
+                scan_entry = {
+                    "codigo": codigo_final,
+                    "empresa": pieza.get("empresa", "Desconocido"),
+                    "marco": pieza.get("marco", "Desconocido"),
+                    "tramo": pieza.get("tramo", "Desconocido"),
+                    "estado": "Rematado",
+                    "calidad": calidad_status,
+                    "fecha": datetime.now(timezone.utc),
+                    "usuario": session.get("nombre"),
+                }
+                res_scan = db.picking.insert_one(scan_entry)
+                scan_entry["_id"] = res_scan.inserted_id
+            else:
+                scan_entry = None
 
             return {
                 "success": True,
@@ -329,6 +359,20 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
                 "estado": estado,
                 "calidad_status": calidad_status,
                 "prod_id": prod_id,
+                "picking_item": (
+                    {
+                        "id": str(scan_entry.get("_id")),
+                        "codigo": scan_entry.get("codigo"),
+                        "empresa": scan_entry.get("empresa"),
+                        "marco": scan_entry.get("marco"),
+                        "tramo": scan_entry.get("tramo"),
+                        "estado": scan_entry.get("estado"),
+                        "calidad": scan_entry.get("calidad"),
+                        "fecha": to_cl(scan_entry.get("fecha")).strftime("%d/%m/%Y %H:%M") if scan_entry and scan_entry.get("fecha") else "",
+                    }
+                    if scan_entry
+                    else None
+                ),
             }
         except Exception as exc:
             print(f"Error picking scan: {exc}")
@@ -368,21 +412,54 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
                         },
                     )
 
-            scan_entry = {
-                "codigo": codigo,
-                "empresa": pieza_data.get("empresa"),
-                "marco": pieza_data.get("marco"),
-                "tramo": pieza_data.get("tramo"),
-                "estado": "Rematado",
-                "calidad": decision,
-                "fecha": datetime.now(timezone.utc),
-                "usuario": session.get("nombre"),
+            existing = db.picking.find_one({"codigo": re.compile(f"^{re.escape(str(codigo))}$", re.IGNORECASE)})
+            if existing:
+                scan_entry = existing
+            else:
+                scan_entry = {
+                    "codigo": codigo,
+                    "empresa": pieza_data.get("empresa"),
+                    "marco": pieza_data.get("marco"),
+                    "tramo": pieza_data.get("tramo"),
+                    "estado": "Rematado",
+                    "calidad": decision,
+                    "fecha": datetime.now(timezone.utc),
+                    "usuario": session.get("nombre"),
+                }
+                res_scan = db.picking.insert_one(scan_entry)
+                scan_entry["_id"] = res_scan.inserted_id
+
+            return {
+                "success": True,
+                "picking_item": {
+                    "id": str(scan_entry.get("_id")),
+                    "codigo": scan_entry.get("codigo"),
+                    "empresa": scan_entry.get("empresa"),
+                    "marco": scan_entry.get("marco"),
+                    "tramo": scan_entry.get("tramo"),
+                    "estado": scan_entry.get("estado"),
+                    "calidad": scan_entry.get("calidad"),
+                    "fecha": to_cl(scan_entry.get("fecha")).strftime("%d/%m/%Y %H:%M") if scan_entry.get("fecha") else "",
+                },
             }
-            db.picking.insert_one(scan_entry)
+        except Exception as exc:
+            print(f"Error validar picking: {exc}")
+            return {"success": False, "message": str(exc)}, 500
+
+    @app.route("/api/picking/item/<item_id>", methods=["DELETE"])
+    @login_required(["administrador", "soporte", "supervisor"])
+    def api_picking_delete_item(item_id):
+        try:
+            if not ObjectId.is_valid(item_id):
+                return {"success": False, "message": "ID inválido"}, 400
+
+            res = db.picking.delete_one({"_id": ObjectId(item_id)})
+            if res.deleted_count != 1:
+                return {"success": False, "message": "Registro no encontrado"}, 404
 
             return {"success": True}
         except Exception as exc:
-            print(f"Error validar picking: {exc}")
+            print(f"Error eliminar item picking: {exc}")
             return {"success": False, "message": str(exc)}, 500
 
     @app.route("/api/picking/reset", methods=["POST"])

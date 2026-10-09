@@ -76,6 +76,32 @@
                         <p>Escanea piezas para comenzar el conteo.</p>
                     </div>
                 </div>
+                <div class="card bg-dark text-white border-secondary mt-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                            <h6 class="mb-0 fw-bold"><i class='bx bx-list-ul text-accent'></i> Piezas Recepcionadas</h6>
+                            <small class="text-secondary">Desde aquí puedes borrar una recepción individual.</small>
+                        </div>
+                        <div class="table-responsive" style="max-height: 320px;">
+                            <table class="table table-dark table-sm table-hover align-middle mb-0">
+                                <thead>
+                                    <tr class="text-secondary small">
+                                        <th>Código</th>
+                                        <th>Cliente</th>
+                                        <th>Marco</th>
+                                        <th>Tramo</th>
+                                        <th>Estado</th>
+                                        <th>Fecha</th>
+                                        <th class="text-end">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="currentItemsTbody">
+                                    <tr><td colspan="7" class="text-center text-secondary py-3">Aún no hay piezas recepcionadas.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <!-- PANEL RECHAZOS -->
@@ -338,7 +364,8 @@
 const state = {
     scannedCodes: new Set({{ scanned_codes|tojson|safe }}),
     data: {{ initial_data|tojson|safe }},
-    rejectedDetails: {{ initial_rejected|tojson|safe }} // Cargar lista desde servidor
+    rejectedDetails: {{ initial_rejected|tojson|safe }},
+    currentItems: {{ initial_items|tojson|safe }}
 };
 
 // ELEMENTOS DOM
@@ -360,6 +387,7 @@ let audioContext = null;
 
 // Inicializar UI con datos del servidor
 document.addEventListener('DOMContentLoaded', () => {
+    rebuildStateFromItems();
     updateUI();
     checkSecureConnection();
     if (typeof bootstrap !== 'undefined') {
@@ -465,14 +493,12 @@ async function processCode(code) {
             
             // Caso 1: Ya tiene una decisión tomada (Aprobado o Rechazado) -> Solo contar
             if (data.calidad_status === 'aprobado' || data.calidad_status === 'rechazado') {
-                state.scannedCodes.add(canonicalCode);
-                const statusToCount = data.calidad_status === 'aprobado' ? 'validado' : 'rechazado';
-                
-                addToData(data.pieza, statusToCount);
-                if (statusToCount === 'rechazado') state.rejectedDetails.push(data.pieza);
-                
+                if (data.picking_item) {
+                    state.currentItems.push(data.picking_item);
+                }
+                rebuildStateFromItems();
                 updateUI();
-                showLastScanned(data.pieza, statusToCount);
+                showLastScanned(data.pieza, data.calidad_status === 'aprobado' ? 'validado' : 'rechazado');
                 playSound('success');
                 return;
             }
@@ -494,8 +520,10 @@ async function processCode(code) {
             
         } else {
             // Guardado automático (Armado, Sin Prod)
-            state.scannedCodes.add(canonicalCode);
-            addToData(data.pieza, data.estado);
+            if (data.picking_item) {
+                state.currentItems.push(data.picking_item);
+            }
+            rebuildStateFromItems();
             updateUI();
             showLastScanned(data.pieza, data.estado);
             playSound('success');
@@ -531,18 +559,12 @@ async function submitValidation(decision) {
         
         if (data.success) {
             validationModal.hide();
-            
-            state.scannedCodes.add(p.pieza.codigo);
-            
-            const statusLabel = decision === 'aprobado' ? 'validado' : 'rechazado';
-            addToData(p.pieza, statusLabel);
-            
-            if (decision === 'rechazado') {
-                state.rejectedDetails.push(p.pieza);
+            if (data.picking_item) {
+                state.currentItems.push(data.picking_item);
             }
-            
+            rebuildStateFromItems();
             updateUI();
-            showLastScanned(p.pieza, statusLabel);
+            showLastScanned(p.pieza, decision === 'aprobado' ? 'validado' : 'rechazado');
             playSound('success');
             
             pendingValidationPiece = null;
@@ -570,6 +592,36 @@ function addToData(pieza, estado) {
     else if (estado === 'validado') counter.validado++;
     else if (estado === 'rechazado') counter.rechazado++;
     else counter.sin_prod++;
+}
+
+function rebuildStateFromItems() {
+    state.scannedCodes = new Set();
+    state.data = {};
+    state.rejectedDetails = [];
+
+    for (const item of state.currentItems) {
+        if (!item || !item.codigo) continue;
+
+        state.scannedCodes.add(item.codigo);
+
+        const pieza = {
+            codigo: item.codigo,
+            empresa: item.empresa,
+            marco: item.marco,
+            tramo: item.tramo
+        };
+
+        if (item.estado === 'Rematado' && item.calidad === 'rechazado') {
+            addToData(pieza, 'rechazado');
+            state.rejectedDetails.push(pieza);
+        } else if (item.estado === 'Rematado') {
+            addToData(pieza, 'validado');
+        } else if (item.estado === 'Armado') {
+            addToData(pieza, 'Armado');
+        } else {
+            addToData(pieza, 'Sin Producción');
+        }
+    }
 }
 
 function updateUI() {
@@ -708,6 +760,8 @@ function updateUI() {
     } else {
         document.getElementById('rej-tab').classList.remove('pulse-text');
     }
+
+    renderCurrentItemsTable();
 }
 
 function showLastScanned(pieza, estado) {
@@ -728,6 +782,69 @@ function showLastScanned(pieza, estado) {
     lastInfoSpan.textContent = `${pieza.empresa} - ${pieza.marco} - ${pieza.tramo}`;
 }
 
+function renderCurrentItemsTable() {
+    const tbody = document.getElementById('currentItemsTbody');
+    if (!tbody) return;
+
+    if (!state.currentItems || state.currentItems.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-3">Aún no hay piezas recepcionadas.</td></tr>';
+        return;
+    }
+
+    let html = '';
+    state.currentItems.forEach(item => {
+        let estadoHtml = '<span class="badge bg-secondary">Sin Prod.</span>';
+        if (item.estado === 'Armado') {
+            estadoHtml = '<span class="badge bg-warning text-dark">Armado</span>';
+        } else if (item.estado === 'Rematado' && item.calidad === 'rechazado') {
+            estadoHtml = '<span class="badge bg-danger">Rechazado</span>';
+        } else if (item.estado === 'Rematado') {
+            estadoHtml = '<span class="badge bg-success">Validado</span>';
+        }
+
+        html += `
+        <tr>
+            <td class="fw-bold text-white">${item.codigo || '-'}</td>
+            <td>${item.empresa || '-'}</td>
+            <td>${item.marco || '-'}</td>
+            <td>${item.tramo || '-'}</td>
+            <td>${estadoHtml}</td>
+            <td class="small text-secondary text-nowrap">${item.fecha || '-'}</td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteCurrentItem('${item.id}')">
+                    <i class='bx bx-trash'></i>
+                </button>
+            </td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
+async function deleteCurrentItem(itemId) {
+    if (!itemId) return;
+    if (!confirm('¿Eliminar esta pieza recepcionada del conteo actual?')) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/picking/item/${itemId}`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        });
+        const data = await res.json();
+        if (!data.success) {
+            alert(`Error al eliminar: ${data.message}`);
+            return;
+        }
+
+        state.currentItems = state.currentItems.filter(item => item.id !== itemId);
+        rebuildStateFromItems();
+        updateUI();
+    } catch (error) {
+        alert(`Error de conexión al eliminar: ${error}`);
+    }
+}
+
 function resetPicking() {
     const totalCount = state.scannedCodes.size;
     if (totalCount === 0) {
@@ -735,6 +852,7 @@ function resetPicking() {
             state.scannedCodes.clear();
             state.data = {};
             state.rejectedDetails = [];
+            state.currentItems = [];
             updateUI();
             lastScannedCard.classList.add('d-none');
         }
@@ -772,6 +890,7 @@ function confirmarResetPicking() {
             state.scannedCodes.clear();
             state.data = {};
             state.rejectedDetails = [];
+            state.currentItems = [];
             updateUI();
             lastScannedCard.classList.add('d-none');
             // Recargar para actualizar la lista histórica
