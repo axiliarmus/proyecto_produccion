@@ -72,6 +72,11 @@
           <i class='bx bxs-purchase-tag'></i> Ver Piezas y Etiquetas (Corte)
         </a>
     </div>
+    <div class="col-md-auto">
+        <a href="{{ url_for('admin_piezas_archivadas', corte_nombre=corte_nombre, estado='Pendientes') }}" class="btn btn-warning w-100 d-flex align-items-center gap-2">
+          <i class='bx bxs-barcode'></i> Reimprimir Etiquetas Pendientes
+        </a>
+    </div>
     {% endif %}
   </div>
 </div>

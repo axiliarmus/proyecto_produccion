@@ -40,6 +40,10 @@
                 <span class="d-flex align-items-center gap-2"><i class='bx bxs-collection text-warning'></i> Piezas Tarjetas</span>
                 <i class='bx bx-chevron-right'></i>
             </a>
+            <a href="{{ url_for('admin_piezas_archivadas', corte_nombre=c.nombre, estado='Pendientes') }}" class="btn btn-outline-warning d-flex align-items-center justify-content-between px-3 py-2 border-warning bg-dark bg-opacity-50 text-warning">
+                <span class="d-flex align-items-center gap-2"><i class='bx bxs-barcode'></i> Reimprimir Etiquetas Pendientes</span>
+                <i class='bx bx-chevron-right'></i>
+            </a>
         </div>
       </div>
     </div>

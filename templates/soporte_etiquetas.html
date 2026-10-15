@@ -6,9 +6,39 @@
 
 {% block content %}
 
+{% if es_corte_historico %}
+<div class="alert alert-warning d-flex align-items-center justify-content-between mb-4 border-0 shadow-sm" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+    <div class="d-flex align-items-center gap-2">
+        <i class='bx bx-history fs-4'></i>
+        <div>
+            <strong>Modo Corte Histórico:</strong> Viendo piezas archivadas del corte <strong>{{ corte_sel }}</strong>.
+            {% if estado_sel in ('Pendientes', 'Armado', 'Sin producción') %}
+            <span class="badge bg-warning text-dark ms-2">Reimpresión de pendientes</span>
+            {% endif %}
+        </div>
+    </div>
+    <a href="{{ url_for('admin_piezas_archivadas', corte_nombre=corte_sel, estado=estado_sel) }}" class="btn btn-sm btn-outline-warning">
+        <i class='bx bxs-file-find'></i> Ver en Gestión de Corte
+    </a>
+</div>
+{% endif %}
+
 <div class="admin-card mb-4">
     <form method="POST" class="row g-3">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="col-md-4">
+                <label class="form-label text-secondary small">Corte / Período</label>
+                <select name="corte" class="form-select bg-dark text-light border-secondary">
+                    <option value="actual" {% if not corte_sel or corte_sel == 'actual' %}selected{% endif %}>🟢 Corte Actual (Piezas Activas)</option>
+                    {% if cortes %}
+                    <optgroup label="Cortes Anteriores (Archivados)">
+                        {% for c in cortes %}
+                        <option value="{{ c.nombre }}" {% if corte_sel == c.nombre %}selected{% endif %}>📁 {{ c.nombre }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endif %}
+                </select>
+            </div>
             <div class="col-md-4">
                 <label class="form-label text-secondary small">Cliente</label>
                 <select name="cliente" class="form-select bg-dark text-light border-secondary">
@@ -36,31 +66,40 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <label class="form-label text-secondary small">Estado</label>
                 <select name="estado" class="form-select bg-dark text-light border-secondary">
                     <option value="todos" {% if estado_sel == 'todos' %}selected{% endif %}>Todos los estados</option>
-                    <option value="Sin producción" {% if estado_sel == 'Sin producción' %}selected{% endif %}>Sin producción</option>
-                    <option value="Armado" {% if estado_sel == 'Armado' %}selected{% endif %}>Armado</option>
-                    <option value="Rematado" {% if estado_sel == 'Rematado' %}selected{% endif %}>Rematado</option>
+                    <option value="Pendientes" {% if estado_sel == 'Pendientes' %}selected{% endif %}>⚠️ Todas las Pendientes (Armado + Sin Prod.)</option>
+                    <option value="Armado" {% if estado_sel == 'Armado' %}selected{% endif %}>⏳ Pendientes en Armado</option>
+                    <option value="Sin producción" {% if estado_sel == 'Sin producción' %}selected{% endif %}>📄 Sin producción / No impresas</option>
+                    <option value="Rematado" {% if estado_sel == 'Rematado' %}selected{% endif %}>✅ Rematado</option>
                 </select>
             </div>
-            <div class="col-md-6 d-flex align-items-end">
+            <div class="col-md-4 d-flex align-items-end">
                 <button class="btn btn-accent w-100">
-                    <i class='bx bx-search'></i> Buscar
+                    <i class='bx bx-search'></i> Filtrar Etiquetas
                 </button>
             </div>
         </form>
 </div>
 
 {% if piezas %}
-<div class="d-flex justify-content-end flex-wrap gap-2 mb-3">
-    <button class="btn btn-secondary d-flex align-items-center gap-2" onclick="imprimirFiltradas()">
-        <i class='bx bxs-printer'></i> Imprimir Todas Las Filtradas
-    </button>
-    <button class="btn btn-info d-flex align-items-center gap-2" onclick="imprimirSeleccionados()">
-        <i class='bx bxs-printer'></i> Imprimir Seleccionadas
-    </button>
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div class="text-secondary small">
+        Total etiquetas filtradas: <strong class="text-white">{{ total_registros }}</strong>
+        {% if es_corte_historico %}
+        <span class="badge bg-secondary ms-2">Corte: {{ corte_sel }}</span>
+        {% endif %}
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-secondary d-flex align-items-center gap-2" onclick="imprimirFiltradas()">
+            <i class='bx bxs-printer'></i> Imprimir Todas Las Filtradas ({{ total_registros }})
+        </button>
+        <button class="btn btn-info d-flex align-items-center gap-2" onclick="imprimirSeleccionados()">
+            <i class='bx bxs-printer'></i> Imprimir Seleccionadas
+        </button>
+    </div>
 </div>
 
 <div class="admin-card">
@@ -100,9 +139,9 @@
                         {% if p.estado_prod == 'Rematado' %}
                             <span class="badge badge-soft text-success">Rematado</span>
                         {% elif p.estado_prod == 'Armado' %}
-                            <span class="badge badge-soft text-warning">Armado</span>
+                            <span class="badge badge-soft text-warning">Pendiente Armado</span>
                         {% else %}
-                            <span class="badge badge-soft text-secondary">Sin Prod.</span>
+                            <span class="badge badge-soft text-secondary">Sin Prod. / No Impresa</span>
                         {% endif %}
                     </td>
                     <td>

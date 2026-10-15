@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from flask import flash, redirect, render_template, request, session, url_for
 
+from core.helpers.codigo import build_codigo_lookup_keys, build_codigo_query_values
 from core.helpers.date_utils import to_cl
 
 
@@ -142,33 +143,52 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
             filtro["tramo"] = tramo_sel
 
         if estado_filter and estado_filter != "todos":
-            modo_buscado = "rematador" if estado_filter == "Rematado" else "armador" if estado_filter == "Armado" else None
-            if modo_buscado:
+            if estado_filter == "Rematado":
                 codigos_con_estado = db.produccion_historica.distinct(
-                    "codigo_pieza", {"modo": modo_buscado, "corte_id": corte_id}
+                    "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
                 )
-                filtro["codigo"] = {"$in": codigos_con_estado}
+                filtro["codigo"] = {"$in": build_codigo_query_values(codigos_con_estado)}
+            elif estado_filter == "Armado":
+                codigos_armados = set(
+                    db.produccion_historica.distinct(
+                        "codigo_pieza", {"modo": "armador", "corte_id": corte_id}
+                    )
+                )
+                codigos_rematados = set(
+                    db.produccion_historica.distinct(
+                        "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
+                    )
+                )
+                filtro["codigo"] = {"$in": build_codigo_query_values(list(codigos_armados - codigos_rematados))}
+            elif estado_filter in ("Pendientes", "pendientes"):
+                codigos_rematados = db.produccion_historica.distinct(
+                    "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
+                )
+                filtro["codigo"] = {"$nin": build_codigo_query_values(codigos_rematados)}
 
         piezas = list(db.piezas_historicas.find(filtro).sort("_id", -1))
         codigos_en_lista = [pieza.get("codigo") for pieza in piezas]
-        set_armado = set(
-            db.produccion_historica.distinct(
-                "codigo_pieza", {"codigo_pieza": {"$in": codigos_en_lista}, "modo": "armador", "corte_id": corte_id}
-            )
-        )
-        set_remate = set(
-            db.produccion_historica.distinct(
-                "codigo_pieza", {"codigo_pieza": {"$in": codigos_en_lista}, "modo": "rematador", "corte_id": corte_id}
-            )
-        )
+        lookup_codigos = build_codigo_query_values(codigos_en_lista)
+        set_armado = set()
+        for c in db.produccion_historica.distinct(
+            "codigo_pieza", {"codigo_pieza": {"$in": lookup_codigos}, "modo": "armador", "corte_id": corte_id}
+        ):
+            set_armado.update(build_codigo_lookup_keys(c))
+
+        set_remate = set()
+        for c in db.produccion_historica.distinct(
+            "codigo_pieza", {"codigo_pieza": {"$in": lookup_codigos}, "modo": "rematador", "corte_id": corte_id}
+        ):
+            set_remate.update(build_codigo_lookup_keys(c))
 
         data = []
         for pieza in piezas:
             codigo = pieza.get("codigo")
+            codigo_keys = build_codigo_lookup_keys(codigo)
             estado = "Sin producción"
-            if codigo in set_remate:
+            if codigo_keys & set_remate:
                 estado = "Rematado"
-            elif codigo in set_armado:
+            elif codigo_keys & set_armado:
                 estado = "Armado"
 
             if estado_filter == "Sin producción" and estado != "Sin producción":
@@ -176,6 +196,8 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
             if estado_filter == "Armado" and estado != "Armado":
                 continue
             if estado_filter == "Rematado" and estado != "Rematado":
+                continue
+            if estado_filter in ("Pendientes", "pendientes") and estado == "Rematado":
                 continue
 
             data.append(

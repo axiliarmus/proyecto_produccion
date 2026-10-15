@@ -9,8 +9,7 @@ from flask import flash, redirect, render_template, request, session, url_for
 from core.helpers.soft_delete import soft_delete_one, soft_delete_many
 
 
-# #region debug-point helpers:piece-master-measures
-def _build_piece_master_measure_map(db, codigos, build_codigo_lookup_keys, build_codigo_query_values):
+def _build_piece_master_measure_map(db, codigos, build_codigo_lookup_keys, build_codigo_query_values, corte_id=None):
     lookup_values = build_codigo_query_values(codigos)
     if not lookup_values:
         return {}
@@ -30,6 +29,15 @@ def _build_piece_master_measure_map(db, codigos, build_codigo_lookup_keys, build
                 "cuerda_externa": pieza.get("cuerda_externa"),
                 "flecha": pieza.get("flecha"),
             }
+    if corte_id:
+        for pieza in db.piezas_historicas.find({"codigo": {"$in": lookup_values}, "corte_id": corte_id}, projection):
+            for key in build_codigo_lookup_keys(pieza.get("codigo")):
+                if key not in master_map or master_map[key].get("cuerda_interna") is None:
+                    master_map[key] = {
+                        "cuerda_interna": pieza.get("cuerda_interna"),
+                        "cuerda_externa": pieza.get("cuerda_externa"),
+                        "flecha": pieza.get("flecha"),
+                    }
     return master_map
 
 
@@ -308,15 +316,19 @@ def register_soporte_basic_routes(
     @app.route("/soporte/etiquetas", methods=["GET", "POST"])
     @login_required(["soporte", "administrador", "supervisor"])
     def soporte_etiquetas():
+        from core.helpers.date_utils import to_cl
+
         page = normalize_page(request.args.get("page", 1))
         filtro = {}
 
+        corte_sel = request.args.get("corte", "")
         cliente_sel = request.args.get("cliente", "")
         marco_sel = request.args.get("marco", "")
         tramo_sel = request.args.get("tramo", "")
         estado_filter = request.args.get("estado", "todos")
 
         if request.method == "POST":
+            corte_sel = request.form.get("corte") or ""
             cliente_sel = request.form.get("cliente") or ""
             marco_sel = request.form.get("marco") or ""
             tramo_sel = request.form.get("tramo") or ""
@@ -324,12 +336,36 @@ def register_soporte_basic_routes(
             return redirect(
                 url_for(
                     "soporte_etiquetas",
+                    corte=corte_sel,
                     cliente=cliente_sel,
                     marco=marco_sel,
                     tramo=tramo_sel,
                     estado=estado_filter,
                 )
             )
+
+        cortes_disponibles = list(
+            db.cortes.find({}, {"nombre": 1, "inicio": 1, "fin": 1, "creado_en": 1}).sort("creado_en", -1)
+        )
+        for c in cortes_disponibles:
+            if c.get("creado_en"):
+                c["creado_en"] = to_cl(c["creado_en"])
+
+        corte_activo = None
+        es_corte_historico = False
+        corte_id = None
+
+        if corte_sel and corte_sel != "actual":
+            corte_activo = db.cortes.find_one({"nombre": corte_sel})
+            if not corte_activo:
+                try:
+                    corte_activo = db.cortes.find_one({"_id": ObjectId(corte_sel)})
+                except Exception:
+                    corte_activo = None
+            if corte_activo:
+                es_corte_historico = True
+                corte_id = corte_activo["_id"]
+                filtro["corte_id"] = corte_id
 
         if cliente_sel and cliente_sel != "todos":
             filtro["empresa"] = cliente_sel
@@ -338,32 +374,97 @@ def register_soporte_basic_routes(
         if tramo_sel and tramo_sel != "todos":
             filtro["tramo"] = tramo_sel
 
-        if estado_filter != "todos":
-            modo_buscado = "rematador" if estado_filter == "Rematado" else "armador" if estado_filter == "Armado" else None
-            if modo_buscado:
-                codigos_con_estado = db.produccion.distinct("codigo_pieza", {"modo": modo_buscado})
-                codigos_estado_lookup = build_codigo_query_values(codigos_con_estado)
-                if codigos_estado_lookup:
+        if es_corte_historico:
+            if estado_filter != "todos":
+                if estado_filter == "Rematado":
+                    codigos_con_estado = db.produccion_historica.distinct(
+                        "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
+                    )
+                    codigos_estado_lookup = build_codigo_query_values(codigos_con_estado)
                     filtro["codigo"] = {"$in": codigos_estado_lookup}
+                elif estado_filter == "Armado":
+                    codigos_armados = set(
+                        db.produccion_historica.distinct(
+                            "codigo_pieza", {"modo": "armador", "corte_id": corte_id}
+                        )
+                    )
+                    codigos_rematados = set(
+                        db.produccion_historica.distinct(
+                            "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
+                        )
+                    )
+                    codigos_solo_armado = build_codigo_query_values(list(codigos_armados - codigos_rematados))
+                    filtro["codigo"] = {"$in": codigos_solo_armado}
+                elif estado_filter in ("Pendientes", "pendientes"):
+                    codigos_rematados = db.produccion_historica.distinct(
+                        "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
+                    )
+                    codigos_rematados_lookup = build_codigo_query_values(codigos_rematados)
+                    filtro["codigo"] = {"$nin": codigos_rematados_lookup}
 
-        try:
-            clientes = sorted([x for x in db.piezas.distinct("empresa") if x], key=str)
-            marcos = sorted([x for x in db.piezas.distinct("marco") if x], key=str)
-            tramos = sorted([x for x in db.piezas.distinct("tramo") if x], key=str)
-        except Exception as exc:
-            print(f"Error obteniendo filtros: {exc}")
-            clientes, marcos, tramos = [], [], []
+            try:
+                all_piezas_corte = list(
+                    db.piezas_historicas.find({"corte_id": corte_id}, {"empresa": 1, "marco": 1, "tramo": 1})
+                )
+                clientes = sorted(list(set(p.get("empresa", "") for p in all_piezas_corte if p.get("empresa"))), key=str)
+                marcos = sorted(list(set(p.get("marco", "") for p in all_piezas_corte if p.get("marco"))), key=str)
+                tramos = sorted(list(set(p.get("tramo", "") for p in all_piezas_corte if p.get("tramo"))), key=str)
+            except Exception:
+                clientes, marcos, tramos = [], [], []
 
-        piezas = list(db.piezas.find(filtro).limit(5000).sort("_id", -1))
-        piezas_finales = []
+            piezas = list(db.piezas_historicas.find(filtro).limit(5000).sort("_id", -1))
+            codigos_en_pantalla = [pieza.get("codigo") for pieza in piezas if pieza.get("codigo")]
+            lookup_codigos = build_codigo_query_values(codigos_en_pantalla)
+            set_armado = set()
+            for c in db.produccion_historica.distinct(
+                "codigo_pieza", {"codigo_pieza": {"$in": lookup_codigos}, "modo": "armador", "corte_id": corte_id}
+            ):
+                set_armado.update(build_codigo_lookup_keys(c))
+            set_remate = set()
+            for c in db.produccion_historica.distinct(
+                "codigo_pieza", {"codigo_pieza": {"$in": lookup_codigos}, "modo": "rematador", "corte_id": corte_id}
+            ):
+                set_remate.update(build_codigo_lookup_keys(c))
 
-        if piezas:
+            master_measure_map = _build_piece_master_measure_map(
+                db, codigos_en_pantalla, build_codigo_lookup_keys, build_codigo_query_values, corte_id=corte_id
+            )
+        else:
+            if estado_filter != "todos":
+                if estado_filter == "Rematado":
+                    codigos_con_estado = db.produccion.distinct("codigo_pieza", {"modo": "rematador"})
+                    codigos_estado_lookup = build_codigo_query_values(codigos_con_estado)
+                    if codigos_estado_lookup:
+                        filtro["codigo"] = {"$in": codigos_estado_lookup}
+                elif estado_filter == "Armado":
+                    codigos_armados = set(db.produccion.distinct("codigo_pieza", {"modo": "armador"}))
+                    codigos_rematados = set(db.produccion.distinct("codigo_pieza", {"modo": "rematador"}))
+                    codigos_solo_armado = build_codigo_query_values(list(codigos_armados - codigos_rematados))
+                    if codigos_solo_armado:
+                        filtro["codigo"] = {"$in": codigos_solo_armado}
+                elif estado_filter in ("Pendientes", "pendientes"):
+                    codigos_rematados = db.produccion.distinct("codigo_pieza", {"modo": "rematador"})
+                    codigos_rematados_lookup = build_codigo_query_values(codigos_rematados)
+                    if codigos_rematados_lookup:
+                        filtro["codigo"] = {"$nin": codigos_rematados_lookup}
+
+            try:
+                clientes = sorted([x for x in db.piezas.distinct("empresa") if x], key=str)
+                marcos = sorted([x for x in db.piezas.distinct("marco") if x], key=str)
+                tramos = sorted([x for x in db.piezas.distinct("tramo") if x], key=str)
+            except Exception as exc:
+                print(f"Error obteniendo filtros: {exc}")
+                clientes, marcos, tramos = [], [], []
+
+            piezas = list(db.piezas.find(filtro).limit(5000).sort("_id", -1))
             codigos_en_pantalla = [pieza.get("codigo") for pieza in piezas if pieza.get("codigo")]
             set_armado, set_remate = get_piece_status_sets(db, codigos_en_pantalla)
             master_measure_map = _build_piece_master_measure_map(
                 db, codigos_en_pantalla, build_codigo_lookup_keys, build_codigo_query_values
             )
 
+        piezas_finales = []
+        if piezas:
             for pieza in piezas:
                 codigo = pieza.get("codigo")
                 codigo_keys = build_codigo_lookup_keys(codigo)
@@ -377,9 +478,12 @@ def register_soporte_basic_routes(
                 for key in codigo_keys:
                     master_info = master_measure_map.get(key)
                     if master_info:
-                        pieza["cuerda_interna"] = master_info.get("cuerda_interna")
-                        pieza["cuerda_externa"] = master_info.get("cuerda_externa")
-                        pieza["flecha"] = master_info.get("flecha")
+                        if pieza.get("cuerda_interna") is None:
+                            pieza["cuerda_interna"] = master_info.get("cuerda_interna")
+                        if pieza.get("cuerda_externa") is None:
+                            pieza["cuerda_externa"] = master_info.get("cuerda_externa")
+                        if pieza.get("flecha") is None:
+                            pieza["flecha"] = master_info.get("flecha")
                         break
 
                 if estado_filter == "Sin producción" and estado != "Sin producción":
@@ -388,6 +492,8 @@ def register_soporte_basic_routes(
                     continue
                 if estado_filter == "Rematado" and estado != "Rematado":
                     continue
+                if estado_filter in ("Pendientes", "pendientes") and estado == "Rematado":
+                    continue
 
                 piezas_finales.append(pieza)
 
@@ -395,6 +501,7 @@ def register_soporte_basic_routes(
             piezas_finales,
             "soporte_etiquetas",
             page=page,
+            corte=corte_sel,
             cliente=cliente_sel,
             marco=marco_sel,
             tramo=tramo_sel,
@@ -413,31 +520,14 @@ def register_soporte_basic_routes(
             }
             for pieza in piezas_finales
         ]
-        # #region debug-point A:vps-piece-master-data
-        _debug_report_vps_flecha_label(
-            "A",
-            "soporte_basic_routes.py:soporte_etiquetas",
-            "Dataset etiquetas generado",
-            {
-                "total_piezas": len(piezas_finales),
-                "sample": [
-                    {
-                        "codigo": pieza.get("codigo"),
-                        "pieza_master_flecha": pieza.get("flecha"),
-                        "pieza_master_cuerda_interna": pieza.get("cuerda_interna"),
-                        "pieza_master_cuerda_externa": pieza.get("cuerda_externa"),
-                        "estado_prod": pieza.get("estado_prod"),
-                    }
-                    for pieza in piezas_finales[:5]
-                ],
-                "sample_impresion": piezas_impresion[:5],
-            },
-        )
-        # #endregion
 
         return render_template(
             "soporte_etiquetas.html",
             piezas=piezas_pagina,
+            cortes=cortes_disponibles,
+            corte_sel=corte_sel,
+            corte_activo=corte_activo,
+            es_corte_historico=es_corte_historico,
             clientes=clientes,
             marcos=marcos,
             tramos=tramos,

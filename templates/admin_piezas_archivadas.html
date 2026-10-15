@@ -41,9 +41,10 @@
                 <label class="form-label text-light">Estado (al momento del corte)</label>
                 <select name="estado" class="form-select form-select-lg">
                     <option value="todos" {% if estado_sel == 'todos' %}selected{% endif %}>Todos los estados</option>
-                    <option value="Sin producción" {% if estado_sel == 'Sin producción' %}selected{% endif %}>Sin producción</option>
-                    <option value="Armado" {% if estado_sel == 'Armado' %}selected{% endif %}>Armado</option>
-                    <option value="Rematado" {% if estado_sel == 'Rematado' %}selected{% endif %}>Rematado</option>
+                    <option value="Pendientes" {% if estado_sel == 'Pendientes' %}selected{% endif %}>⚠️ Todas las Pendientes (Armado + Sin Prod.)</option>
+                    <option value="Armado" {% if estado_sel == 'Armado' %}selected{% endif %}>⏳ Pendientes en Armado</option>
+                    <option value="Sin producción" {% if estado_sel == 'Sin producción' %}selected{% endif %}>📄 Sin producción / No impresas</option>
+                    <option value="Rematado" {% if estado_sel == 'Rematado' %}selected{% endif %}>✅ Rematado</option>
                 </select>
             </div>
             <div class="col-md-6 d-flex align-items-end">
@@ -64,8 +65,21 @@
 </div>
 
 {% if piezas %}
-<div class="d-flex justify-content-end mb-3">
-    <button class="btn btn-info" onclick="imprimirSeleccionados()">🖨️ Imprimir Etiquetas Seleccionadas</button>
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div class="d-flex align-items-center gap-2">
+        <a href="{{ url_for('soporte_etiquetas', corte=corte_nombre, estado=estado_sel) }}" class="btn btn-outline-warning d-flex align-items-center gap-2">
+            <i class='bx bxs-barcode'></i> Abrir en Generador Zebra
+        </a>
+        <span class="text-secondary small ms-2">Mostrando <strong>{{ total_registros }}</strong> piezas</span>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-secondary d-flex align-items-center gap-2" onclick="imprimirFiltradas()">
+            <i class='bx bxs-printer'></i> Imprimir Todas Las Filtradas ({{ total_registros }})
+        </button>
+        <button class="btn btn-info d-flex align-items-center gap-2" onclick="imprimirSeleccionados()">
+            <i class='bx bxs-printer'></i> Imprimir Seleccionadas
+        </button>
+    </div>
 </div>
 
 <div class="table-responsive">
@@ -104,9 +118,9 @@
                     {% if p.estado_prod == 'Rematado' %}
                         <span class="badge bg-success">Rematado</span>
                     {% elif p.estado_prod == 'Armado' %}
-                        <span class="badge bg-warning text-dark">Armado</span>
+                        <span class="badge bg-warning text-dark">Pendiente Armado</span>
                     {% else %}
-                        <span class="badge bg-secondary">Sin Prod.</span>
+                        <span class="badge bg-secondary">Sin Prod. / No Impresa</span>
                     {% endif %}
                 </td>
                 <td>
@@ -138,6 +152,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
 <script>
+const piezasImpresion = {{ piezas_impresion|tojson }};
+const LIMITE_CONFIRMACION_IMPRESION = {{ print_confirm_limit|default(100) }};
+
 document.addEventListener('DOMContentLoaded', function() {
     JsBarcode(".barcode").init();
 
@@ -152,10 +169,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function imprimirSeleccionados() {
-    const seleccionados = document.querySelectorAll('.item-check:checked');
-    if (seleccionados.length === 0) {
-        alert("Selecciona al menos una etiqueta para imprimir.");
+function confirmarImpresionMasiva(cantidad, origen) {
+    if (cantidad < LIMITE_CONFIRMACION_IMPRESION) {
+        return true;
+    }
+
+    return window.confirm(
+        `Vas a imprimir ${cantidad} etiquetas ${origen}. Esta acción puede tardar varios segundos y abrir el diálogo de impresión con muchas páginas. ¿Deseas continuar?`
+    );
+}
+
+function abrirVentanaImpresion(etiquetas) {
+    if (!etiquetas || etiquetas.length === 0) {
+        alert("No hay etiquetas para imprimir.");
         return;
     }
 
@@ -167,7 +193,7 @@ function imprimirSeleccionados() {
         <style>
             @media print {
                 @page {
-                    size: 100mm 50mm; /* Tamaño típico de etiqueta Zebra (4x2 pulgadas) */
+                    size: 100mm 50mm;
                     margin: 0;
                 }
                 body {
@@ -175,15 +201,15 @@ function imprimirSeleccionados() {
                     padding: 0;
                 }
                 .etiqueta {
-                    width: 95mm;
+                    width: 94mm;
                     height: 48mm;
-                    margin: 2mm;
+                    margin: 1mm;
                     page-break-after: always;
                     display: flex;
                     flex-direction: column;
                     justify-content: flex-start;
                     align-items: center;
-                    border: 1px solid #ddd; /* Borde solo para visualizar en pantalla, quitar si molesta */
+                    border: 0;
                     text-align: center;
                     font-family: Arial, sans-serif;
                     box-sizing: border-box;
@@ -194,7 +220,7 @@ function imprimirSeleccionados() {
                 .detalle-medidas { font-size: 18px; margin-bottom: 2px; }
                 .detalle-flecha { font-size: 18px; margin-bottom: 2px; }
                 .codigo-texto { font-size: 16px; font-weight: bold; margin-top: 2px; }
-                svg { max-width: 90%; height: auto; }
+                svg { width: 100%; max-width: 100%; height: auto; overflow: visible; }
             }
         </style>
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"><\/script>
@@ -202,32 +228,25 @@ function imprimirSeleccionados() {
     <body>
     `;
 
-    seleccionados.forEach((cb, index) => {
-        const codigo = cb.dataset.codigo;
-        const marco = cb.dataset.marco;
-        const tramo = cb.dataset.tramo;
-        const cuerdaInterna = cb.dataset.cinterna || 'N/A';
-        const cuerdaExterna = cb.dataset.cexterna || 'N/A';
-        const flecha = cb.dataset.flecha || 'N/A';
-
+    etiquetas.forEach((item, index) => {
         content += `
         <div class="etiqueta">
-            <div class="detalle"><strong>Marco:</strong> ${marco}</div>
-            <div class="detalle"><strong>Tramo:</strong> ${tramo}</div>
-            <div class="detalle detalle-medidas"><strong>C. Int:</strong> ${cuerdaInterna} | <strong>C. Ext:</strong> ${cuerdaExterna}</div>
-            <div class="detalle detalle-flecha"><strong>Flecha:</strong> ${flecha}</div>
+            <div class="detalle"><strong>Marco:</strong> ${item.marco}</div>
+            <div class="detalle"><strong>Tramo:</strong> ${item.tramo}</div>
+            <div class="detalle detalle-medidas"><strong>C. Int:</strong> ${item.cuerda_interna} | <strong>C. Ext:</strong> ${item.cuerda_externa}</div>
+            <div class="detalle detalle-flecha"><strong>Flecha:</strong> ${item.flecha}</div>
             <svg id="barcode-${index}"></svg>
         </div>
         <script>
-            JsBarcode("#barcode-${index}", "${codigo}", {
+            JsBarcode("#barcode-${index}", "${item.codigo}", {
                 format: "CODE128",
-                width: 3,
-                height: 30,
+                width: 2,
+                height: 36,
                 displayValue: true,
-                fontSize: 38,
+                fontSize: 24,
                 fontOptions: "bold",
-                margin: 3,
-                textMargin: 3
+                margin: 0,
+                textMargin: 2
             });
         <\/script>
         `;
@@ -246,6 +265,42 @@ function imprimirSeleccionados() {
 
     printWindow.document.write(content);
     printWindow.document.close();
+}
+
+function imprimirSeleccionados() {
+    const seleccionados = document.querySelectorAll('.item-check:checked');
+    if (seleccionados.length === 0) {
+        alert("Selecciona al menos una etiqueta para imprimir.");
+        return;
+    }
+
+    if (!confirmarImpresionMasiva(seleccionados.length, "seleccionadas")) {
+        return;
+    }
+
+    const etiquetas = Array.from(seleccionados).map((cb) => ({
+        codigo: cb.dataset.codigo,
+        marco: cb.dataset.marco,
+        tramo: cb.dataset.tramo,
+        cuerda_interna: cb.dataset.cinterna || 'N/A',
+        cuerda_externa: cb.dataset.cexterna || 'N/A',
+        flecha: cb.dataset.flecha || 'N/A'
+    }));
+
+    abrirVentanaImpresion(etiquetas);
+}
+
+function imprimirFiltradas() {
+    if (!piezasImpresion || piezasImpresion.length === 0) {
+        alert("No hay etiquetas para imprimir con el filtro actual.");
+        return;
+    }
+
+    if (!confirmarImpresionMasiva(piezasImpresion.length, "filtradas")) {
+        return;
+    }
+
+    abrirVentanaImpresion(piezasImpresion);
 }
 </script>
 

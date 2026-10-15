@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 
 from flask import flash, redirect, render_template, request, url_for
 
+from core.helpers.codigo import build_codigo_lookup_keys, build_codigo_query_values
+from core.helpers.config_store import get_label_print_confirm_limit
 from core.helpers.date_utils import CL, apply_date_range_filter, to_cl
 
 
@@ -259,12 +261,31 @@ def register_admin_produccion_routes(
             filtro["tramo"] = tramo_sel
 
         if estado_filter != "todos":
-            modo_buscado = "rematador" if estado_filter == "Rematado" else "armador" if estado_filter == "Armado" else None
-            if modo_buscado:
+            if estado_filter == "Rematado":
                 codigos_con_estado = db.produccion_historica.distinct(
-                    "codigo_pieza", {"modo": modo_buscado, "corte_id": corte_id}
+                    "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
                 )
-                filtro["codigo"] = {"$in": codigos_con_estado}
+                codigos_lookup = build_codigo_query_values(codigos_con_estado)
+                filtro["codigo"] = {"$in": codigos_lookup}
+            elif estado_filter == "Armado":
+                codigos_armados = set(
+                    db.produccion_historica.distinct(
+                        "codigo_pieza", {"modo": "armador", "corte_id": corte_id}
+                    )
+                )
+                codigos_rematados = set(
+                    db.produccion_historica.distinct(
+                        "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
+                    )
+                )
+                codigos_solo_armado = build_codigo_query_values(list(codigos_armados - codigos_rematados))
+                filtro["codigo"] = {"$in": codigos_solo_armado}
+            elif estado_filter in ("Pendientes", "pendientes"):
+                codigos_rematados = db.produccion_historica.distinct(
+                    "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
+                )
+                codigos_rematados_lookup = build_codigo_query_values(codigos_rematados)
+                filtro["codigo"] = {"$nin": codigos_rematados_lookup}
 
         piezas = list(db.piezas_historicas.find(filtro).sort("_id", -1))
 
@@ -281,25 +302,28 @@ def register_admin_produccion_routes(
         piezas_finales = []
         if piezas:
             codigos_en_pantalla = [p.get("codigo") for p in piezas if p.get("codigo")]
-            set_armado = set(
-                db.produccion_historica.distinct(
-                    "codigo_pieza",
-                    {"codigo_pieza": {"$in": codigos_en_pantalla}, "modo": "armador", "corte_id": corte_id},
-                )
-            )
-            set_remate = set(
-                db.produccion_historica.distinct(
-                    "codigo_pieza",
-                    {"codigo_pieza": {"$in": codigos_en_pantalla}, "modo": "rematador", "corte_id": corte_id},
-                )
-            )
+            lookup_codigos = build_codigo_query_values(codigos_en_pantalla)
+            set_armado = set()
+            for c in db.produccion_historica.distinct(
+                "codigo_pieza",
+                {"codigo_pieza": {"$in": lookup_codigos}, "modo": "armador", "corte_id": corte_id},
+            ):
+                set_armado.update(build_codigo_lookup_keys(c))
+
+            set_remate = set()
+            for c in db.produccion_historica.distinct(
+                "codigo_pieza",
+                {"codigo_pieza": {"$in": lookup_codigos}, "modo": "rematador", "corte_id": corte_id},
+            ):
+                set_remate.update(build_codigo_lookup_keys(c))
 
             for pieza in piezas:
                 codigo = pieza.get("codigo")
+                codigo_keys = build_codigo_lookup_keys(codigo)
                 estado = "Sin producción"
-                if codigo in set_remate:
+                if codigo_keys & set_remate:
                     estado = "Rematado"
-                elif codigo in set_armado:
+                elif codigo_keys & set_armado:
                     estado = "Armado"
                 pieza["estado_prod"] = estado
 
@@ -308,6 +332,8 @@ def register_admin_produccion_routes(
                 if estado_filter == "Armado" and estado != "Armado":
                     continue
                 if estado_filter == "Rematado" and estado != "Rematado":
+                    continue
+                if estado_filter in ("Pendientes", "pendientes") and estado == "Rematado":
                     continue
 
                 piezas_finales.append(pieza)
@@ -323,6 +349,19 @@ def register_admin_produccion_routes(
             estado=estado_filter,
         )
 
+        piezas_impresion = [
+            {
+                "codigo": str(pieza.get("codigo", "")),
+                "empresa": pieza.get("empresa", ""),
+                "marco": pieza.get("marco", ""),
+                "tramo": pieza.get("tramo", ""),
+                "cuerda_interna": pieza.get("cuerda_interna") if pieza.get("cuerda_interna") is not None else "N/A",
+                "cuerda_externa": pieza.get("cuerda_externa") if pieza.get("cuerda_externa") is not None else "N/A",
+                "flecha": pieza.get("flecha") if pieza.get("flecha") is not None else "N/A",
+            }
+            for pieza in piezas_finales
+        ]
+
         return render_template(
             "admin_piezas_archivadas.html",
             piezas=piezas_pagina,
@@ -336,6 +375,8 @@ def register_admin_produccion_routes(
             estado_sel=estado_filter,
             pagination=pagination,
             total_registros=len(piezas_finales),
+            piezas_impresion=piezas_impresion,
+            print_confirm_limit=get_label_print_confirm_limit(db.config, 100),
         )
 
     @app.route("/admin/produccion/archivada/export", methods=["POST"])
