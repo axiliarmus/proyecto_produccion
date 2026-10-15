@@ -6,6 +6,12 @@ from flask import flash, redirect, render_template, request, session, url_for
 
 from core.helpers.codigo import build_codigo_lookup_keys, build_codigo_query_values
 from core.helpers.date_utils import to_cl
+from core.helpers.reporting import (
+    build_piece_master_measure_map,
+    get_piece_status_sets,
+    piece_matches_status_filter,
+    resolve_piece_production_status,
+)
 
 
 def register_admin_tools_routes(app, db, login_required, normalize_page, paginate_list, send_excel_file):
@@ -142,62 +148,29 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
         if tramo_sel and tramo_sel != "todos":
             filtro["tramo"] = tramo_sel
 
-        if estado_filter and estado_filter != "todos":
-            if estado_filter == "Rematado":
-                codigos_con_estado = db.produccion_historica.distinct(
-                    "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
-                )
-                filtro["codigo"] = {"$in": build_codigo_query_values(codigos_con_estado)}
-            elif estado_filter == "Armado":
-                codigos_armados = set(
-                    db.produccion_historica.distinct(
-                        "codigo_pieza", {"modo": "armador", "corte_id": corte_id}
-                    )
-                )
-                codigos_rematados = set(
-                    db.produccion_historica.distinct(
-                        "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
-                    )
-                )
-                filtro["codigo"] = {"$in": build_codigo_query_values(list(codigos_armados - codigos_rematados))}
-            elif estado_filter in ("Pendientes", "pendientes"):
-                codigos_rematados = db.produccion_historica.distinct(
-                    "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
-                )
-                filtro["codigo"] = {"$nin": build_codigo_query_values(codigos_rematados)}
-
         piezas = list(db.piezas_historicas.find(filtro).sort("_id", -1))
-        codigos_en_lista = [pieza.get("codigo") for pieza in piezas]
-        lookup_codigos = build_codigo_query_values(codigos_en_lista)
-        set_armado = set()
-        for c in db.produccion_historica.distinct(
-            "codigo_pieza", {"codigo_pieza": {"$in": lookup_codigos}, "modo": "armador", "corte_id": corte_id}
-        ):
-            set_armado.update(build_codigo_lookup_keys(c))
-
-        set_remate = set()
-        for c in db.produccion_historica.distinct(
-            "codigo_pieza", {"codigo_pieza": {"$in": lookup_codigos}, "modo": "rematador", "corte_id": corte_id}
-        ):
-            set_remate.update(build_codigo_lookup_keys(c))
+        codigos_en_lista = [pieza.get("codigo") for pieza in piezas if pieza.get("codigo")]
+        set_armado, set_remate = get_piece_status_sets(db, codigos_en_lista)
+        master_measure_map = build_piece_master_measure_map(db, codigos_en_lista, corte_id=corte_id)
 
         data = []
         for pieza in piezas:
             codigo = pieza.get("codigo")
             codigo_keys = build_codigo_lookup_keys(codigo)
-            estado = "Sin producción"
-            if codigo_keys & set_remate:
-                estado = "Rematado"
-            elif codigo_keys & set_armado:
-                estado = "Armado"
+            estado = resolve_piece_production_status(codigo, set_armado, set_remate)
 
-            if estado_filter == "Sin producción" and estado != "Sin producción":
-                continue
-            if estado_filter == "Armado" and estado != "Armado":
-                continue
-            if estado_filter == "Rematado" and estado != "Rematado":
-                continue
-            if estado_filter in ("Pendientes", "pendientes") and estado == "Rematado":
+            for key in codigo_keys:
+                master_info = master_measure_map.get(key)
+                if master_info:
+                    if pieza.get("cuerda_interna") is None:
+                        pieza["cuerda_interna"] = master_info.get("cuerda_interna")
+                    if pieza.get("cuerda_externa") is None:
+                        pieza["cuerda_externa"] = master_info.get("cuerda_externa")
+                    if pieza.get("flecha") is None:
+                        pieza["flecha"] = master_info.get("flecha")
+                    break
+
+            if not piece_matches_status_filter(estado, estado_filter):
                 continue
 
             data.append(

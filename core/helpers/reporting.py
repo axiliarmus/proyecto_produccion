@@ -4,10 +4,10 @@ from core.helpers.codigo import build_codigo_lookup_keys, build_codigo_query_val
 from core.helpers.date_utils import to_cl
 
 
-def get_piece_status_sets(db, codigos, collection=None):
-    """Obtiene sets de piezas armadas y rematadas para un conjunto de codigos."""
-    if collection is None:
-        collection = db.produccion
+def get_piece_status_sets(db, codigos, collection=None, include_all=True):
+    """Obtiene sets de piezas armadas y rematadas para un conjunto de codigos.
+    Por defecto consulta tanto db.produccion como db.produccion_historica para que
+    piezas rematadas o armadas tras un corte se reconozcan siempre."""
     lookup_values = build_codigo_query_values(codigos)
     if not lookup_values:
         return set(), set()
@@ -15,13 +15,106 @@ def get_piece_status_sets(db, codigos, collection=None):
     set_armado = set()
     set_remate = set()
 
-    for codigo in collection.distinct("codigo_pieza", {"codigo_pieza": {"$in": lookup_values}, "modo": "armador"}):
-        set_armado.update(build_codigo_lookup_keys(codigo))
+    if collection is not None and not include_all:
+        collections = [collection]
+    else:
+        collections = [db.produccion, db.produccion_historica]
 
-    for codigo in collection.distinct("codigo_pieza", {"codigo_pieza": {"$in": lookup_values}, "modo": "rematador"}):
-        set_remate.update(build_codigo_lookup_keys(codigo))
+    for col in collections:
+        for codigo in col.distinct("codigo_pieza", {"codigo_pieza": {"$in": lookup_values}, "modo": "armador"}):
+            set_armado.update(build_codigo_lookup_keys(codigo))
+
+        for codigo in col.distinct("codigo_pieza", {"codigo_pieza": {"$in": lookup_values}, "modo": "rematador"}):
+            set_remate.update(build_codigo_lookup_keys(codigo))
 
     return set_armado, set_remate
+
+
+def resolve_piece_production_status(codigo, set_armado, set_remate):
+    """Resuelve el estado final de una pieza ('Rematado', 'Armado' o 'Sin producción')."""
+    codigo_keys = build_codigo_lookup_keys(codigo)
+    if codigo_keys & set_remate:
+        return "Rematado"
+    if codigo_keys & set_armado:
+        return "Armado"
+    return "Sin producción"
+
+
+def piece_matches_status_filter(estado, estado_filter):
+    """Determina si el estado de una pieza coincide con el filtro solicitado."""
+    if not estado_filter or estado_filter == "todos":
+        return True
+    if estado_filter in ("Pendientes", "pendientes"):
+        return estado != "Rematado"
+    return estado == estado_filter
+
+
+def merge_status_maps(*maps):
+    """Combina múltiples mapas de estado de producción acumulando valores máximos."""
+    merged = {}
+    for current_map in maps:
+        for codigo_key, payload in (current_map or {}).items():
+            existing = merged.get(codigo_key)
+            if not existing:
+                merged[codigo_key] = dict(payload)
+                continue
+
+            existing["armadas"] = max(int(existing.get("armadas") or 0), int(payload.get("armadas") or 0))
+            existing["rematadas"] = max(int(existing.get("rematadas") or 0), int(payload.get("rematadas") or 0))
+    return merged
+
+
+def build_piece_master_measure_map(db, codigos, corte_id=None):
+    """Construye un mapa con cuerda_interna, cuerda_externa y flecha para una lista de códigos,
+    buscando en piezas activas, históricas y registros de producción para garantizar datos completos."""
+    lookup_values = build_codigo_query_values(codigos)
+    if not lookup_values:
+        return {}
+
+    projection = {
+        "_id": 0,
+        "codigo": 1,
+        "cuerda_interna": 1,
+        "cuerda_externa": 1,
+        "flecha": 1,
+    }
+    master_map = {}
+
+    for pieza in db.piezas.find({"codigo": {"$in": lookup_values}}, projection):
+        for key in build_codigo_lookup_keys(pieza.get("codigo")):
+            master_map[key] = {
+                "cuerda_interna": pieza.get("cuerda_interna"),
+                "cuerda_externa": pieza.get("cuerda_externa"),
+                "flecha": pieza.get("flecha"),
+            }
+
+    hist_filter = {"codigo": {"$in": lookup_values}}
+    if corte_id:
+        hist_filter["corte_id"] = corte_id
+    for pieza in db.piezas_historicas.find(hist_filter, projection):
+        for key in build_codigo_lookup_keys(pieza.get("codigo")):
+            if key not in master_map or master_map[key].get("cuerda_interna") is None:
+                master_map[key] = {
+                    "cuerda_interna": pieza.get("cuerda_interna"),
+                    "cuerda_externa": pieza.get("cuerda_externa"),
+                    "flecha": pieza.get("flecha"),
+                }
+
+    missing_codes = [k for k, v in master_map.items() if v.get("cuerda_interna") is None or v.get("flecha") is None]
+    if missing_codes:
+        missing_lookup = build_codigo_query_values(missing_codes)
+        for col in (db.produccion, db.produccion_historica):
+            prod_map = get_latest_production_map(db, missing_lookup, col)
+            for key, prod in prod_map.items():
+                if key in master_map:
+                    if master_map[key].get("cuerda_interna") is None and prod.get("cuerda_interna") is not None:
+                        master_map[key]["cuerda_interna"] = prod.get("cuerda_interna")
+                    if master_map[key].get("cuerda_externa") is None and prod.get("cuerda_externa") is not None:
+                        master_map[key]["cuerda_externa"] = prod.get("cuerda_externa")
+                    if master_map[key].get("flecha") is None and prod.get("flecha") is not None:
+                        master_map[key]["flecha"] = prod.get("flecha")
+
+    return master_map
 
 
 def get_latest_production_map(db, codigos, collection=None):
@@ -102,6 +195,8 @@ def ensure_mongo_indexes(db):
         (db.produccion_historica, [("corte_id", 1), ("fecha", -1)], "idx_produccion_hist_corte_fecha"),
         (db.produccion_historica, [("corte_id", 1), ("codigo_pieza", 1), ("fecha", -1)], "idx_produccion_hist_corte_codigo_fecha"),
         (db.produccion_historica, [("corte_id", 1), ("modo", 1), ("codigo_pieza", 1)], "idx_produccion_hist_corte_modo_codigo"),
+        (db.produccion_historica, [("codigo_pieza", 1), ("modo", 1)], "idx_produccion_hist_codigo_modo"),
+        (db.produccion_historica, [("codigo_pieza", 1)], "idx_produccion_hist_codigo"),
         (db.piezas_historicas, [("corte_id", 1), ("codigo", 1)], "idx_piezas_hist_corte_codigo"),
         (db.piezas_historicas, [("corte_id", 1), ("empresa", 1), ("marco", 1), ("tramo", 1)], "idx_piezas_hist_filtros"),
         (db.usuarios_historicos, [("corte_id", 1), ("usuario", 1)], "idx_usuarios_hist_corte_usuario"),

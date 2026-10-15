@@ -3,6 +3,7 @@ from flask import flash, redirect, render_template, request, url_for
 
 from core.helpers.codigo import build_codigo_query_values
 from core.helpers.date_utils import apply_date_range_filter, to_cl
+from core.helpers.reporting import merge_status_maps
 
 
 def register_admin_informes_avanzados_routes(
@@ -20,19 +21,6 @@ def register_admin_informes_avanzados_routes(
     send_excel_file,
 ):
     """Registra informes avanzados de valor, estado y tarjetas archivadas."""
-
-    def merge_status_maps(*maps):
-        merged = {}
-        for current_map in maps:
-            for codigo_key, payload in (current_map or {}).items():
-                existing = merged.get(codigo_key)
-                if not existing:
-                    merged[codigo_key] = dict(payload)
-                    continue
-
-                existing["armadas"] = max(int(existing.get("armadas") or 0), int(payload.get("armadas") or 0))
-                existing["rematadas"] = max(int(existing.get("rematadas") or 0), int(payload.get("rematadas") or 0))
-        return merged
 
     @app.route("/admin/archivados/valor-operador", methods=["GET", "POST"])
     @login_required(["administrador", "soporte"])

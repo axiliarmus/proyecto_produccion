@@ -6,39 +6,12 @@ import urllib.request
 from bson import ObjectId
 from flask import flash, redirect, render_template, request, session, url_for
 
+from core.helpers.reporting import (
+    build_piece_master_measure_map,
+    piece_matches_status_filter,
+    resolve_piece_production_status,
+)
 from core.helpers.soft_delete import soft_delete_one, soft_delete_many
-
-
-def _build_piece_master_measure_map(db, codigos, build_codigo_lookup_keys, build_codigo_query_values, corte_id=None):
-    lookup_values = build_codigo_query_values(codigos)
-    if not lookup_values:
-        return {}
-
-    projection = {
-        "_id": 0,
-        "codigo": 1,
-        "cuerda_interna": 1,
-        "cuerda_externa": 1,
-        "flecha": 1,
-    }
-    master_map = {}
-    for pieza in db.piezas.find({"codigo": {"$in": lookup_values}}, projection):
-        for key in build_codigo_lookup_keys(pieza.get("codigo")):
-            master_map[key] = {
-                "cuerda_interna": pieza.get("cuerda_interna"),
-                "cuerda_externa": pieza.get("cuerda_externa"),
-                "flecha": pieza.get("flecha"),
-            }
-    if corte_id:
-        for pieza in db.piezas_historicas.find({"codigo": {"$in": lookup_values}, "corte_id": corte_id}, projection):
-            for key in build_codigo_lookup_keys(pieza.get("codigo")):
-                if key not in master_map or master_map[key].get("cuerda_interna") is None:
-                    master_map[key] = {
-                        "cuerda_interna": pieza.get("cuerda_interna"),
-                        "cuerda_externa": pieza.get("cuerda_externa"),
-                        "flecha": pieza.get("flecha"),
-                    }
-    return master_map
 
 
 # #endregion
@@ -224,47 +197,32 @@ def register_soporte_basic_routes(
                 {"marco": {"$regex": search_query, "$options": "i"}},
             ]
 
-        if estado_filter != "todos":
-            modo_buscado = "rematador" if estado_filter == "Rematado" else "armador" if estado_filter == "Armado" else None
-            if modo_buscado:
-                codigos_con_estado = db.produccion.distinct("codigo_pieza", {"modo": modo_buscado})
-                codigos_estado_lookup = build_codigo_query_values(codigos_con_estado)
-                if codigos_estado_lookup:
-                    filtro["codigo"] = {"$in": codigos_estado_lookup}
-
         piezas = list(db.piezas.find(filtro).limit(5000).sort("_id", -1))
 
         if piezas:
             codigos_en_pantalla = [pieza.get("codigo") for pieza in piezas if pieza.get("codigo")]
             set_armado, set_remate = get_piece_status_sets(db, codigos_en_pantalla)
-            master_measure_map = _build_piece_master_measure_map(
-                db, codigos_en_pantalla, build_codigo_lookup_keys, build_codigo_query_values
-            )
+            master_measure_map = build_piece_master_measure_map(db, codigos_en_pantalla)
 
             piezas_finales = []
             for pieza in piezas:
                 codigo = pieza.get("codigo")
                 codigo_keys = build_codigo_lookup_keys(codigo)
-                estado = "Sin producción"
-                if codigo_keys & set_remate:
-                    estado = "Rematado"
-                elif codigo_keys & set_armado:
-                    estado = "Armado"
+                estado = resolve_piece_production_status(codigo, set_armado, set_remate)
                 pieza["estado_prod"] = estado
 
                 for key in codigo_keys:
                     master_info = master_measure_map.get(key)
                     if master_info:
-                        pieza["cuerda_interna"] = master_info.get("cuerda_interna")
-                        pieza["cuerda_externa"] = master_info.get("cuerda_externa")
-                        pieza["flecha"] = master_info.get("flecha")
+                        if pieza.get("cuerda_interna") is None:
+                            pieza["cuerda_interna"] = master_info.get("cuerda_interna")
+                        if pieza.get("cuerda_externa") is None:
+                            pieza["cuerda_externa"] = master_info.get("cuerda_externa")
+                        if pieza.get("flecha") is None:
+                            pieza["flecha"] = master_info.get("flecha")
                         break
 
-                if estado_filter == "Sin producción" and estado != "Sin producción":
-                    continue
-                if estado_filter == "Armado" and estado != "Armado":
-                    continue
-                if estado_filter == "Rematado" and estado != "Rematado":
+                if not piece_matches_status_filter(estado, estado_filter):
                     continue
 
                 piezas_finales.append(pieza)
@@ -375,33 +333,6 @@ def register_soporte_basic_routes(
             filtro["tramo"] = tramo_sel
 
         if es_corte_historico:
-            if estado_filter != "todos":
-                if estado_filter == "Rematado":
-                    codigos_con_estado = db.produccion_historica.distinct(
-                        "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
-                    )
-                    codigos_estado_lookup = build_codigo_query_values(codigos_con_estado)
-                    filtro["codigo"] = {"$in": codigos_estado_lookup}
-                elif estado_filter == "Armado":
-                    codigos_armados = set(
-                        db.produccion_historica.distinct(
-                            "codigo_pieza", {"modo": "armador", "corte_id": corte_id}
-                        )
-                    )
-                    codigos_rematados = set(
-                        db.produccion_historica.distinct(
-                            "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
-                        )
-                    )
-                    codigos_solo_armado = build_codigo_query_values(list(codigos_armados - codigos_rematados))
-                    filtro["codigo"] = {"$in": codigos_solo_armado}
-                elif estado_filter in ("Pendientes", "pendientes"):
-                    codigos_rematados = db.produccion_historica.distinct(
-                        "codigo_pieza", {"modo": "rematador", "corte_id": corte_id}
-                    )
-                    codigos_rematados_lookup = build_codigo_query_values(codigos_rematados)
-                    filtro["codigo"] = {"$nin": codigos_rematados_lookup}
-
             try:
                 all_piezas_corte = list(
                     db.piezas_historicas.find({"corte_id": corte_id}, {"empresa": 1, "marco": 1, "tramo": 1})
@@ -414,40 +345,11 @@ def register_soporte_basic_routes(
 
             piezas = list(db.piezas_historicas.find(filtro).limit(5000).sort("_id", -1))
             codigos_en_pantalla = [pieza.get("codigo") for pieza in piezas if pieza.get("codigo")]
-            lookup_codigos = build_codigo_query_values(codigos_en_pantalla)
-            set_armado = set()
-            for c in db.produccion_historica.distinct(
-                "codigo_pieza", {"codigo_pieza": {"$in": lookup_codigos}, "modo": "armador", "corte_id": corte_id}
-            ):
-                set_armado.update(build_codigo_lookup_keys(c))
-            set_remate = set()
-            for c in db.produccion_historica.distinct(
-                "codigo_pieza", {"codigo_pieza": {"$in": lookup_codigos}, "modo": "rematador", "corte_id": corte_id}
-            ):
-                set_remate.update(build_codigo_lookup_keys(c))
-
-            master_measure_map = _build_piece_master_measure_map(
-                db, codigos_en_pantalla, build_codigo_lookup_keys, build_codigo_query_values, corte_id=corte_id
+            set_armado, set_remate = get_piece_status_sets(db, codigos_en_pantalla)
+            master_measure_map = build_piece_master_measure_map(
+                db, codigos_en_pantalla, corte_id=corte_id
             )
         else:
-            if estado_filter != "todos":
-                if estado_filter == "Rematado":
-                    codigos_con_estado = db.produccion.distinct("codigo_pieza", {"modo": "rematador"})
-                    codigos_estado_lookup = build_codigo_query_values(codigos_con_estado)
-                    if codigos_estado_lookup:
-                        filtro["codigo"] = {"$in": codigos_estado_lookup}
-                elif estado_filter == "Armado":
-                    codigos_armados = set(db.produccion.distinct("codigo_pieza", {"modo": "armador"}))
-                    codigos_rematados = set(db.produccion.distinct("codigo_pieza", {"modo": "rematador"}))
-                    codigos_solo_armado = build_codigo_query_values(list(codigos_armados - codigos_rematados))
-                    if codigos_solo_armado:
-                        filtro["codigo"] = {"$in": codigos_solo_armado}
-                elif estado_filter in ("Pendientes", "pendientes"):
-                    codigos_rematados = db.produccion.distinct("codigo_pieza", {"modo": "rematador"})
-                    codigos_rematados_lookup = build_codigo_query_values(codigos_rematados)
-                    if codigos_rematados_lookup:
-                        filtro["codigo"] = {"$nin": codigos_rematados_lookup}
-
             try:
                 clientes = sorted([x for x in db.piezas.distinct("empresa") if x], key=str)
                 marcos = sorted([x for x in db.piezas.distinct("marco") if x], key=str)
@@ -459,8 +361,8 @@ def register_soporte_basic_routes(
             piezas = list(db.piezas.find(filtro).limit(5000).sort("_id", -1))
             codigos_en_pantalla = [pieza.get("codigo") for pieza in piezas if pieza.get("codigo")]
             set_armado, set_remate = get_piece_status_sets(db, codigos_en_pantalla)
-            master_measure_map = _build_piece_master_measure_map(
-                db, codigos_en_pantalla, build_codigo_lookup_keys, build_codigo_query_values
+            master_measure_map = build_piece_master_measure_map(
+                db, codigos_en_pantalla
             )
 
         piezas_finales = []
@@ -468,11 +370,7 @@ def register_soporte_basic_routes(
             for pieza in piezas:
                 codigo = pieza.get("codigo")
                 codigo_keys = build_codigo_lookup_keys(codigo)
-                estado = "Sin producción"
-                if codigo_keys & set_remate:
-                    estado = "Rematado"
-                elif codigo_keys & set_armado:
-                    estado = "Armado"
+                estado = resolve_piece_production_status(codigo, set_armado, set_remate)
                 pieza["estado_prod"] = estado
 
                 for key in codigo_keys:
@@ -486,13 +384,7 @@ def register_soporte_basic_routes(
                             pieza["flecha"] = master_info.get("flecha")
                         break
 
-                if estado_filter == "Sin producción" and estado != "Sin producción":
-                    continue
-                if estado_filter == "Armado" and estado != "Armado":
-                    continue
-                if estado_filter == "Rematado" and estado != "Rematado":
-                    continue
-                if estado_filter in ("Pendientes", "pendientes") and estado == "Rematado":
+                if not piece_matches_status_filter(estado, estado_filter):
                     continue
 
                 piezas_finales.append(pieza)
