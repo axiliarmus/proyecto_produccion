@@ -71,7 +71,7 @@ def register_admin_produccion_routes(
         return render_template(
             "crud_produccion_admin.html",
             registros=registros,
-            operadores=sorted(operadores),
+            operadores=sorted([op for op in operadores if op], key=str),
             operador_sel=operador_sel,
             codigo_sel=codigo_sel,
             fecha_inicio=fecha_inicio,
@@ -201,7 +201,7 @@ def register_admin_produccion_routes(
         return render_template(
             "crud_produccion_admin.html",
             registros=registros,
-            operadores=sorted(operadores),
+            operadores=sorted([op for op in operadores if op], key=str),
             operador_sel=operador_sel,
             codigo_sel=codigo_sel,
             fecha_inicio=fecha_inicio,

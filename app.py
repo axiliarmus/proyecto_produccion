@@ -1,10 +1,10 @@
 import os
-from core.app_factory import app, create_app, ensure_mongo_indexes, set_tunnel_url
+from core.app_factory import app, set_tunnel_url
 from core.runtime import maybe_start_tunnel, print_startup_banner
 
 
 if __name__ == "__main__":
-    server_app = create_app()
+    server_app = app
     maybe_start_tunnel(
         enabled=os.getenv("ENABLE_TUNNEL") == "true",
         set_tunnel_url=lambda url: set_tunnel_url(server_app, url),

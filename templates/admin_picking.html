@@ -244,6 +244,7 @@
       </div>
     </div>
   </div>
+</div>
 <!-- Modal Detalle Picking Histórico -->
 <div class="modal fade" id="modalDetalleHistorial" tabindex="-1">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -460,7 +461,7 @@ async function processCode(code) {
     const codeUpper = code.toUpperCase();
     let isDuplicate = false;
     state.scannedCodes.forEach(c => {
-        if (c.toUpperCase() === codeUpper) isDuplicate = true;
+        if (String(c).toUpperCase() === codeUpper) isDuplicate = true;
     });
 
     if (isDuplicate) {

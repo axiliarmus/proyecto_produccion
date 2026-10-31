@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from bson.objectid import ObjectId
 from pymongo.collection import Collection
+from pymongo.errors import PyMongoError
 
 
 DAYS_RETAIN = 7
@@ -157,7 +158,10 @@ def soft_delete_many(
     col_origen: Collection = db[collection_origen]
     col_papelera: Collection = db[COLLECTION_PAPELERA]
 
-    docs = list(col_origen.find(filtro_docs))
+    try:
+        docs = list(col_origen.find(filtro_docs))
+    except PyMongoError:
+        return 0, "No se pudo consultar la coleccion. No se ejecuto el borrado."
     if not docs:
         return 0, "No se encontraron documentos coincidentes."
 
@@ -174,11 +178,19 @@ def soft_delete_many(
             )
         )
 
-    insert_result = col_papelera.insert_many(papelera_bulk, ordered=False)
+    try:
+        insert_result = col_papelera.insert_many(papelera_bulk, ordered=False)
+    except PyMongoError:
+        return 0, "No se pudo completar la copia en papelera. Los originales se conservaron."
     if not insert_result.inserted_ids:
         return 0, "No se pudo guardar copia en papelera."
 
-    delete_result = col_origen.delete_many(filtro_docs)
+    # No borrar documentos agregados despues de preparar las copias.
+    snapshot_filter = {"_id": {"$in": [doc["_id"] for doc in docs]}}
+    try:
+        delete_result = col_origen.delete_many(snapshot_filter)
+    except PyMongoError:
+        return 0, "No se pudo confirmar el borrado. Hay copias en papelera; verifica el listado antes de reintentar."
     if delete_result.deleted_count != len(docs):
         return (
             delete_result.deleted_count,
@@ -187,6 +199,81 @@ def soft_delete_many(
 
     tipo = _doc_type_name(collection_origen)
     return delete_result.deleted_count, f"✅ {delete_result.deleted_count} {tipo}(s) movidos a papelera. Permanencia {DAYS_RETAIN} días."
+
+
+def soft_delete_selected_production(db, object_ids, **audit):
+    """Borra un lote protegido por copias en papelera y devuelve resultados por ID."""
+    origin = db["produccion"]
+    recycle_bin = db[COLLECTION_PAPELERA]
+    result = {"deleted_ids": [], "problems": [], "uncertain_ids": []}
+
+    def problem(ids, message):
+        result["problems"].extend({"id": str(uid), "message": message} for uid in ids)
+
+    try:
+        docs = list(origin.find({"_id": {"$in": object_ids}}))
+    except Exception:
+        problem(object_ids, "No se pudo consultar la produccion. No se ejecuto el borrado.")
+        return result
+
+    found_ids = {doc["_id"] for doc in docs}
+    problem([uid for uid in object_ids if uid not in found_ids], "Registro no encontrado en produccion activa.")
+    if not docs:
+        return result
+
+    backups = []
+    for doc in docs:
+        backup = _build_papelera_doc("produccion", doc, **audit)
+        backup["_id"] = ObjectId()
+        backups.append(backup)
+
+    try:
+        recycle_bin.insert_many(backups, ordered=False)
+        saved_ids = found_ids
+    except Exception:
+        # Una escritura masiva puede guardar solo parte del lote; verificamos las copias.
+        try:
+            saved_ids = {
+                doc["documento_id_original"]
+                for doc in recycle_bin.find(
+                    {"_id": {"$in": [backup["_id"] for backup in backups]}},
+                    {"documento_id_original": 1},
+                )
+            }
+        except Exception:
+            problem(found_ids, "No se pudo verificar la copia en papelera. No se ejecuto el borrado.")
+            return result
+
+    problem(found_ids - saved_ids, "No se pudo guardar copia en papelera. Registro conservado.")
+    if not saved_ids:
+        return result
+
+    delete_failed = False
+    try:
+        deletion = origin.delete_many({"_id": {"$in": list(saved_ids)}})
+        if deletion.deleted_count == len(saved_ids):
+            result["deleted_ids"] = [str(uid) for uid in saved_ids]
+            return result
+    except Exception:
+        delete_failed = True
+
+    # Ante un fallo parcial o de conexion, comprobar el estado antes de informar exito.
+    try:
+        remaining_ids = {
+            doc["_id"] for doc in origin.find({"_id": {"$in": list(saved_ids)}}, {"_id": 1})
+        }
+    except Exception:
+        result["uncertain_ids"] = [str(uid) for uid in saved_ids]
+        problem(saved_ids, "Resultado no verificable. Recarga la lista antes de volver a intentar.")
+        return result
+
+    result["deleted_ids"] = [str(uid) for uid in saved_ids - remaining_ids]
+    problem(
+        remaining_ids,
+        "Fallo al eliminar; el registro sigue activo y tiene copia en papelera."
+        if delete_failed else "El registro sigue activo y tiene copia en papelera.",
+    )
+    return result
 
 
 def restore_from_bin(db, papelera_id: str) -> Tuple[bool, str]:

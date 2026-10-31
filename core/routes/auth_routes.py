@@ -17,6 +17,9 @@ def register_auth_routes(app, db, login_required, login_attempts):
     @app.route("/", methods=["GET"])
     def index():
         if "user_id" in session:
+            if not ObjectId.is_valid(str(session["user_id"])):
+                session.clear()
+                return redirect(url_for("login"))
             role = session.get("role")
 
             user = db.usuarios.find_one({"_id": ObjectId(session["user_id"])})
@@ -78,8 +81,8 @@ def register_auth_routes(app, db, login_required, login_attempts):
     @login_required()
     def cambiar_password():
         if request.method == "POST":
-            nueva = request.form.get("password_nueva")
-            repetir = request.form.get("password_repetir")
+            nueva = request.form.get("password_nueva", "")
+            repetir = request.form.get("password_repetir", "")
 
             if nueva != repetir:
                 flash("Las contraseñas no coinciden.", "danger")

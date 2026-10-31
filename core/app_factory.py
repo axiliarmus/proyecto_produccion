@@ -51,6 +51,30 @@ def _configure_app(app, secret_key, enable_seed):
 
 
 def _register_security_hooks(app, runtime_state):
+    from bson.errors import InvalidId
+    from pymongo.errors import PyMongoError
+    from core.helpers.date_utils import InvalidDateRange
+
+    @app.errorhandler(InvalidDateRange)
+    def invalid_date_range(error):
+        if request.is_json or request.path.startswith("/api/"):
+            return {"success": False, "message": str(error)}, 400
+        return str(error), 400
+
+    @app.errorhandler(InvalidId)
+    def invalid_document_id(error):
+        if request.is_json or request.path.startswith("/api/"):
+            return {"success": False, "message": "Identificador de registro invalido."}, 400
+        return "Identificador de registro invalido. Vuelve al listado e intenta nuevamente.", 400
+
+    @app.errorhandler(PyMongoError)
+    def database_unavailable(error):
+        app.logger.exception("Fallo de MongoDB en %s", request.path)
+        message = "No se pudo completar la operacion con la base de datos. Comprueba el listado antes de reintentar."
+        if request.is_json or request.path.startswith("/api/"):
+            return {"success": False, "message": message}, 503
+        return message, 503
+
     @app.after_request
     def add_security_headers(response):
         csp = (
@@ -76,10 +100,12 @@ def _register_security_hooks(app, runtime_state):
 
     @app.before_request
     def csrf_protect():
-        if request.method == "POST":
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
             token = request.form.get("_csrf_token") or request.headers.get("X-CSRFToken")
             expected = session.get("_csrf_token") or _get_or_create_csrf_token()
-            if not token or token != expected:
+            if not token or not secrets.compare_digest(token, expected):
+                if request.is_json or request.path.startswith("/api/"):
+                    return {"success": False, "message": "CSRF token invalido. Recarga la pagina."}, 400
                 return "CSRF token inválido", 400
 
     @app.route("/favicon.ico")

@@ -48,6 +48,11 @@ def build_login_required(db):
                     flash("Inicia sesión para continuar", "warning")
                     return redirect(url_for("login"))
 
+                if not ObjectId.is_valid(str(session["user_id"])):
+                    session.clear()
+                    flash("Sesion invalida. Inicia sesion nuevamente.", "warning")
+                    return redirect(url_for("login"))
+
                 if request.endpoint == "cambiar_password":
                     return fn(*args, **kwargs)
 
@@ -156,9 +161,15 @@ def record_failed_login(login_attempts, ip, now=None):
 
 def authenticate_user(db, usuario, password):
     """Busca y valida credenciales de usuario."""
+    if not isinstance(password, str) or not password:
+        return None
     user = db.usuarios.find_one({"usuario": usuario})
-    if user and check_password_hash(user["password"], password):
-        return user
+    if user and isinstance(user.get("password"), str):
+        try:
+            if check_password_hash(user["password"], password):
+                return user
+        except (ValueError, TypeError):
+            return None
     return None
 
 

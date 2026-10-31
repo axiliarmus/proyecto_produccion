@@ -445,8 +445,11 @@ def register_admin_crud_routes(
     @login_required(["administrador", "soporte"])
     def piezas_eliminar_confirmar():
         try:
-            codigos = request.json.get("codigos", [])
-            if not codigos:
+            data = request.get_json(silent=True)
+            codigos = data.get("codigos") if isinstance(data, dict) else None
+            if not isinstance(codigos, list) or not codigos or any(
+                not isinstance(codigo, (str, int)) for codigo in codigos
+            ):
                 return {"success": False, "message": "No se seleccionaron piezas"}, 400
 
             cantidad, msg = soft_delete_many(
@@ -458,7 +461,8 @@ def register_admin_crud_routes(
                 deleted_by_ip=request.remote_addr,
                 motivo="admin eliminación masiva piezas (códigos)",
             )
-            return {"success": True, "deleted_count": cantidad, "message": msg}
+            return {"success": cantidad > 0 and not msg.startswith("ADVERTENCIA"),
+                    "deleted_count": cantidad, "message": msg}
         except Exception as exc:
             return {"success": False, "message": str(exc)}, 500
 

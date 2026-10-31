@@ -133,7 +133,7 @@ def register_admin_dashboard_routes(app, db, login_required):
             count = len(registros)
 
             if count > 0:
-                corte_doc = {"nombre": nombre, "inicio": start_utc, "fin": end_utc, "creado_en": datetime.utcnow()}
+                corte_doc = {"nombre": nombre, "inicio": start_utc, "fin": end_utc, "creado_en": datetime.now(timezone.utc)}
                 res = db.cortes.insert_one(corte_doc)
                 corte_id = res.inserted_id
 
@@ -206,8 +206,9 @@ def register_admin_dashboard_routes(app, db, login_required):
                 if usuarios_a_insertar:
                     db.usuarios_historicos.insert_many(usuarios_a_insertar)
 
-                db.produccion.delete_many(filtro)
-                db.piezas.delete_many({})
+                # Eliminar solo las instantaneas archivadas, no nuevas entradas concurrentes.
+                db.produccion.delete_many({"_id": {"$in": [r["_id"] for r in registros]}})
+                db.piezas.delete_many({"_id": {"$in": [p["_id"] for p in piezas_activas]}})
 
                 # Evaluar y limpiar solo las planificaciones que ya estén 100% completadas.
                 # Las planificaciones con saldo o piezas pendientes se mantienen activas.

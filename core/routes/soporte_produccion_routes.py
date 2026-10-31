@@ -1,11 +1,12 @@
+import re
 from datetime import datetime, timezone
 
 from bson import ObjectId
 from flask import flash, redirect, render_template, request, session, url_for
 from pymongo.errors import BulkWriteError
 
-from core.helpers.date_utils import CL, to_cl
-from core.helpers.soft_delete import soft_delete_one
+from core.helpers.date_utils import CL, to_cl, apply_date_range_filter
+from core.helpers.soft_delete import soft_delete_one, soft_delete_selected_production
 
 
 def register_soporte_produccion_routes(app, db, login_required):
@@ -19,27 +20,13 @@ def register_soporte_produccion_routes(app, db, login_required):
         filtro = {}
 
         if codigo:
-            filtro["codigo_pieza"] = {"$regex": f"^{str(codigo).strip()}$", "$options": "i"}
+            filtro["codigo_pieza"] = {"$regex": f"^{re.escape(codigo)}$", "$options": "i"}
 
         if operador_sel and operador_sel != "todos":
             filtro["usuario"] = operador_sel
 
         if fecha_inicio or fecha_fin:
-            start_cl = None
-            end_cl = None
-            if fecha_inicio:
-                d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-                start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
-            if fecha_fin:
-                d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
-                end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
-            rango = {}
-            if start_cl:
-                rango["$gte"] = start_cl.astimezone(timezone.utc)
-            if end_cl:
-                rango["$lte"] = end_cl.astimezone(timezone.utc)
-            if rango:
-                filtro["fecha"] = rango
+            apply_date_range_filter(filtro, fecha_inicio, fecha_fin)
 
         return filtro, codigo, operador_sel, fecha_inicio, fecha_fin
 
@@ -53,7 +40,11 @@ def register_soporte_produccion_routes(app, db, login_required):
         filtro = {}
 
         if request.method == "POST":
-            filtro, codigo, operador_sel, fecha_inicio, fecha_fin = _build_filtro_from_form()
+            try:
+                filtro, codigo, operador_sel, fecha_inicio, fecha_fin = _build_filtro_from_form()
+            except ValueError:
+                flash("Fechas invalidas. Utiliza el formato AAAA-MM-DD.", "warning")
+                return redirect(url_for("soporte_produccion_list"))
 
         registros = list(db.produccion.find(filtro).sort("fecha", -1))
         operadores = db.produccion.distinct("usuario")
@@ -67,7 +58,7 @@ def register_soporte_produccion_routes(app, db, login_required):
             "crud_produccion.html",
             registros=registros,
             codigo_sel=codigo,
-            operadores=sorted(operadores),
+            operadores=sorted([op for op in operadores if op], key=str),
             operador_sel=operador_sel,
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
@@ -90,7 +81,11 @@ def register_soporte_produccion_routes(app, db, login_required):
             flash("Corte no encontrado.", "warning")
             return redirect(url_for("soporte_produccion_list"))
 
-        filtro, _, _, _, _ = _build_filtro_from_form()
+        try:
+            filtro, _, _, _, _ = _build_filtro_from_form()
+        except ValueError:
+            flash("Fechas invalidas. No se asignaron registros al corte.", "warning")
+            return redirect(url_for("soporte_produccion_list"))
         if scope != "filtrados":
             filtro = {}
 
@@ -136,7 +131,21 @@ def register_soporte_produccion_routes(app, db, login_required):
         try:
             db.produccion_historica.insert_many(historicos, ordered=False)
         except BulkWriteError:
-            pass
+            # No confundir una escritura parcial o duplicada con un archivo completo.
+            try:
+                archived_ids = {
+                    r["_id"] for r in db.produccion_historica.find(
+                        {"_id": {"$in": ids}, "corte_id": corte_id}, {"_id": 1}
+                    )
+                }
+            except Exception:
+                archived_ids = set()
+            if archived_ids != set(ids):
+                flash("No se pudo archivar todo el lote. Se conservaron los registros activos; revisa el historial antes de reintentar.", "danger")
+                return redirect(url_for("soporte_produccion_list"))
+        except Exception:
+            flash("No se pudo confirmar el archivo. Se conservaron los registros activos.", "danger")
+            return redirect(url_for("soporte_produccion_list"))
 
         for codigo in codigos:
             if db.piezas_historicas.find_one({"corte_id": corte_id, "$or": [{"codigo": codigo}, {"codigo": str(codigo)}]}):
@@ -254,9 +263,47 @@ def register_soporte_produccion_routes(app, db, login_required):
         flash("Registro actualizado ✔", "success")
         return redirect(url_for("soporte_produccion_list"))
 
+    @app.route("/soporte/produccion/eliminar-masivo", methods=["POST"])
+    @login_required("soporte")
+    def soporte_produccion_eliminar_masivo():
+        payload = request.get_json(silent=True)
+        ids = payload.get("ids") if isinstance(payload, dict) else None
+        if not isinstance(ids, list) or not ids:
+            return {"success": False, "message": "Selecciona al menos un registro.", "deleted_ids": []}, 400
+        if any(not isinstance(uid, str) for uid in ids):
+            return {"success": False, "message": "La lista de identificadores no es valida.", "deleted_ids": []}, 400
+
+        ids = list(dict.fromkeys(ids))
+        invalid_ids = [uid for uid in ids if not ObjectId.is_valid(uid)]
+        object_ids = list({ObjectId(uid) for uid in ids if ObjectId.is_valid(uid)})
+        result = soft_delete_selected_production(
+            db,
+            object_ids,
+            deleted_by_user_id=session.get("user_id"),
+            deleted_by_user_name=session.get("nombre"),
+            deleted_by_ip=request.remote_addr,
+            motivo="soporte eliminacion masiva de produccion",
+        )
+        result["problems"].extend({"id": uid, "message": "Identificador invalido."} for uid in invalid_ids)
+        deleted_count = len(result["deleted_ids"])
+        problem_count = len(result["problems"])
+        return {
+            **result,
+            "success": not result["problems"],
+            "deleted_count": deleted_count,
+            "problem_count": problem_count,
+            "message": (
+                f"Eliminados: {deleted_count}. Con problemas: {problem_count}. "
+                "Los registros eliminados permanecen en papelera durante 7 dias."
+            ),
+        }
+
     @app.route("/soporte/produccion/<id>/delete", methods=["POST"])
     @login_required("soporte")
     def soporte_produccion_delete(id):
+        if not ObjectId.is_valid(id):
+            flash("Identificador de produccion invalido.", "warning")
+            return redirect(url_for("soporte_produccion_list"))
         ok, msg = soft_delete_one(
             db,
             collection_origen="produccion",

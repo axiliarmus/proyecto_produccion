@@ -7,8 +7,7 @@ Werkzeug==3.0.3
 pandas==2.2.2
 XlsxWriter==3.2.0
 
-# Necesario para convertir ObjectId y manejar BSON
-bson==0.5.10
+# PyMongo incluye BSON y ObjectId; no instalar el paquete bson por separado.
 
 # Servidor de producción
 gunicorn==21.2.0

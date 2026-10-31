@@ -227,6 +227,8 @@ def register_admin_informes_avanzados_routes(
         filtro_piezas = {}
         if corte_nombre:
             corte = db.cortes.find_one({"nombre": corte_nombre})
+            if not corte:
+                return "Corte no encontrado.", 404
             if corte:
                 corte_id = corte.get("_id")
                 if corte_id:
@@ -251,7 +253,7 @@ def register_admin_informes_avanzados_routes(
                     get_production_status_map(db, db.produccion, filtro_codigos),
                 )
 
-        if not piezas:
+        if not piezas and not corte_nombre:
             production_status_map = get_production_status_map(db, db.produccion_historica, {})
             piezas = list(db.piezas.find({}, {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0}))
 

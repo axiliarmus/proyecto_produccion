@@ -399,6 +399,17 @@ def build_tarjetas_grupos(piezas, production_status_map, include_orphans=False):
     grupos_map = {}
     existing_keys = set()
 
+    # Unificar alias numericos antes de contar: "001" y "1" son la misma pieza.
+    normalized_status_map = {}
+    for codigo, payload in production_status_map.items():
+        keys = build_codigo_lookup_keys(codigo)
+        if not keys:
+            continue
+        canonical = min(keys, key=lambda key: (len(key), key))
+        existing = normalized_status_map.setdefault(canonical, dict(payload))
+        existing["armadas"] = max(existing.get("armadas", 0), payload.get("armadas", 0))
+        existing["rematadas"] = max(existing.get("rematadas", 0), payload.get("rematadas", 0))
+
     def ensure_bucket(cliente, marco, tramo):
         cliente = cliente or "Sin Cliente"
         marco = marco or "Sin Marco"
@@ -415,18 +426,17 @@ def build_tarjetas_grupos(piezas, production_status_map, include_orphans=False):
 
         status_info = None
         normalized_keys = build_codigo_lookup_keys(pieza.get("codigo"))
-        for key in normalized_keys:
-            existing_keys.add(key)
-            status_info = production_status_map.get(key)
-            if status_info:
-                break
+        existing_keys.update(normalized_keys)
+        if normalized_keys:
+            canonical = min(normalized_keys, key=lambda key: (len(key), key))
+            status_info = normalized_status_map.get(canonical)
 
         if status_info:
             bucket["armadas"] += status_info.get("armadas", 0)
             bucket["rematadas"] += status_info.get("rematadas", 0)
 
     if include_orphans:
-        for codigo_key, status_info in production_status_map.items():
+        for codigo_key, status_info in normalized_status_map.items():
             if codigo_key in existing_keys:
                 continue
             bucket = ensure_bucket(status_info.get("empresa"), status_info.get("marco"), status_info.get("tramo"))

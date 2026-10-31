@@ -5,6 +5,10 @@ import zoneinfo
 CL = zoneinfo.ZoneInfo("America/Santiago")
 
 
+class InvalidDateRange(ValueError):
+    """Fechas de entrada invalidas; no es un fallo interno de la aplicacion."""
+
+
 def now_cl():
     """Devuelve la fecha/hora actual en Chile, siempre timezone-aware."""
     return datetime.now(timezone.utc).astimezone(CL)
@@ -25,15 +29,23 @@ def build_date_range_utc(fecha_inicio=None, fecha_fin=None):
     end_utc = None
 
     if fecha_inicio:
-        d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+        try:
+            d1 = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+        except (TypeError, ValueError) as exc:
+            raise InvalidDateRange("Fecha inicial invalida. Utiliza AAAA-MM-DD.") from exc
         start_cl = datetime.combine(d1, datetime.min.time()).replace(tzinfo=CL)
         start_utc = start_cl.astimezone(timezone.utc)
 
     if fecha_fin:
-        d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+        try:
+            d2 = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+        except (TypeError, ValueError) as exc:
+            raise InvalidDateRange("Fecha final invalida. Utiliza AAAA-MM-DD.") from exc
         end_cl = datetime.combine(d2, datetime.max.time()).replace(tzinfo=CL)
         end_utc = end_cl.astimezone(timezone.utc)
 
+    if start_utc and end_utc and start_utc > end_utc:
+        raise InvalidDateRange("La fecha inicial no puede ser posterior a la final.")
     return start_utc, end_utc
 
 

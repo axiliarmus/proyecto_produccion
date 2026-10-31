@@ -261,7 +261,9 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
     @login_required(["administrador", "soporte", "supervisor"])
     def api_picking_scan():
         try:
-            data = request.json
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict) or not isinstance(data.get("codigo"), str):
+                return {"success": False, "message": "Envia un codigo de pieza valido."}, 400
             codigo = data.get("codigo", "").strip()
 
             if not codigo:
@@ -281,7 +283,13 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
 
             last_prod = None
             if last_prod_active and last_prod_hist:
-                last_prod = last_prod_active if last_prod_active["fecha"] >= last_prod_hist["fecha"] else last_prod_hist
+                active_date = to_cl(last_prod_active.get("fecha"))
+                historic_date = to_cl(last_prod_hist.get("fecha"))
+                last_prod = (
+                    last_prod_active
+                    if active_date and (not historic_date or active_date >= historic_date)
+                    else last_prod_hist
+                )
             elif last_prod_active:
                 last_prod = last_prod_active
             elif last_prod_hist:
@@ -377,16 +385,27 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
     @login_required(["administrador", "soporte", "supervisor"])
     def api_picking_validar():
         try:
-            data = request.json
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict):
+                return {"success": False, "message": "Solicitud de validacion invalida."}, 400
             codigo = data.get("codigo")
             prod_id = data.get("prod_id")
             decision = data.get("decision")
             comentario = data.get("comentario")
             pieza_data = data.get("pieza")
+            if (
+                not isinstance(codigo, (str, int)) or not str(codigo).strip()
+                or decision not in ("aprobado", "rechazado")
+                or not isinstance(pieza_data, dict)
+                or not isinstance(prod_id, str) or not ObjectId.is_valid(prod_id)
+                or comentario is not None and not isinstance(comentario, str)
+            ):
+                return {"success": False, "message": "Codigo, produccion o decision de validacion invalidos."}, 400
 
             if prod_id:
                 res = db.produccion.update_one(
-                    {"_id": ObjectId(prod_id)},
+                    {"_id": ObjectId(prod_id), "modo": "rematador",
+                     "codigo_pieza": {"$in": build_codigo_query_values([codigo])}},
                     {
                         "$set": {
                             "calidad_status": decision,
@@ -396,8 +415,9 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
                     },
                 )
                 if res.matched_count == 0:
-                    db.produccion_historica.update_one(
-                        {"_id": ObjectId(prod_id)},
+                    res = db.produccion_historica.update_one(
+                        {"_id": ObjectId(prod_id), "modo": "rematador",
+                         "codigo_pieza": {"$in": build_codigo_query_values([codigo])}},
                         {
                             "$set": {
                                 "calidad_status": decision,
@@ -406,6 +426,8 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
                             }
                         },
                     )
+                if res.matched_count == 0:
+                    return {"success": False, "message": "Produccion rematada no encontrada para esta pieza."}, 404
 
             existing = db.picking.find_one({"codigo": re.compile(f"^{re.escape(str(codigo))}$", re.IGNORECASE)})
             if existing:
@@ -461,7 +483,11 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
     @login_required(["administrador", "soporte", "supervisor"])
     def api_picking_reset():
         try:
-            payload = request.get_json(silent=True) or {}
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict) or any(
+                not isinstance(payload.get(key, ""), str) for key in ("nombre", "nota")
+            ):
+                return {"success": False, "message": "Nombre y nota deben ser textos validos."}, 400
             nombre_sesion = (payload.get("nombre") or "").strip()
             nota = (payload.get("nota") or "").strip()
 
@@ -542,7 +568,11 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
                 res_ins = db.picking_historial.insert_one(hist_doc)
                 historial_id = str(res_ins.inserted_id)
 
-            db.picking.delete_many({})
+            if registros:
+                snapshot_filter = {"_id": {"$in": [r["_id"] for r in registros]}}
+                db.picking.delete_many(snapshot_filter)
+                if db.picking.count_documents(snapshot_filter):
+                    return {"success": False, "message": "Picking guardado, pero quedaron registros activos. Revisa el historial antes de reintentar."}, 409
             return {"success": True, "saved_to_history": bool(historial_id), "historial_id": historial_id}
         except Exception as exc:
             return {"success": False, "message": str(exc)}, 500

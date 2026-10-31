@@ -78,10 +78,20 @@
 
 {% if registros|length > 0 %}
 <div class="admin-card">
+  <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+    <span class="text-secondary"><span id="selectedProductionCount">0</span> registros seleccionados</span>
+    <button type="button" id="deleteSelectedProduction" class="btn btn-danger" disabled
+            data-bs-toggle="modal" data-bs-target="#deleteProductionModal">
+      <i class='bx bxs-trash'></i> Eliminar seleccionados
+    </button>
+  </div>
+  <div id="bulkProductionResult" class="d-none mb-3" role="status" aria-live="polite"></div>
   <div class="table-responsive">
     <table class="table table-dark table-striped align-middle mb-0">
       <thead>
         <tr class="text-secondary small">
+          <th><input type="checkbox" id="selectAllProduction" class="form-check-input"
+                     aria-label="Seleccionar todos los registros mostrados"></th>
           <th>Fecha</th>
           <th>Modo</th>
           <th>Operador</th>
@@ -99,7 +109,9 @@
       </thead>
       <tbody>
         {% for r in registros %}
-        <tr>
+        <tr data-production-id="{{ r._id }}">
+          <td><input type="checkbox" class="form-check-input production-selection" value="{{ r._id }}"
+                     aria-label="Seleccionar registro {{ r.codigo_pieza }} de {{ r.usuario }}"></td>
           <td>{% if r.fecha %}{{ r.fecha.strftime('%d-%m-%Y %H:%M') }}{% else %}—{% endif %}</td>
           <td>
             {% if r.modo == 'armador' %}
@@ -149,6 +161,24 @@
     </table>
   </div>
 </div>
+<div class="modal fade" id="deleteProductionModal" tabindex="-1" aria-labelledby="deleteProductionTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-light border-secondary shadow">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title" id="deleteProductionTitle">Eliminar registros seleccionados</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p>Vas a eliminar <strong id="confirmProductionCount">0</strong> registros de produccion.</p>
+        <p class="text-secondary mb-0">Se moveran a papelera durante 7 dias. Esta accion no elimina piezas ni planificaciones.</p>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteProduction">Confirmar eliminacion</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% else %}
 <div class="admin-card text-center py-5">
   <div class="mb-3 text-secondary display-6"><i class='bx bx-bar-chart-alt-2'></i></div>
@@ -156,4 +186,96 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const selectAll = document.getElementById('selectAllProduction');
+  if (!selectAll) return;
+  const deleteButton = document.getElementById('deleteSelectedProduction');
+  const confirmButton = document.getElementById('confirmDeleteProduction');
+  const modalElement = document.getElementById('deleteProductionModal');
+  const resultPanel = document.getElementById('bulkProductionResult');
+  let busy = false;
+  let confirmedIds = [];
+  const checkboxes = () => Array.from(document.querySelectorAll('.production-selection'));
+  const selected = () => checkboxes().filter(cb => cb.checked);
+
+  function updateSelection() {
+    const total = checkboxes().length;
+    const count = selected().length;
+    document.getElementById('selectedProductionCount').textContent = count;
+    deleteButton.disabled = busy || count === 0;
+    selectAll.checked = total > 0 && count === total;
+    selectAll.indeterminate = count > 0 && count < total;
+    selectAll.disabled = busy || total === 0;
+    checkboxes().forEach(cb => { cb.disabled = busy; });
+  }
+
+  selectAll.addEventListener('change', () => {
+    checkboxes().forEach(cb => { cb.checked = selectAll.checked; });
+    updateSelection();
+  });
+  checkboxes().forEach(cb => cb.addEventListener('change', updateSelection));
+  modalElement.addEventListener('show.bs.modal', () => {
+    confirmedIds = selected().map(cb => cb.value);
+    document.getElementById('confirmProductionCount').textContent = confirmedIds.length;
+  });
+
+  confirmButton.addEventListener('click', async () => {
+    if (busy || confirmedIds.length === 0) return;
+    busy = true;
+    confirmButton.disabled = true;
+    updateSelection();
+    bootstrap.Modal.getInstance(modalElement).hide();
+    resultPanel.className = 'alert alert-info mb-3';
+    resultPanel.textContent = 'Procesando eliminacion masiva...';
+    try {
+      const response = await fetch({{ url_for('soporte_produccion_eliminar_masivo')|tojson }}, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': {{ csrf_token|tojson }} },
+        body: JSON.stringify({ ids: confirmedIds })
+      });
+      if (!(response.headers.get('content-type') || '').includes('application/json')) {
+        throw new Error('No se pudo verificar el resultado. Recarga la lista y comprueba tu sesion antes de reintentar.');
+      }
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'No se pudo completar la eliminacion.');
+      const deletedIds = new Set(data.deleted_ids || []);
+      document.querySelectorAll('tr[data-production-id]').forEach(row => {
+        if (deletedIds.has(row.dataset.productionId)) row.remove();
+      });
+      resultPanel.className = `alert ${data.success ? 'alert-success' : 'alert-warning'} mb-3`;
+      resultPanel.textContent = data.message;
+      if ((data.problems || []).length) {
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
+        summary.textContent = 'Ver registros con problemas';
+        details.appendChild(summary);
+        const list = document.createElement('ul');
+        data.problems.forEach(problem => {
+          const item = document.createElement('li');
+          item.textContent = `${problem.id}: ${problem.message}`;
+          list.appendChild(item);
+        });
+        details.appendChild(list);
+        resultPanel.appendChild(details);
+      }
+      if ((data.uncertain_ids || []).length) {
+        confirmedIds = [];
+        checkboxes().forEach(cb => { cb.checked = false; });
+      }
+    } catch (error) {
+      resultPanel.className = 'alert alert-danger mb-3';
+      resultPanel.textContent = `${error.message} No vuelvas a enviar el lote sin comprobar el listado actualizado.`;
+    } finally {
+      busy = false;
+      confirmButton.disabled = false;
+      updateSelection();
+    }
+  });
+  updateSelection();
+});
+</script>
 {% endblock %}
