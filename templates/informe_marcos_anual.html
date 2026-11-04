@@ -58,9 +58,28 @@
   </div>
 </div>
 
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-4">
+<div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+  <div class="flex-grow-1" style="max-width: 420px;">
+    <label for="buscarMarco" class="form-label text-secondary small mb-1">Buscar marco</label>
+    <div class="input-group input-group-sm">
+      <span class="input-group-text"><i class='bx bx-search'></i></span>
+      <input type="search" id="buscarMarco" class="form-control" placeholder="Ej: TH1, 3 carriles…" autocomplete="off">
+    </div>
+  </div>
+  <div class="form-check mt-4">
+    <input class="form-check-input" type="checkbox" id="marcoExacto">
+    <label class="form-check-label text-secondary small" for="marcoExacto">Nombre exacto (TH1 no muestra TH10)</label>
+  </div>
+  <div class="form-check mt-4">
+    <input class="form-check-input" type="checkbox" id="soloFaltantes">
+    <label class="form-check-label text-secondary small" for="soloFaltantes">Solo con tramos faltantes</label>
+  </div>
+  <div class="text-secondary small mt-4" id="marcoContador" aria-live="polite"></div>
+</div>
+
+<div class="row row-cols-1 row-cols-md-3 g-4 mb-4" id="marcoCards">
   {% for f in filas %}
-  <div class="col">
+  <div class="col marco-item" data-marco="{{ f.marco }}" data-faltantes="{{ 1 if f.tramos_faltantes else 0 }}">
     <div class="card bg-dark border-light shadow h-100">
       <div class="card-body text-center">
         <h5 class="card-title text-light mb-3">{{ f.marco }}</h5>
@@ -103,6 +122,7 @@
   </div>
   {% endfor %}
 </div>
+<div id="marcoSinResultados" class="alert alert-secondary text-center d-none">Ningún marco coincide con la búsqueda.</div>
 
 <div class="table-responsive">
   <table class="table table-dark table-sm align-middle">
@@ -117,7 +137,7 @@
     </thead>
     <tbody>
       {% for f in filas %}
-      <tr>
+      <tr class="marco-item" data-marco="{{ f.marco }}" data-faltantes="{{ 1 if f.tramos_faltantes else 0 }}">
         <td>{{ f.marco }}</td>
         <td class="text-end">{{ f.ingresado }}</td>
         <td class="text-end">{{ f.producido }}</td>
@@ -141,4 +161,45 @@
 <div class="alert alert-secondary text-center">No hay marcos ingresados ni producidos en {{ anio }}.</div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('buscarMarco');
+  if (!input) return;
+  const exacto = document.getElementById('marcoExacto');
+  const faltantes = document.getElementById('soloFaltantes');
+  const contador = document.getElementById('marcoContador');
+  const vacio = document.getElementById('marcoSinResultados');
+  const cards = Array.from(document.querySelectorAll('#marcoCards .marco-item'));
+  const filas = Array.from(document.querySelectorAll('tr.marco-item'));
+  const norm = s => (s || '').normalize('NFD').replace(/\p{M}/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+  function coincide(el) {
+    const q = norm(input.value);
+    const nombre = norm(el.dataset.marco);
+    if (q && (exacto.checked ? nombre !== q : !nombre.includes(q))) return false;
+    if (faltantes.checked && el.dataset.faltantes !== '1') return false;
+    return true;
+  }
+
+  function aplicar() {
+    let visibles = 0;
+    cards.forEach(el => {
+      const ok = coincide(el);
+      el.classList.toggle('d-none', !ok);
+      if (ok) visibles++;
+    });
+    filas.forEach(el => el.classList.toggle('d-none', !coincide(el)));
+    contador.textContent = `Mostrando ${visibles} de ${cards.length} marcos`;
+    vacio.classList.toggle('d-none', visibles > 0);
+  }
+
+  input.addEventListener('input', aplicar);
+  exacto.addEventListener('change', aplicar);
+  faltantes.addEventListener('change', aplicar);
+  aplicar();
+});
+</script>
 {% endblock %}
