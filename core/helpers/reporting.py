@@ -1,3 +1,4 @@
+from datetime import timezone
 import re
 from bson import ObjectId
 
@@ -497,49 +498,91 @@ def get_marcos_anual_years(db):
     return sorted(years, reverse=True)
 
 
-def build_marcos_anual(db, anio, start_utc, end_utc):
-    """Ingresado (piezas creadas en el anio) y producido (piezas rematadas en el anio) por marco.
+def _a_utc(valor):
+    """Devuelve un datetime aware en UTC (los datetimes naive de Mongo se asumen UTC)."""
+    if valor is None:
+        return None
+    if valor.tzinfo is None:
+        return valor.replace(tzinfo=timezone.utc)
+    return valor.astimezone(timezone.utc)
 
-    Los cortes mensuales copian las piezas activas a piezas_historicas, por lo que una
-    misma pieza puede estar repetida: se deduplica por codigo normalizado.
+
+def _primera_produccion(db, codigos):
+    """Fecha del primer registro de produccion (activa o historica) por codigo canonico."""
+    primeras = {}
+    for chunk_start in range(0, len(codigos), 5000):
+        valores = build_codigo_query_values(codigos[chunk_start:chunk_start + 5000])
+        if not valores:
+            continue
+        pipeline = [
+            {"$match": {"codigo_pieza": {"$in": valores}, "fecha": {"$type": "date"}}},
+            {"$group": {"_id": "$codigo_pieza", "fecha": {"$min": "$fecha"}}},
+        ]
+        for collection in (db.produccion, db.produccion_historica):
+            for row in collection.aggregate(pipeline):
+                canon = _codigo_canonico(row.get("_id"))
+                fecha = _a_utc(row.get("fecha"))
+                if canon is None or fecha is None:
+                    continue
+                if canon not in primeras or fecha < primeras[canon]:
+                    primeras[canon] = fecha
+    return primeras
+
+
+def build_marcos_anual(db, anio, start_utc, end_utc):
+    """Ingresado y producido por marco y tramo para las piezas ingresadas en el anio.
+
+    - Ingresado: piezas cuyo ingreso cae en el anio (created_at; si falta, la fecha de
+      creacion del documento o, en su defecto, el primer registro de produccion).
+    - Producido: de esas mismas piezas, las que tienen registro de remate (en cualquier fecha).
+      Asi el producido nunca supera al ingresado.
+
+    Los cortes mensuales copian las piezas activas a piezas_historicas, por lo que una misma
+    pieza puede estar repetida: se deduplica por codigo normalizado. El marco y el tramo se
+    toman siempre de la pieza.
     """
     rango = {"$gte": start_utc, "$lte": end_utc}
+    filtro = {"$or": [{"created_at": rango}, {"created_at": {"$exists": False}}]}
 
-    ingresadas = {}
-    for collection in (db.piezas, db.piezas_historicas):
-        cursor = collection.find(
-            {"created_at": rango},
-            {"codigo": 1, "marco": 1, "tramo": 1, "_id": 0},
-        )
-        for pieza in cursor:
+    piezas = {}          # canon -> (marco, tramo)
+    sin_created_at = {}  # canon -> (marco, tramo, fecha_por_id | None)
+    vistos = set()
+    for collection, es_activa in ((db.piezas, True), (db.piezas_historicas, False)):
+        for pieza in collection.find(filtro, {"codigo": 1, "marco": 1, "tramo": 1, "created_at": 1}):
             canon = _codigo_canonico(pieza.get("codigo"))
-            if canon is None or canon in ingresadas:
+            if canon is None or canon in vistos:
                 continue
-            ingresadas[canon] = (pieza.get("marco"), pieza.get("tramo"))
-
-    rematadas = {}
-    pipeline = [
-        {"$match": {"modo": "rematador", "fecha": rango}},
-        {"$group": {"_id": "$codigo_pieza", "marco": {"$first": "$marco"}, "tramo": {"$first": "$tramo"}}},
-    ]
-    for collection in (db.produccion, db.produccion_historica):
-        for row in collection.aggregate(pipeline):
-            canon = _codigo_canonico(row.get("_id"))
-            if canon is None:
+            if pieza.get("created_at") is not None:
+                vistos.add(canon)
+                piezas[canon] = (pieza.get("marco"), pieza.get("tramo"))
                 continue
-            actual = rematadas.get(canon)
-            if actual is None or ((not actual[0] or not actual[1]) and row.get("marco") and row.get("tramo")):
-                rematadas[canon] = (row.get("marco"), row.get("tramo"))
+            fecha_id = None
+            if es_activa and pieza.get("_id") is not None and hasattr(pieza["_id"], "generation_time"):
+                fecha_id = _a_utc(pieza["_id"].generation_time)
+            previo = sin_created_at.get(canon)
+            if previo is None or (previo[2] is None and fecha_id is not None):
+                sin_created_at[canon] = (pieza.get("marco"), pieza.get("tramo"), fecha_id)
 
-    # Marco o tramo faltante en produccion: tomarlos de la pieza (activa o historica).
-    incompletas = [codigo for codigo, (marco, tramo) in rematadas.items() if not marco or not tramo]
-    if incompletas:
-        piezas_map = build_piezas_map(db, incompletas)
-        for codigo in incompletas:
-            pieza = piezas_map.get(codigo)
-            if pieza:
-                marco, tramo = rematadas[codigo]
-                rematadas[codigo] = (marco or pieza.get("marco"), tramo or pieza.get("tramo"))
+    # Piezas sin created_at: ubicarlas por la fecha de su documento o su primera produccion.
+    sin_fecha = 0
+    if sin_created_at:
+        pendientes = [c for c, (_, _, f) in sin_created_at.items() if f is None]
+        primeras = _primera_produccion(db, pendientes) if pendientes else {}
+        for canon, (marco, tramo, fecha_id) in sin_created_at.items():
+            if canon in piezas:
+                continue
+            fecha = fecha_id or primeras.get(canon)
+            if fecha is None:
+                sin_fecha += 1
+            elif start_utc <= fecha <= end_utc:
+                piezas[canon] = (marco, tramo)
+
+    # Producido: piezas de esta cohorte con remate registrado.
+    rematadas = set()
+    codigos = list(piezas)
+    for chunk_start in range(0, len(codigos), 5000):
+        _, set_remate = get_piece_status_sets(db, codigos[chunk_start:chunk_start + 5000])
+        rematadas.update(c for c in codigos[chunk_start:chunk_start + 5000] if c in set_remate)
 
     grupos = {}
 
@@ -549,14 +592,16 @@ def build_marcos_anual(db, anio, start_utc, end_utc):
     def bucket(marco, tramo):
         key = _marco_key(marco)
         grupo = grupos.setdefault(key, {"nombres": {}, "tramos": {}})
-        grupo["nombres"][_nombre(marco, "Sin Marco")] = grupo["nombres"].get(_nombre(marco, "Sin Marco"), 0) + 1
+        nombre_marco = _nombre(marco, "Sin Marco")
+        grupo["nombres"][nombre_marco] = grupo["nombres"].get(nombre_marco, 0) + 1
         tramo_nombre = _nombre(tramo, "Sin Tramo")
         return grupo["tramos"].setdefault(tramo_nombre.upper(), {"nombre": tramo_nombre, "ingresado": 0, "producido": 0})
 
-    for marco, tramo in ingresadas.values():
-        bucket(marco, tramo)["ingresado"] += 1
-    for marco, tramo in rematadas.values():
-        bucket(marco, tramo)["producido"] += 1
+    for canon, (marco, tramo) in piezas.items():
+        b = bucket(marco, tramo)
+        b["ingresado"] += 1
+        if canon in rematadas:
+            b["producido"] += 1
 
     def _orden_tramo(nombre):
         partes = re.split(r"(\d+)", nombre)
@@ -598,13 +643,4 @@ def build_marcos_anual(db, anio, start_utc, end_utc):
         "pendiente": total_ingresado - total_producido,
         "avance": round(total_producido * 100.0 / total_ingresado, 1) if total_ingresado else None,
     }
-
-    # Piezas sin created_at: no se pueden ubicar en ningun anio.
-    sin_fecha = set()
-    for collection in (db.piezas, db.piezas_historicas):
-        for pieza in collection.find({"created_at": {"$exists": False}}, {"codigo": 1, "_id": 0}):
-            canon = _codigo_canonico(pieza.get("codigo"))
-            if canon is not None:
-                sin_fecha.add(canon)
-
-    return filas, totales, len(sin_fecha)
+    return filas, totales, sin_fecha

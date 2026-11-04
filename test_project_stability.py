@@ -305,36 +305,45 @@ class ProjectRegressionTests(unittest.TestCase):
         for marker in (b"production-selection", b"selectAllProduction", b"deleteProductionModal"):
             self.assertIn(marker, response.data)
 
-    def test_informe_marcos_anual_agrupa_sin_duplicados(self):
+    def test_informe_marcos_anual_producido_nunca_supera_ingresado(self):
         utc = timezone.utc
 
         def dt(y, m, d):
             return datetime(y, m, d, tzinfo=utc)
 
         db = MagicMock()
-        db.piezas.find.side_effect = lambda q, *a: iter(
-            [{"codigo": "a1", "marco": "TH1", "tramo": "1"}, {"codigo": "a2", "marco": "th1 ", "tramo": "2"}]
-            if "created_at" in q and "$gte" in q["created_at"] else [])
-        db.piezas_historicas.find.side_effect = lambda q, *a: iter(
-            [{"codigo": "a1", "marco": "TH1", "tramo": "1"}, {"codigo": "a4", "marco": "TH1", "tramo": "2"}]
-            if "created_at" in q and "$gte" in q["created_at"] else [])
-        db.produccion.aggregate.return_value = [{"_id": "a1", "marco": "TH1", "tramo": "1"}, {"_id": "a3", "marco": "3 CARRILES", "tramo": "1"}]
-        db.produccion_historica.aggregate.return_value = [{"_id": "a1", "marco": "TH1", "tramo": "1"}]
+        db.piezas.find.return_value = iter([
+            {"codigo": "a1", "marco": "TH1", "tramo": "1", "created_at": dt(2026, 3, 1)},
+            {"codigo": "a2", "marco": "th1 ", "tramo": "2", "created_at": dt(2026, 3, 1)},
+            {"codigo": "a3", "marco": "3 CARRILES", "tramo": "1", "created_at": dt(2026, 4, 1)},
+            # sin created_at: se ubica por la fecha del documento (2025 -> fuera del anio)
+            {"_id": ObjectId.from_datetime(dt(2025, 5, 1)), "codigo": "a5", "marco": "TH1", "tramo": "1"},
+        ])
+        db.piezas_historicas.find.return_value = iter([
+            {"codigo": "a1", "marco": "TH1", "tramo": "1", "created_at": dt(2026, 3, 1)},   # duplicada por corte
+            {"codigo": "a4", "marco": "TH1", "tramo": "2", "created_at": dt(2026, 6, 1)},
+        ])
+        # a9 se remato pero es de otra cohorte (no esta en las piezas del anio)
+        db.produccion.distinct.side_effect = lambda field, flt: ["a1", "a3", "a9"] if flt.get("modo") == "rematador" else []
+        db.produccion_historica.distinct.side_effect = lambda field, flt: ["a1"] if flt.get("modo") == "rematador" else []
 
         filas, totales, sin_fecha = build_marcos_anual(db, 2026, dt(2026, 1, 1), dt(2026, 12, 31))
 
         por_marco = {f["marco"]: f for f in filas}
-        self.assertEqual(por_marco["TH1"]["ingresado"], 3)   # a1 (duplicada), a2, a4
-        self.assertEqual(por_marco["TH1"]["producido"], 1)   # a1 rematada en ambas colecciones
+        self.assertEqual(por_marco["TH1"]["ingresado"], 3)   # a1 (una sola vez), a2, a4; a5 es de 2025
+        self.assertEqual(por_marco["TH1"]["producido"], 1)   # solo a1
         self.assertEqual(por_marco["3 CARRILES"]["producido"], 1)
-        self.assertEqual(totales["ingresado"], 3)
+        self.assertEqual(totales["ingresado"], 4)
         self.assertEqual(totales["producido"], 2)
+        self.assertEqual(sin_fecha, 0)
+        for fila in filas:
+            self.assertLessEqual(fila["producido"], fila["ingresado"])
+            for tramo in fila["tramos"]:
+                self.assertLessEqual(tramo["producido"], tramo["ingresado"])
         tramos = {t["tramo"]: t for t in por_marco["TH1"]["tramos"]}
-        self.assertTrue(tramos["1"]["completo"])          # a1 ingresada y rematada
-        self.assertFalse(tramos["2"]["completo"])         # a2 y a4 sin rematar
+        self.assertTrue(tramos["1"]["completo"])
         self.assertEqual(tramos["2"]["pendiente"], 2)
         self.assertEqual(por_marco["TH1"]["tramos_faltantes"], ["2"])
-        self.assertFalse(por_marco["TH1"]["completo"])
 
     def test_informe_marcos_anual_route_rejects_bad_year(self):
         self.assertEqual(self.client.get("/admin/informes/marcos/anual?anio=abc").status_code, 400)
