@@ -1,9 +1,5 @@
 import hashlib
-import json
-import os
 import re
-import time
-import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from bson import ObjectId
@@ -12,42 +8,6 @@ from pymongo.errors import DuplicateKeyError
 
 from core.helpers.date_utils import CL, build_date_range_utc, now_cl, to_cl
 
-
-# #region debug-point helpers:operator-armado-duplicate
-def _debug_report_operator_armado(hypothesis_id, location, msg, data=None, run_id="post-fix"):
-    try:
-        debug_url = "http://127.0.0.1:7777/event"
-        debug_session_id = "operator-armado-duplicate"
-        env_path = os.path.join(".dbg", "operator-armado-duplicate.env")
-        if os.path.exists(env_path):
-            with open(env_path, encoding="utf-8") as env_file:
-                for raw_line in env_file:
-                    line = raw_line.strip()
-                    if line.startswith("DEBUG_SERVER_URL="):
-                        debug_url = line.split("=", 1)[1] or debug_url
-                    elif line.startswith("DEBUG_SESSION_ID="):
-                        debug_session_id = line.split("=", 1)[1] or debug_session_id
-
-        payload = {
-            "sessionId": debug_session_id,
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "msg": f"[DEBUG] {msg}",
-            "data": data or {},
-            "ts": int(time.time() * 1000),
-        }
-        request_obj = urllib.request.Request(
-            debug_url,
-            data=json.dumps(payload, default=str).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-        )
-        urllib.request.urlopen(request_obj, timeout=1).read()
-    except Exception:
-        pass
-
-
-# #endregion
 
 
 def _build_submission_guard_id(user_id, modo, box, codigo_pieza, cuerda_interna_raw, cuerda_externa_raw, flecha_raw):
@@ -453,21 +413,6 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
         cuerda_externa_raw = request.form.get("cuerda_externa")
         flecha_raw = request.form.get("flecha")
         # #region debug-point A:request-entry
-        _debug_report_operator_armado(
-            "A",
-            "core/routes/operator_routes.py:operador_registrar",
-            "Entrada a operador_registrar",
-            {
-                "user_id": user_id,
-                "usuario": usuario,
-                "modo": modo,
-                "box": box,
-                "codigo_pieza": codigo_pieza,
-                "cuerda_interna_raw": cuerda_interna_raw,
-                "cuerda_externa_raw": cuerda_externa_raw,
-                "flecha_raw": flecha_raw,
-            },
-        )
         # #endregion
         submission_guard_id = _build_submission_guard_id(
             user_id,
@@ -733,22 +678,6 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             + db.produccion_historica.count_documents({**filtro_prod_hist, "modo": "rematador"})
         )
         # #region debug-point B:counts
-        _debug_report_operator_armado(
-            "B",
-            "core/routes/operator_routes.py:count_documents",
-            "Conteos previos al registro",
-            {
-                "codigo_pieza": codigo_pieza,
-                "modo": modo,
-                "es_historico": es_historico,
-                "corte_id_historico": str(corte_id_historico or ""),
-                "collection": "produccion_historica" if es_historico else "produccion",
-                "filtro_base": filtro_prod_activa,
-                "armado_count": armado_count,
-                "remate_count": remate_count,
-                "pieza_codigo": str(pieza_data.get("codigo")),
-            },
-        )
         # #endregion
 
         if modo == "armador":
@@ -763,12 +692,6 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
 
             if armado_count + unidades_registro > 2:
                 # #region debug-point A:blocked-by-armado-count
-                _debug_report_operator_armado(
-                    "A",
-                    "core/routes/operator_routes.py:armado_limit",
-                    "Bloqueo por limite de armados",
-                    {"codigo_pieza": codigo_pieza, "armado_count": armado_count, "remate_count": remate_count},
-                )
                 # #endregion
                 release_submission_guard()
                 flash(f"❌ La pieza {codigo_pieza} ya fue armada 2 veces", "danger")
@@ -823,12 +746,6 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
         if modo == "rematador":
             if remate_count >= 1:
                 # #region debug-point E:blocked-by-remate-count
-                _debug_report_operator_armado(
-                    "E",
-                    "core/routes/operator_routes.py:remate_limit",
-                    "Bloqueo por pieza ya rematada",
-                    {"codigo_pieza": codigo_pieza, "armado_count": armado_count, "remate_count": remate_count},
-                )
                 # #endregion
                 release_submission_guard()
                 flash(f"❌ La pieza {codigo_pieza} ya fue rematada", "danger")
@@ -986,17 +903,6 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
         release_submission_guard()
 
         # #region debug-point D:insert-success
-        _debug_report_operator_armado(
-            "D",
-            "core/routes/operator_routes.py:insert",
-            "Registro insertado correctamente",
-            {
-                "codigo_pieza": codigo_pieza,
-                "modo": modo,
-                "es_historico": es_historico,
-                "registro_fecha": registro.get("fecha"),
-            },
-        )
         # #endregion
 
         return redirect(url_for("operador_home"))

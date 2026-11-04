@@ -1,9 +1,10 @@
+import re
 from datetime import datetime, timedelta, timezone
 
-from flask import render_template, session
+from flask import abort, render_template, request, session
 
-from core.helpers.date_utils import CL, now_cl
-from core.helpers.reporting import merge_status_maps
+from core.helpers.date_utils import CL, build_date_range_utc, now_cl
+from core.helpers.reporting import build_marcos_anual, get_marcos_anual_years, merge_status_maps
 
 
 def _get_ciclo_actual(db):
@@ -11,7 +12,7 @@ def _get_ciclo_actual(db):
     return str(conf.get("value") or "a")
 
 
-def register_admin_informes_routes(app, db, login_required, get_production_status_map, build_tarjetas_grupos):
+def register_admin_informes_routes(app, db, login_required, get_production_status_map, build_tarjetas_grupos, send_excel_file=None):
     """Registra rutas aisladas del menú e informes resumidos."""
 
     @app.route("/admin/informes")
@@ -23,8 +24,8 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
     @login_required(["administrador", "supervisor", "soporte", "cliente"])
     def informe_piezas_tarjetas():
         ciclo = _get_ciclo_actual(db)
-        filtro_ciclo_piezas = {"codigo": {"$regex": f"^{ciclo}"}}
-        filtro_ciclo_produccion = {"codigo_pieza": {"$regex": f"^{ciclo}"}}
+        filtro_ciclo_piezas = {"codigo": {"$regex": f"^{re.escape(ciclo)}"}}
+        filtro_ciclo_produccion = {"codigo_pieza": {"$regex": f"^{re.escape(ciclo)}"}}
 
         production_status_map = merge_status_maps(
             get_production_status_map(db, db.produccion_historica, filtro_ciclo_produccion),
@@ -33,6 +34,65 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
         piezas = list(db.piezas.find(filtro_ciclo_piezas, {"codigo": 1, "empresa": 1, "marco": 1, "tramo": 1, "_id": 0}))
         grupos = build_tarjetas_grupos(piezas, production_status_map, include_orphans=True)
         return render_template("informe_piezas_tarjetas.html", grupos=grupos)
+
+    def _resolve_anio_marcos():
+        raw = (request.values.get("anio") or "").strip()
+        anio_actual = now_cl().year
+        if not raw:
+            return anio_actual
+        try:
+            anio = int(raw)
+        except ValueError:
+            abort(400)
+        if anio < 2000 or anio > anio_actual + 1:
+            abort(400)
+        return anio
+
+    def _datos_marcos_anual(anio):
+        start_utc, end_utc = build_date_range_utc(f"{anio}-01-01", f"{anio}-12-31")
+        return build_marcos_anual(db, anio, start_utc, end_utc)
+
+    @app.route("/admin/informes/marcos/anual", methods=["GET"])
+    @login_required(["administrador", "supervisor", "soporte", "cliente"])
+    def informe_marcos_anual():
+        anio = _resolve_anio_marcos()
+        filas, totales, sin_fecha = _datos_marcos_anual(anio)
+        anios = sorted(set(get_marcos_anual_years(db)) | {anio}, reverse=True)
+        return render_template(
+            "informe_marcos_anual.html",
+            anio=anio,
+            anios=anios,
+            filas=filas,
+            totales=totales,
+            sin_fecha=sin_fecha,
+            puede_exportar=send_excel_file is not None,
+        )
+
+    @app.route("/admin/informes/marcos/anual/export", methods=["GET"])
+    @login_required(["administrador", "supervisor", "soporte", "cliente"])
+    def informe_marcos_anual_export():
+        if send_excel_file is None:
+            abort(404)
+        anio = _resolve_anio_marcos()
+        filas, totales, _ = _datos_marcos_anual(anio)
+        data = [
+            {
+                "Marco": fila["marco"],
+                "Ingresado": fila["ingresado"],
+                "Producido (rematadas)": fila["producido"],
+                "Pendiente": fila["pendiente"],
+                "Avance %": fila["avance"] if fila["avance"] is not None else "",
+            }
+            for fila in filas
+        ]
+        data.append({
+            "Marco": "TOTAL",
+            "Ingresado": totales["ingresado"],
+            "Producido (rematadas)": totales["producido"],
+            "Pendiente": totales["pendiente"],
+            "Avance %": totales["avance"] if totales["avance"] is not None else "",
+        })
+        return send_excel_file(data, f"Marcos {anio}", f"informe_marcos_{anio}.xlsx")
 
     @app.route("/admin/informes/resumen-produccion", methods=["GET"])
     @login_required(["administrador", "cliente", "soporte"])

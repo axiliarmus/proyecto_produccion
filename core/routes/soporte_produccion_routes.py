@@ -12,6 +12,20 @@ from core.helpers.soft_delete import soft_delete_one, soft_delete_selected_produ
 def register_soporte_produccion_routes(app, db, login_required):
     """Registra rutas de soporte para gestión de producción activa."""
 
+    def _resolve_origen(raw):
+        """Devuelve (coleccion, corte_id|None, ubicacion) segun el selector de ubicacion.
+
+        "" / "activa" -> produccion activa; "cualquiera" -> todos los cortes; ObjectId -> ese corte.
+        """
+        raw = (raw or "").strip()
+        if not raw or raw == "activa":
+            return db.produccion, None, "activa"
+        if raw == "cualquiera":
+            return db.produccion_historica, None, "cualquiera"
+        if ObjectId.is_valid(raw):
+            return db.produccion_historica, ObjectId(raw), raw
+        return db.produccion, None, "activa"
+
     def _build_filtro_from_form():
         codigo = (request.form.get("codigo_pieza") or "").strip()
         operador_sel = request.form.get("operador")
@@ -38,6 +52,7 @@ def register_soporte_produccion_routes(app, db, login_required):
         fecha_inicio = None
         fecha_fin = None
         filtro = {}
+        ubicacion = request.args.get("ubicacion")
 
         if request.method == "POST":
             try:
@@ -45,10 +60,19 @@ def register_soporte_produccion_routes(app, db, login_required):
             except ValueError:
                 flash("Fechas invalidas. Utiliza el formato AAAA-MM-DD.", "warning")
                 return redirect(url_for("soporte_produccion_list"))
+            ubicacion = request.form.get("ubicacion")
 
-        registros = list(db.produccion.find(filtro).sort("fecha", -1))
-        operadores = db.produccion.distinct("usuario")
+        coleccion, corte_oid, ubicacion = _resolve_origen(ubicacion)
+        archived = coleccion is db.produccion_historica
+        if corte_oid is not None:
+            filtro["corte_id"] = corte_oid
+
+        registros = list(coleccion.find(filtro).sort("fecha", -1))
+        operadores = coleccion.distinct("usuario")
         cortes = list(db.cortes.find().sort("creado_en", -1))
+        cortes_nombre = {c["_id"]: c.get("nombre", "") for c in cortes}
+        for registro in registros:
+            registro["corte_nombre"] = cortes_nombre.get(registro.get("corte_id"), "") if archived else ""
 
         for registro in registros:
             if registro.get("fecha"):
@@ -63,6 +87,9 @@ def register_soporte_produccion_routes(app, db, login_required):
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
             cortes=cortes,
+            ubicacion=ubicacion,
+            archived=archived,
+            origen="historica" if archived else "activa",
         )
 
     @app.route("/soporte/produccion/asignar-corte-masivo", methods=["POST"])
@@ -168,16 +195,55 @@ def register_soporte_produccion_routes(app, db, login_required):
     @app.route("/soporte/produccion/<id>/editar")
     @login_required("soporte")
     def soporte_produccion_editar_form(id):
-        reg = db.produccion.find_one({"_id": ObjectId(id)})
+        origen = "historica" if request.args.get("origen") == "historica" else "activa"
+        if not ObjectId.is_valid(id):
+            flash("Identificador de produccion invalido.", "warning")
+            return redirect(url_for("soporte_produccion_list"))
+        coleccion = db.produccion_historica if origen == "historica" else db.produccion
+        reg = coleccion.find_one({"_id": ObjectId(id)})
         if not reg:
             flash("Registro no encontrado", "warning")
             return redirect(url_for("soporte_produccion_list"))
         cortes = list(db.cortes.find().sort("creado_en", -1))
-        return render_template("produccion_form.html", modo="editar", reg=reg, cortes=cortes)
+        return render_template("produccion_form.html", modo="editar", reg=reg, cortes=cortes, origen=origen)
+
+    def _guardar_historica(id, update):
+        """Guarda un registro de un corte; permite cambiarlo de corte o devolverlo a produccion activa."""
+        oid = ObjectId(id)
+        reg = db.produccion_historica.find_one({"_id": oid})
+        if not reg:
+            flash("Registro no encontrado", "warning")
+            return redirect(url_for("soporte_produccion_list"))
+
+        destino = (request.form.get("corte_destino") or "").strip()
+        ubicacion_actual = str(reg.get("corte_id") or "cualquiera")
+        if destino and destino != "activa" and ObjectId.is_valid(destino):
+            corte = db.cortes.find_one({"_id": ObjectId(destino)})
+            if not corte:
+                flash("El corte seleccionado no existe.", "danger")
+                return redirect(url_for("soporte_produccion_list", ubicacion=ubicacion_actual))
+            db.produccion_historica.update_one({"_id": oid}, {"$set": {**update, "corte_id": corte["_id"]}})
+            flash(f'Registro actualizado en el corte: {corte.get("nombre", "")} ✔', "success")
+            return redirect(url_for("soporte_produccion_list", ubicacion=str(corte["_id"])))
+
+        if destino == "activa":
+            nuevo = {**{k: v for k, v in reg.items() if k not in ("_id", "corte_id")}, **update}
+            db.produccion.insert_one(nuevo)
+            db.produccion_historica.delete_one({"_id": oid})
+            flash("Registro devuelto a la producción activa (sin corte) ✔", "success")
+            return redirect(url_for("soporte_produccion_list"))
+
+        db.produccion_historica.update_one({"_id": oid}, {"$set": update})
+        flash("Registro actualizado ✔", "success")
+        return redirect(url_for("soporte_produccion_list", ubicacion=ubicacion_actual))
 
     @app.route("/soporte/produccion/<id>/editar", methods=["POST"])
     @login_required("soporte")
     def soporte_produccion_editar_post(id):
+        origen = "historica" if request.form.get("origen") == "historica" else "activa"
+        if not ObjectId.is_valid(id):
+            flash("Identificador de produccion invalido.", "warning")
+            return redirect(url_for("soporte_produccion_list"))
         empresa = request.form.get("empresa", "").strip()
         marco = request.form.get("marco", "").strip()
         tramo = request.form.get("tramo", "").strip()
@@ -212,6 +278,9 @@ def register_soporte_produccion_routes(app, db, login_required):
         }
         if fecha_dt:
             update["fecha"] = fecha_dt
+
+        if origen == "historica":
+            return _guardar_historica(id, update)
 
         db.produccion.update_one({"_id": ObjectId(id)}, {"$set": update})
 
@@ -273,16 +342,18 @@ def register_soporte_produccion_routes(app, db, login_required):
         if any(not isinstance(uid, str) for uid in ids):
             return {"success": False, "message": "La lista de identificadores no es valida.", "deleted_ids": []}, 400
 
+        origen = "historica" if payload.get("origen") == "historica" else "activa"
         ids = list(dict.fromkeys(ids))
         invalid_ids = [uid for uid in ids if not ObjectId.is_valid(uid)]
         object_ids = list({ObjectId(uid) for uid in ids if ObjectId.is_valid(uid)})
         result = soft_delete_selected_production(
             db,
             object_ids,
+            collection="produccion_historica" if origen == "historica" else "produccion",
             deleted_by_user_id=session.get("user_id"),
             deleted_by_user_name=session.get("nombre"),
             deleted_by_ip=request.remote_addr,
-            motivo="soporte eliminacion masiva de produccion",
+            motivo="soporte eliminacion masiva de produccion" + (" (corte)" if origen == "historica" else ""),
         )
         result["problems"].extend({"id": uid, "message": "Identificador invalido."} for uid in invalid_ids)
         deleted_count = len(result["deleted_ids"])
@@ -304,14 +375,16 @@ def register_soporte_produccion_routes(app, db, login_required):
         if not ObjectId.is_valid(id):
             flash("Identificador de produccion invalido.", "warning")
             return redirect(url_for("soporte_produccion_list"))
+        origen = "historica" if request.form.get("origen") == "historica" else "activa"
+        ubicacion = (request.form.get("ubicacion") or "activa") if origen == "historica" else "activa"
         ok, msg = soft_delete_one(
             db,
-            collection_origen="produccion",
+            collection_origen="produccion_historica" if origen == "historica" else "produccion",
             filtro_doc={"_id": ObjectId(id)},
             deleted_by_user_id=session.get("user_id"),
             deleted_by_user_name=session.get("nombre"),
             deleted_by_ip=request.remote_addr,
-            motivo="soporte botón eliminar registro producción",
+            motivo="soporte botón eliminar registro producción" + (" (corte)" if origen == "historica" else ""),
         )
         flash(msg, "success" if ok else "danger")
-        return redirect(url_for("soporte_produccion_list"))
+        return redirect(url_for("soporte_produccion_list", ubicacion=ubicacion))

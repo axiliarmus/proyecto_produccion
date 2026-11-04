@@ -14,8 +14,8 @@ from pymongo.errors import BulkWriteError, OperationFailure
 
 from core.helpers.auth import authenticate_user
 from core.helpers.date_utils import InvalidDateRange, build_date_range_utc
-from core.helpers.reporting import build_tarjetas_grupos
-from core.helpers.soft_delete import soft_delete_many
+from core.helpers.reporting import build_marcos_anual, build_tarjetas_grupos
+from core.helpers.soft_delete import soft_delete_many, soft_delete_selected_production
 from core.routes.registry import register_all_routes
 
 
@@ -304,6 +304,75 @@ class ProjectRegressionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         for marker in (b"production-selection", b"selectAllProduction", b"deleteProductionModal"):
             self.assertIn(marker, response.data)
+
+    def test_informe_marcos_anual_agrupa_sin_duplicados(self):
+        utc = timezone.utc
+
+        def dt(y, m, d):
+            return datetime(y, m, d, tzinfo=utc)
+
+        db = MagicMock()
+        db.piezas.find.side_effect = lambda q, *a: iter(
+            [{"codigo": "a1", "marco": "TH1"}, {"codigo": "a2", "marco": "th1 "}]
+            if "created_at" in q and "$gte" in q["created_at"] else [])
+        db.piezas_historicas.find.side_effect = lambda q, *a: iter(
+            [{"codigo": "a1", "marco": "TH1"}, {"codigo": "a4", "marco": "TH1"}]
+            if "created_at" in q and "$gte" in q["created_at"] else [])
+        db.produccion.aggregate.return_value = [{"_id": "a1", "marco": "TH1"}, {"_id": "a3", "marco": "3 CARRILES"}]
+        db.produccion_historica.aggregate.return_value = [{"_id": "a1", "marco": "TH1"}]
+
+        filas, totales, sin_fecha = build_marcos_anual(db, 2026, dt(2026, 1, 1), dt(2026, 12, 31))
+
+        por_marco = {f["marco"]: f for f in filas}
+        self.assertEqual(por_marco["TH1"]["ingresado"], 3)   # a1 (duplicada), a2, a4
+        self.assertEqual(por_marco["TH1"]["producido"], 1)   # a1 rematada en ambas colecciones
+        self.assertEqual(por_marco["3 CARRILES"]["producido"], 1)
+        self.assertEqual(totales["ingresado"], 3)
+        self.assertEqual(totales["producido"], 2)
+
+    def test_informe_marcos_anual_route_rejects_bad_year(self):
+        self.assertEqual(self.client.get("/admin/informes/marcos/anual?anio=abc").status_code, 400)
+        self.assertEqual(self.client.get("/admin/informes/marcos/anual/export?anio=1500").status_code, 400)
+
+    def test_produccion_archivada_lista_borra_y_vuelve_a_activa(self):
+        corte_id = ObjectId()
+        reg_id = ObjectId()
+        reg = {"_id": reg_id, "corte_id": corte_id, "codigo_pieza": "a1", "modo": "rematador",
+               "usuario": "op", "fecha": datetime(2026, 1, 5, tzinfo=timezone.utc)}
+        self.db.cortes.find.return_value.sort.return_value = [{"_id": corte_id, "nombre": "Enero",
+                                                                 "inicio": datetime(2026, 1, 1), "fin": datetime(2026, 2, 1)}]
+        self.db.produccion_historica.find.return_value.sort.return_value = [dict(reg)]
+        self.db.produccion_historica.distinct.return_value = ["op"]
+
+        response = self.client.get(f"/soporte/produccion?ubicacion={corte_id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Enero", response.data)
+        self.db.produccion_historica.find.assert_called_with({"corte_id": corte_id})
+        self.db.produccion.find.assert_not_called()
+
+        # Borrado masivo apunta a la coleccion historica
+        with patch("core.routes.soporte_produccion_routes.soft_delete_selected_production",
+                   return_value={"deleted_ids": [str(reg_id)], "problems": [], "uncertain_ids": []}) as bulk:
+            response = self.client.post("/soporte/produccion/eliminar-masivo",
+                                        json={"ids": [str(reg_id)], "origen": "historica"},
+                                        headers={"X-CSRFToken": "token"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(bulk.call_args.kwargs["collection"], "produccion_historica")
+
+        # Editar un registro archivado y devolverlo a produccion activa
+        self.db.produccion_historica.find_one.return_value = dict(reg)
+        response = self.post(f"/soporte/produccion/{reg_id}/editar",
+                             data={"origen": "historica", "corte_destino": "activa", "modo": "rematador",
+                                   "usuario": "op", "codigo_pieza": "a1"})
+        self.assertEqual(response.status_code, 302)
+        insertado = self.db.produccion.insert_one.call_args.args[0]
+        self.assertNotIn("corte_id", insertado)
+        self.assertNotIn("_id", insertado)
+        self.db.produccion_historica.delete_one.assert_called_once_with({"_id": reg_id})
+
+    def test_soft_delete_produccion_rechaza_coleccion_no_permitida(self):
+        with self.assertRaises(ValueError):
+            soft_delete_selected_production(MagicMock(), [ObjectId()], collection="usuarios")
 
 
 if __name__ == "__main__":

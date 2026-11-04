@@ -76,7 +76,7 @@
                                     <td>{{ pieza.kilo_pieza }} kg</td>
                                     <td class="text-end">
                                         <div class="d-flex gap-2 justify-content-end">
-                                            <a href="{{ url_for('piezas_editar', id=pieza._id) }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                            <a href="{{ url_for('piezas_editar_form', id=pieza._id) }}" class="btn btn-sm btn-outline-primary" target="_blank">
                                                 <i class='bx bx-edit-alt'></i> Editar
                                             </a>
                                             <form method="POST" action="{{ url_for('soporte_eliminar_duplicado', id_pieza=pieza._id) }}" onsubmit="return confirm('¿Estás seguro de ELIMINAR esta copia? Se moverá a Papelera por 7 días.');">

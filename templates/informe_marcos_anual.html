@@ -1,0 +1,117 @@
+{% extends 'admin_layout.html' %}
+
+{% block title %}Marcos del Año {{ anio }}{% endblock %}
+{% block header_title %}Marcos del Año {{ anio }}{% endblock %}
+{% block header_subtitle %}Ingresado y producido en el año, agrupado por marco{% endblock %}
+
+{% block content %}
+
+<form method="get" class="d-flex flex-wrap align-items-end gap-3 mb-4">
+  <div>
+    <label for="anio" class="form-label text-secondary small mb-1">Año</label>
+    <select name="anio" id="anio" class="form-select form-select-sm" onchange="this.form.submit()">
+      {% for a in anios %}
+      <option value="{{ a }}" {% if a == anio %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <noscript><button type="submit" class="btn btn-sm btn-outline-light">Ver</button></noscript>
+  {% if puede_exportar and filas %}
+  <a href="{{ url_for('informe_marcos_anual_export', anio=anio) }}" class="btn btn-sm btn-success">
+    <i class='bx bxs-file-export'></i> Exportar Excel
+  </a>
+  {% endif %}
+</form>
+
+<p class="text-secondary small">
+  <strong>Ingresado</strong>: piezas creadas en {{ anio }}.
+  <strong>Producido</strong>: piezas rematadas en {{ anio }}.
+  Pendiente = Ingresado − Producido (puede ser negativo si se remataron piezas ingresadas en años anteriores).
+</p>
+
+{% if sin_fecha %}
+<div class="alert alert-warning small">
+  Hay {{ sin_fecha }} pieza(s) sin fecha de creación; no se pueden contar como ingresadas en ningún año.
+</div>
+{% endif %}
+
+{% if filas %}
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card bg-dark border-light text-center"><div class="card-body">
+      <div class="text-secondary small">Total ingresado</div>
+      <div class="fs-3 text-light">{{ totales.ingresado }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card bg-dark border-light text-center"><div class="card-body">
+      <div class="text-secondary small">Total producido</div>
+      <div class="fs-3 text-success">{{ totales.producido }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card bg-dark border-light text-center"><div class="card-body">
+      <div class="text-secondary small">Avance</div>
+      <div class="fs-3 text-warning">{% if totales.avance is not none %}{{ totales.avance }}%{% else %}—{% endif %}</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row row-cols-1 row-cols-md-3 g-4 mb-4">
+  {% for f in filas %}
+  <div class="col">
+    <div class="card bg-dark border-light shadow h-100">
+      <div class="card-body text-center">
+        <h5 class="card-title text-light mb-3">{{ f.marco }}</h5>
+        <div class="d-flex justify-content-around">
+          <div><div class="text-secondary small">Ingresado</div><div class="fs-4 text-light">{{ f.ingresado }}</div></div>
+          <div><div class="text-secondary small">Producido</div><div class="fs-4 text-success">{{ f.producido }}</div></div>
+          <div><div class="text-secondary small">Pendiente</div><div class="fs-4 {% if f.pendiente > 0 %}text-warning{% else %}text-light{% endif %}">{{ f.pendiente }}</div></div>
+        </div>
+        {% if f.avance is not none %}
+        <div class="small text-secondary mt-2">Avance: {{ f.avance }}%</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="table-responsive">
+  <table class="table table-dark table-sm align-middle">
+    <thead>
+      <tr class="text-secondary small">
+        <th>Marco</th>
+        <th class="text-end">Ingresado</th>
+        <th class="text-end">Producido</th>
+        <th class="text-end">Pendiente</th>
+        <th class="text-end">Avance</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td>{{ f.marco }}</td>
+        <td class="text-end">{{ f.ingresado }}</td>
+        <td class="text-end">{{ f.producido }}</td>
+        <td class="text-end">{{ f.pendiente }}</td>
+        <td class="text-end">{% if f.avance is not none %}{{ f.avance }}%{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="fw-bold">
+        <td>TOTAL</td>
+        <td class="text-end">{{ totales.ingresado }}</td>
+        <td class="text-end">{{ totales.producido }}</td>
+        <td class="text-end">{{ totales.pendiente }}</td>
+        <td class="text-end">{% if totales.avance is not none %}{{ totales.avance }}%{% else %}—{% endif %}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{% else %}
+<div class="alert alert-secondary text-center">No hay marcos ingresados ni producidos en {{ anio }}.</div>
+{% endif %}
+
+{% endblock %}

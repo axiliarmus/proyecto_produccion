@@ -19,6 +19,7 @@ COLLECTION_PAPELERA = "papelera"
 NOMBRE_AMIGABLE = {
     "piezas": "Pieza Maestra",
     "produccion": "Registro de Producción",
+    "produccion_historica": "Registro de Producción (Corte)",
     "usuarios": "Usuario",
     "boxes": "Box / Caja",
     "cortes": "Corte Mensual",
@@ -201,9 +202,14 @@ def soft_delete_many(
     return delete_result.deleted_count, f"✅ {delete_result.deleted_count} {tipo}(s) movidos a papelera. Permanencia {DAYS_RETAIN} días."
 
 
-def soft_delete_selected_production(db, object_ids, **audit):
-    """Borra un lote protegido por copias en papelera y devuelve resultados por ID."""
-    origin = db["produccion"]
+def soft_delete_selected_production(db, object_ids, collection="produccion", **audit):
+    """Borra un lote protegido por copias en papelera y devuelve resultados por ID.
+
+    `collection` puede ser "produccion" (activa) o "produccion_historica" (registros de un corte).
+    """
+    if collection not in ("produccion", "produccion_historica"):
+        raise ValueError("Coleccion de produccion no permitida")
+    origin = db[collection]
     recycle_bin = db[COLLECTION_PAPELERA]
     result = {"deleted_ids": [], "problems": [], "uncertain_ids": []}
 
@@ -217,13 +223,13 @@ def soft_delete_selected_production(db, object_ids, **audit):
         return result
 
     found_ids = {doc["_id"] for doc in docs}
-    problem([uid for uid in object_ids if uid not in found_ids], "Registro no encontrado en produccion activa.")
+    problem([uid for uid in object_ids if uid not in found_ids], "Registro no encontrado en " + ("produccion activa." if collection == "produccion" else "el corte."))
     if not docs:
         return result
 
     backups = []
     for doc in docs:
-        backup = _build_papelera_doc("produccion", doc, **audit)
+        backup = _build_papelera_doc(collection, doc, **audit)
         backup["_id"] = ObjectId()
         backups.append(backup)
 

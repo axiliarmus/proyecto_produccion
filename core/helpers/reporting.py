@@ -463,3 +463,124 @@ def build_tarjetas_grupos(piezas, production_status_map, include_orphans=False):
         grupos.append(grupo)
 
     return sorted(grupos, key=lambda item: str(item["cliente"]))
+
+
+def _marco_key(marco):
+    """Normaliza el nombre de un marco para agrupar variantes (mayusculas/espacios)."""
+    texto = " ".join(str(marco or "").split())
+    return texto.upper() if texto else "SIN MARCO"
+
+
+def _codigo_canonico(codigo):
+    keys = build_codigo_lookup_keys(codigo)
+    return min(keys, key=lambda key: (len(key), key)) if keys else None
+
+
+def get_marcos_anual_years(db):
+    """Anios con ingresos (created_at) o produccion (fecha) en cualquier coleccion."""
+    years = set()
+    sources = (
+        (db.piezas, "created_at"),
+        (db.piezas_historicas, "created_at"),
+        (db.produccion, "fecha"),
+        (db.produccion_historica, "fecha"),
+    )
+    for collection, field in sources:
+        pipeline = [
+            {"$match": {field: {"$type": "date"}}},
+            {"$group": {"_id": {"$year": {"date": f"${field}", "timezone": "America/Santiago"}}}},
+        ]
+        for row in collection.aggregate(pipeline):
+            if row.get("_id"):
+                years.add(int(row["_id"]))
+    return sorted(years, reverse=True)
+
+
+def build_marcos_anual(db, anio, start_utc, end_utc):
+    """Ingresado (piezas creadas en el anio) y producido (piezas rematadas en el anio) por marco.
+
+    Los cortes mensuales copian las piezas activas a piezas_historicas, por lo que una
+    misma pieza puede estar repetida: se deduplica por codigo normalizado.
+    """
+    rango = {"$gte": start_utc, "$lte": end_utc}
+
+    ingresadas = {}
+    for collection in (db.piezas, db.piezas_historicas):
+        cursor = collection.find(
+            {"created_at": rango},
+            {"codigo": 1, "marco": 1, "_id": 0},
+        )
+        for pieza in cursor:
+            canon = _codigo_canonico(pieza.get("codigo"))
+            if canon is None or canon in ingresadas:
+                continue
+            ingresadas[canon] = pieza.get("marco")
+
+    rematadas = {}
+    pipeline = [
+        {"$match": {"modo": "rematador", "fecha": rango}},
+        {"$group": {"_id": "$codigo_pieza", "marco": {"$first": "$marco"}}},
+    ]
+    for collection in (db.produccion, db.produccion_historica):
+        for row in collection.aggregate(pipeline):
+            canon = _codigo_canonico(row.get("_id"))
+            if canon is None:
+                continue
+            if canon not in rematadas or (not rematadas[canon] and row.get("marco")):
+                rematadas[canon] = row.get("marco")
+
+    # Marco faltante en produccion: tomarlo de la pieza (activa o historica).
+    sin_marco = [codigo for codigo, marco in rematadas.items() if not marco]
+    if sin_marco:
+        piezas_map = build_piezas_map(db, sin_marco)
+        for codigo in sin_marco:
+            pieza = piezas_map.get(codigo)
+            if pieza and pieza.get("marco"):
+                rematadas[codigo] = pieza["marco"]
+
+    grupos = {}
+
+    def bucket(marco):
+        key = _marco_key(marco)
+        grupo = grupos.setdefault(key, {"nombres": {}, "ingresado": 0, "producido": 0})
+        nombre = " ".join(str(marco or "").split()) or "Sin Marco"
+        grupo["nombres"][nombre] = grupo["nombres"].get(nombre, 0) + 1
+        return grupo
+
+    for marco in ingresadas.values():
+        bucket(marco)["ingresado"] += 1
+    for marco in rematadas.values():
+        bucket(marco)["producido"] += 1
+
+    filas = []
+    for key, grupo in grupos.items():
+        nombre = max(grupo["nombres"].items(), key=lambda item: (item[1], item[0]))[0]
+        ingresado = grupo["ingresado"]
+        producido = grupo["producido"]
+        filas.append({
+            "marco": nombre,
+            "ingresado": ingresado,
+            "producido": producido,
+            "pendiente": ingresado - producido,
+            "avance": round(producido * 100.0 / ingresado, 1) if ingresado else None,
+        })
+    filas.sort(key=lambda fila: fila["marco"].upper())
+
+    total_ingresado = sum(f["ingresado"] for f in filas)
+    total_producido = sum(f["producido"] for f in filas)
+    totales = {
+        "ingresado": total_ingresado,
+        "producido": total_producido,
+        "pendiente": total_ingresado - total_producido,
+        "avance": round(total_producido * 100.0 / total_ingresado, 1) if total_ingresado else None,
+    }
+
+    # Piezas sin created_at: no se pueden ubicar en ningun anio.
+    sin_fecha = set()
+    for collection in (db.piezas, db.piezas_historicas):
+        for pieza in collection.find({"created_at": {"$exists": False}}, {"codigo": 1, "_id": 0}):
+            canon = _codigo_canonico(pieza.get("codigo"))
+            if canon is not None:
+                sin_fecha.add(canon)
+
+    return filas, totales, len(sin_fecha)

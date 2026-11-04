@@ -157,6 +157,7 @@
 {% endif %}
 
 <script>
+function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 const selEmpresa = document.getElementById('empresa');
 const selMarco = document.getElementById('marco');
 const selTramo = document.getElementById('tramo');
@@ -164,7 +165,7 @@ const selTramo = document.getElementById('tramo');
 function setOptions(selectEl, values) {
   const prev = selectEl.value;
   selectEl.innerHTML = '<option value="todos">Todos</option>';
-  (values || []).forEach(v => selectEl.innerHTML += `<option value="${v}">${v}</option>`);
+  (values || []).forEach(v => selectEl.innerHTML += `<option value="${escHtml(v)}">${escHtml(v)}</option>`);
   if ([...selectEl.options].some(o => o.value === prev)) selectEl.value = prev;
 }
 

@@ -4,8 +4,9 @@ dnspython==2.6.1
 python-dotenv==1.0.1
 Werkzeug==3.0.3
 
-pandas==2.2.2
+pandas==2.2.3
 XlsxWriter==3.2.0
+tzdata>=2024.1
 
 # PyMongo incluye BSON y ObjectId; no instalar el paquete bson por separado.
 

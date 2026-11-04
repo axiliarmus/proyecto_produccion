@@ -8,6 +8,16 @@
 <div class="admin-card mb-4">
   <form method="post" class="row g-3">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <div class="col-md-12">
+      <label class="form-label text-secondary small">Ubicación de la producción</label>
+      <select name="ubicacion" class="form-select bg-dark text-light border-secondary">
+        <option value="activa" {% if ubicacion == 'activa' %}selected{% endif %}>Producción activa (sin corte)</option>
+        <option value="cualquiera" {% if ubicacion == 'cualquiera' %}selected{% endif %}>Archivada: cualquier corte</option>
+        {% for c in cortes %}
+          <option value="{{ c._id }}" {% if ubicacion == c._id|string %}selected{% endif %}>Archivada: corte {{ c.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <div class="col-md-3">
       <label class="form-label text-secondary small">Operador</label>
       <select name="operador" class="form-select bg-dark text-light border-secondary">
@@ -40,6 +50,11 @@
   </form>
 </div>
 
+{% if archived %}
+<div class="alert alert-warning">
+  Estás viendo producción <strong>archivada en cortes</strong>. Puedes editarla, moverla a otro corte, devolverla a la producción activa o eliminarla (va a papelera 7 días).
+</div>
+{% else %}
 <div class="admin-card mb-4">
   <form method="post" action="{{ url_for('soporte_produccion_asignar_corte_masivo') }}" class="row g-3"
         onsubmit="return confirm('¿Asignar la producción al corte seleccionado? Esto moverá los registros a PRODUCCIÓN HISTÓRICA.')">
@@ -75,6 +90,7 @@
     Mueve los registros desde producción activa a producción histórica con el corte seleccionado.
   </div>
 </div>
+{% endif %}
 
 {% if registros|length > 0 %}
 <div class="admin-card">
@@ -93,6 +109,7 @@
           <th><input type="checkbox" id="selectAllProduction" class="form-check-input"
                      aria-label="Seleccionar todos los registros mostrados"></th>
           <th>Fecha</th>
+          {% if archived %}<th>Corte</th>{% endif %}
           <th>Modo</th>
           <th>Operador</th>
           <th>Box</th>
@@ -113,6 +130,7 @@
           <td><input type="checkbox" class="form-check-input production-selection" value="{{ r._id }}"
                      aria-label="Seleccionar registro {{ r.codigo_pieza }} de {{ r.usuario }}"></td>
           <td>{% if r.fecha %}{{ r.fecha.strftime('%d-%m-%Y %H:%M') }}{% else %}—{% endif %}</td>
+          {% if archived %}<td><span class="badge bg-info text-dark">{{ r.corte_nombre or '—' }}</span></td>{% endif %}
           <td>
             {% if r.modo == 'armador' %}
             <span class="badge bg-warning text-dark">Armador</span>
@@ -144,11 +162,13 @@
           </td>
           <td class="text-end">
             <div class="d-flex gap-1 justify-content-end">
-              <a href="{{ url_for('soporte_produccion_editar_form', id=r._id) }}" class="btn btn-sm btn-warning">
+              <a href="{{ url_for('soporte_produccion_editar_form', id=r._id, origen=origen) }}" class="btn btn-sm btn-warning">
                 <i class='bx bx-edit-alt'></i> Editar
               </a>
               <form action="{{ url_for('soporte_produccion_delete', id=r._id) }}" method="post" class="d-inline">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="origen" value="{{ origen }}">
+                <input type="hidden" name="ubicacion" value="{{ ubicacion }}">
                 <button class="btn btn-sm btn-danger" onclick="return confirm('¿Estás seguro? El registro se moverá a PAPELERA durante 7 días antes de eliminarse permanentemente.')">
                   <i class='bx bxs-trash'></i>
                 </button>
@@ -235,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch({{ url_for('soporte_produccion_eliminar_masivo')|tojson }}, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': {{ csrf_token|tojson }} },
-        body: JSON.stringify({ ids: confirmedIds })
+        body: JSON.stringify({ ids: confirmedIds, origen: {{ origen|tojson }} })
       });
       if (!(response.headers.get('content-type') || '').includes('application/json')) {
         throw new Error('No se pudo verificar el resultado. Recarga la lista y comprueba tu sesion antes de reintentar.');

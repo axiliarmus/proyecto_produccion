@@ -1,7 +1,6 @@
+import math
+import re
 import json
-import os
-import time
-import urllib.request
 from datetime import datetime
 
 from bson import ObjectId
@@ -58,41 +57,24 @@ def _normalize_massive_field(raw_field):
     return aliases.get(value, value)
 
 
-# #region debug-point helpers:piece-flecha-save
-def _debug_report_piece_flecha(hypothesis_id, location, msg, data=None, run_id="pre"):
-    try:
-        debug_url = "http://127.0.0.1:7777/event"
-        debug_session_id = "piece-flecha-save"
-        env_path = os.path.join(".dbg", "piece-flecha-save.env")
-        if os.path.exists(env_path):
-            with open(env_path, encoding="utf-8") as env_file:
-                for raw_line in env_file:
-                    line = raw_line.strip()
-                    if line.startswith("DEBUG_SERVER_URL="):
-                        debug_url = line.split("=", 1)[1] or debug_url
-                    elif line.startswith("DEBUG_SESSION_ID="):
-                        debug_session_id = line.split("=", 1)[1] or debug_session_id
 
-        payload = {
-            "sessionId": debug_session_id,
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "msg": f"[DEBUG] {msg}",
-            "data": data or {},
-            "ts": int(time.time() * 1000),
-        }
-        request_obj = urllib.request.Request(
-            debug_url,
-            data=json.dumps(payload, default=str).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-        )
-        urllib.request.urlopen(request_obj, timeout=1).read()
-    except Exception:
-        pass
+ROLES_VALIDOS = {"operador", "supervisor", "soporte", "administrador", "cliente"}
+PRECIO_CAMPOS = ("precio_metro_armado", "precio_metro_remate", "precio_avo_armado", "precio_avo_remate")
 
 
-# #endregion
+def _leer_precios(form):
+    """Lee los precios del formulario; devuelve None si alguno no es un numero valido >= 0."""
+    precios = {}
+    for campo in PRECIO_CAMPOS:
+        raw = (form.get(campo) or "0").strip().replace(",", ".")
+        try:
+            valor = float(raw)
+        except ValueError:
+            return None
+        if not math.isfinite(valor) or valor < 0:
+            return None
+        precios[campo] = valor
+    return precios
 
 
 def register_admin_crud_routes(
@@ -123,10 +105,21 @@ def register_admin_crud_routes(
         nombre = request.form["nombre"].strip()
         tipo = request.form["tipo"]
 
-        precio_metro_armado = float(request.form.get("precio_metro_armado", 0))
-        precio_metro_remate = float(request.form.get("precio_metro_remate", 0))
-        precio_avo_armado = float(request.form.get("precio_avo_armado", 0))
-        precio_avo_remate = float(request.form.get("precio_avo_remate", 0))
+        if tipo not in ROLES_VALIDOS:
+            flash("Tipo de usuario inválido", "danger")
+            return redirect(url_for("usuarios_list"))
+        if tipo == "administrador" and session.get("role") != "administrador":
+            flash("Solo un administrador puede crear administradores", "danger")
+            return redirect(url_for("usuarios_list"))
+
+        precios = _leer_precios(request.form)
+        if precios is None:
+            flash("Los precios deben ser números válidos mayores o iguales a 0", "danger")
+            return redirect(url_for("usuarios_list"))
+        precio_metro_armado = precios["precio_metro_armado"]
+        precio_metro_remate = precios["precio_metro_remate"]
+        precio_avo_armado = precios["precio_avo_armado"]
+        precio_avo_remate = precios["precio_avo_remate"]
         sin_restriccion = bool(request.form.get("sin_restriccion"))
         puede_editar_planificacion = bool(request.form.get("puede_editar_planificacion")) if tipo == "supervisor" else False
 
@@ -170,10 +163,23 @@ def register_admin_crud_routes(
         nombre = request.form["nombre"].strip()
         tipo = request.form["tipo"]
 
-        precio_metro_armado = float(request.form.get("precio_metro_armado", 0))
-        precio_metro_remate = float(request.form.get("precio_metro_remate", 0))
-        precio_avo_armado = float(request.form.get("precio_avo_armado", 0))
-        precio_avo_remate = float(request.form.get("precio_avo_remate", 0))
+        if tipo not in ROLES_VALIDOS:
+            flash("Tipo de usuario inválido", "danger")
+            return redirect(url_for("usuarios_list"))
+        if session.get("role") != "administrador":
+            objetivo = db.usuarios.find_one({"_id": ObjectId(id)}, {"tipo": 1})
+            if tipo == "administrador" or (objetivo or {}).get("tipo") == "administrador":
+                flash("Solo un administrador puede editar administradores", "danger")
+                return redirect(url_for("usuarios_list"))
+
+        precios = _leer_precios(request.form)
+        if precios is None:
+            flash("Los precios deben ser números válidos mayores o iguales a 0", "danger")
+            return redirect(url_for("usuarios_list"))
+        precio_metro_armado = precios["precio_metro_armado"]
+        precio_metro_remate = precios["precio_metro_remate"]
+        precio_avo_armado = precios["precio_avo_armado"]
+        precio_avo_remate = precios["precio_avo_remate"]
         sin_restriccion = bool(request.form.get("sin_restriccion"))
         puede_editar_planificacion = bool(request.form.get("puede_editar_planificacion")) if tipo == "supervisor" else False
 
@@ -294,7 +300,7 @@ def register_admin_crud_routes(
         filtro = {}
 
         if codigo:
-            filtro["codigo"] = {"$regex": codigo, "$options": "i"}
+            filtro["codigo"] = {"$regex": re.escape(codigo), "$options": "i"}
 
         total_registros = db.piezas.count_documents(filtro)
         total_pages = max((total_registros + default_per_page - 1) // default_per_page, 1)
@@ -308,25 +314,6 @@ def register_admin_crud_routes(
             .limit(default_per_page)
         )
         # #region debug-point C:listado
-        _debug_report_piece_flecha(
-            "C",
-            "admin_crud_routes.py:piezas_list",
-            "Listado de piezas renderizado",
-            {
-                "page": page,
-                "codigo_filter": codigo,
-                "count": len(piezas),
-                "sample": [
-                    {
-                        "codigo": pieza.get("codigo"),
-                        "flecha": pieza.get("flecha"),
-                        "cuerda_interna": pieza.get("cuerda_interna"),
-                        "cuerda_externa": pieza.get("cuerda_externa"),
-                    }
-                    for pieza in piezas[:5]
-                ],
-            },
-        )
         # #endregion
         pagination = build_pagination("piezas_list", page, total_registros, codigo=codigo)
         return render_template(
@@ -359,7 +346,7 @@ def register_admin_crud_routes(
 
             return data
         except Exception as exc:
-            return {"error": str(exc)}, 500
+            return {"error": "No se pudieron cargar los filtros"}, 500
 
     @app.route("/admin/piezas/eliminar-masivo")
     @login_required(["administrador", "soporte"])
@@ -464,7 +451,7 @@ def register_admin_crud_routes(
             return {"success": cantidad > 0 and not msg.startswith("ADVERTENCIA"),
                     "deleted_count": cantidad, "message": msg}
         except Exception as exc:
-            return {"success": False, "message": str(exc)}, 500
+            return {"success": False, "message": "Error interno al eliminar las piezas"}, 500
 
     @app.route("/admin/piezas/nuevo")
     @login_required(["administrador", "soporte"])
@@ -495,7 +482,7 @@ def register_admin_crud_routes(
         counter_id = f"piezas_seq_{prefijo}"
         if not db.counters.find_one({"_id": counter_id}):
             max_seq = 0
-            existentes = list(db.piezas.find({"codigo": {"$regex": f"^{prefijo}"}}))
+            existentes = list(db.piezas.find({"codigo": {"$regex": f"^{re.escape(prefijo)}"}}))
             for pieza in existentes:
                 try:
                     num_part = int(pieza["codigo"][len(prefijo) :])
@@ -576,38 +563,11 @@ def register_admin_crud_routes(
             )
         except ValueError:
             # #region debug-point D:edit-parse-error
-            _debug_report_piece_flecha(
-                "D",
-                "admin_crud_routes.py:piezas_editar_post",
-                "Error parseando medidas en edicion simple",
-                {
-                    "pieza_id": id,
-                    "form_flecha": request.form.get("flecha"),
-                    "form_cuerda_interna": request.form.get("cuerda_interna"),
-                    "form_cuerda_externa": request.form.get("cuerda_externa"),
-                },
-            )
             # #endregion
             flash("Peso y medidas de la pieza deben ser numéricos.", "danger")
             return redirect(url_for("piezas_editar_form", id=id))
 
         # #region debug-point A:edit-before-update
-        _debug_report_piece_flecha(
-            "A",
-            "admin_crud_routes.py:piezas_editar_post",
-            "Edicion simple recibida",
-            {
-                "pieza_id": id,
-                "codigo": (pieza_actual or {}).get("codigo"),
-                "empresa": empresa,
-                "marco": marco,
-                "tramo": tramo,
-                "flecha": flecha,
-                "cuerda_interna": cuerda_interna,
-                "cuerda_externa": cuerda_externa,
-                "form_keys": sorted(list(request.form.keys())),
-            },
-        )
         # #endregion
 
         update_result = db.piezas.update_one(
@@ -627,17 +587,6 @@ def register_admin_crud_routes(
         )
         pieza_actualizada = db.piezas.find_one({"_id": ObjectId(id)}, {"codigo": 1, "flecha": 1, "cuerda_interna": 1, "cuerda_externa": 1})
         # #region debug-point B:edit-after-update
-        _debug_report_piece_flecha(
-            "B",
-            "admin_crud_routes.py:piezas_editar_post",
-            "Resultado edicion simple",
-            {
-                "pieza_id": id,
-                "matched_count": update_result.matched_count,
-                "modified_count": update_result.modified_count,
-                "saved_doc": pieza_actualizada,
-            },
-        )
         # #endregion
 
         if pieza_actual and pieza_actual.get("codigo"):
@@ -730,12 +679,6 @@ def register_admin_crud_routes(
         ]
         if campo not in permitidos:
             # #region debug-point B:massive-not-allowed
-            _debug_report_piece_flecha(
-                "B",
-                "admin_crud_routes.py:piezas_masivo_confirmar",
-                "Campo rechazado en edicion masiva",
-                {"campo": campo, "valor": valor, "filtros": filtros, "permitidos": permitidos},
-            )
             # #endregion
             flash("Campo no permitido para edición masiva.", "danger")
             return redirect(url_for("piezas_masivo"))
@@ -756,12 +699,6 @@ def register_admin_crud_routes(
                 valor = _parse_optional_measure(valor)
             except ValueError:
                 # #region debug-point D:massive-parse-error
-                _debug_report_piece_flecha(
-                    "D",
-                    "admin_crud_routes.py:piezas_masivo_confirmar",
-                    "Error parseando medida en edicion masiva",
-                    {"campo": campo, "valor": request.form.get("valor"), "filtros": filtros},
-                )
                 # #endregion
                 flash("El valor debe ser numérico para este campo.", "danger")
                 return redirect(url_for("piezas_masivo"))
@@ -786,27 +723,9 @@ def register_admin_crud_routes(
                 )
 
         # #region debug-point B:massive-before-update
-        _debug_report_piece_flecha(
-            "B",
-            "admin_crud_routes.py:piezas_masivo_confirmar",
-            "Edicion masiva recibida",
-            {"campo": campo, "valor": valor, "filtros": filtros},
-        )
         # #endregion
         resultado = db.piezas.update_many(filtros, {"$set": {campo: valor}})
         # #region debug-point B:massive-after-update
-        _debug_report_piece_flecha(
-            "B",
-            "admin_crud_routes.py:piezas_masivo_confirmar",
-            "Resultado edicion masiva",
-            {
-                "campo": campo,
-                "valor": valor,
-                "matched_count": resultado.matched_count,
-                "modified_count": resultado.modified_count,
-                "sample": list(db.piezas.find(filtros, {"codigo": 1, "flecha": 1}).limit(5)),
-            },
-        )
         # #endregion
 
         flash(f"Se actualizaron {resultado.modified_count} piezas correctamente.", "success")

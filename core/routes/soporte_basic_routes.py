@@ -1,7 +1,4 @@
-import json
-import os
-import time
-import urllib.request
+import re
 
 from bson import ObjectId
 from flask import flash, redirect, render_template, request, session, url_for
@@ -14,44 +11,7 @@ from core.helpers.reporting import (
 from core.helpers.soft_delete import soft_delete_one, soft_delete_many
 
 
-# #endregion
 
-
-# #region debug-point helpers:vps-flecha-label
-def _debug_report_vps_flecha_label(hypothesis_id, location, msg, data=None, run_id="pre"):
-    try:
-        debug_url = "http://127.0.0.1:7777/event"
-        debug_session_id = "vps-flecha-label"
-        env_path = os.path.join(".dbg", "vps-flecha-label.env")
-        if os.path.exists(env_path):
-            with open(env_path, encoding="utf-8") as env_file:
-                for raw_line in env_file:
-                    line = raw_line.strip()
-                    if line.startswith("DEBUG_SERVER_URL="):
-                        debug_url = line.split("=", 1)[1] or debug_url
-                    elif line.startswith("DEBUG_SESSION_ID="):
-                        debug_session_id = line.split("=", 1)[1] or debug_session_id
-
-        payload = {
-            "sessionId": debug_session_id,
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "msg": f"[DEBUG] {msg}",
-            "data": data or {},
-            "ts": int(time.time() * 1000),
-        }
-        request_obj = urllib.request.Request(
-            debug_url,
-            data=json.dumps(payload, default=str).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-        )
-        urllib.request.urlopen(request_obj, timeout=1).read()
-    except Exception:
-        pass
-
-
-# #endregion
 
 
 def register_soporte_basic_routes(
@@ -192,9 +152,9 @@ def register_soporte_basic_routes(
 
         if search_query:
             filtro["$or"] = [
-                {"codigo": {"$regex": search_query, "$options": "i"}},
-                {"empresa": {"$regex": search_query, "$options": "i"}},
-                {"marco": {"$regex": search_query, "$options": "i"}},
+                {"codigo": {"$regex": re.escape(search_query), "$options": "i"}},
+                {"empresa": {"$regex": re.escape(search_query), "$options": "i"}},
+                {"marco": {"$regex": re.escape(search_query), "$options": "i"}},
             ]
 
         piezas = list(db.piezas.find(filtro).limit(5000).sort("_id", -1))

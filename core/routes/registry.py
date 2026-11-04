@@ -59,6 +59,7 @@ def register_all_routes(app, db, runtime_state, log_audit):
         login_required,
         reporting_helpers.get_production_status_map,
         reporting_helpers.build_tarjetas_grupos,
+        send_excel_file,
     )
     register_admin_planificacion_routes(
         app,

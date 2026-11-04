@@ -7,6 +7,8 @@
 <div class="card bg-dark border-light">
   <div class="card-body">
     <form method="post" action="{{ url_for('soporte_produccion_editar_post', id=reg._id) }}" class="row g-3">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="origen" value="{{ origen or 'activa' }}">
 
       <div class="col-md-4">
         <label class="form-label text-light">Fecha</label>
@@ -76,6 +78,23 @@
         </select>
       </div>
 
+      {% if origen == 'historica' %}
+      <div class="col-md-12 mt-4">
+        <div class="card bg-dark border-info">
+          <div class="card-body">
+            <h5 class="card-title text-info">Ubicación del registro</h5>
+            <p class="card-text text-light" style="font-size: 0.9em;">Este registro está archivado en un corte. Puedes dejarlo ahí, moverlo a otro corte o devolverlo a la <strong>producción activa</strong> (sin corte).</p>
+            <select name="corte_destino" class="form-select bg-secondary text-light">
+              <option value="" {% if not reg.corte_id %}selected{% endif %}>-- Mantener donde está --</option>
+              <option value="activa">Producción activa (sin corte)</option>
+              {% for c in cortes %}
+              <option value="{{ c._id }}" {% if reg.corte_id == c._id %}selected{% endif %}>Corte: {{ c.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+      {% else %}
       <div class="col-md-12 mt-4">
         <div class="card bg-dark border-warning">
           <div class="card-body">
@@ -90,6 +109,7 @@
           </div>
         </div>
       </div>
+      {% endif %}
 
       <div class="col-12 d-flex justify-content-between mt-4">
         <a href="{{ url_for('soporte_produccion_list') }}" class="btn btn-secondary">← Volver</a>

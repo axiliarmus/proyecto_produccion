@@ -136,6 +136,7 @@
 
 <!-- SCRIPT LISTAS DINÁMICAS -->
 <script>
+function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 document.getElementById("empresa").addEventListener("change", async function () {
     const empresa = this.value;
     const selMarco = document.getElementById("marco");
@@ -155,7 +156,7 @@ document.getElementById("empresa").addEventListener("change", async function () 
 
         selMarco.innerHTML = "<option value=''>Seleccione...</option>";
         data.marcos.forEach(m => {
-            selMarco.innerHTML += `<option value="${m}">${m}</option>`;
+            selMarco.innerHTML += `<option value="${escHtml(m)}">${escHtml(m)}</option>`;
         });
         selMarco.disabled = false;
     } catch (e) {
@@ -180,7 +181,7 @@ document.getElementById("marco").addEventListener("change", async function () {
 
         selTramo.innerHTML = "<option value=''>Seleccione...</option>";
         data.tramos.forEach(t => {
-            selTramo.innerHTML += `<option value="${t}">${t}</option>`;
+            selTramo.innerHTML += `<option value="${escHtml(t)}">${escHtml(t)}</option>`;
         });
         selTramo.disabled = false;
     } catch (e) {

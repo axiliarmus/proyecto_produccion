@@ -111,6 +111,7 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 let currentPiezas = [];
 
 // Cargar Marcos dinámicamente
@@ -136,7 +137,7 @@ async function cargarMarcos() {
         
         let options = '<option value="">Todos</option>';
         data.marcos.forEach(m => {
-            options += `<option value="${m}">${m}</option>`;
+            options += `<option value="${escHtml(m)}">${escHtml(m)}</option>`;
         });
         
         marcoSelect.innerHTML = options;
@@ -168,7 +169,7 @@ async function cargarTramos() {
         
         let options = '<option value="">Todos</option>';
         data.tramos.forEach(t => {
-            options += `<option value="${t}">${t}</option>`;
+            options += `<option value="${escHtml(t)}">${escHtml(t)}</option>`;
         });
         
         tramoSelect.innerHTML = options;

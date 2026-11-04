@@ -1,3 +1,4 @@
+import re
 """
 Rutas para Papelera de Reciclaje (7 días de retención).
 Permite listar, restaurar y eliminar permanentemente documentos borrados.
@@ -47,13 +48,13 @@ def register_recycle_bin_routes(app, db, login_required, normalize_page, paginat
         if search_query:
             # Buscar por código de pieza, nombre operador, IP, etc. dentro del documento o metadata
             filtro["$or"] = [
-                {"documento_original.codigo": {"$regex": search_query, "$options": "i"}},
-                {"documento_original.codigo_pieza": {"$regex": search_query, "$options": "i"}},
-                {"documento_original.usuario": {"$regex": search_query, "$options": "i"}},
-                {"documento_original.empresa": {"$regex": search_query, "$options": "i"}},
-                {"documento_original.nombre": {"$regex": search_query, "$options": "i"}},
-                {"deleted_by_user_name": {"$regex": search_query, "$options": "i"}},
-                {"tipo_documento": {"$regex": search_query, "$options": "i"}},
+                {"documento_original.codigo": {"$regex": re.escape(search_query), "$options": "i"}},
+                {"documento_original.codigo_pieza": {"$regex": re.escape(search_query), "$options": "i"}},
+                {"documento_original.usuario": {"$regex": re.escape(search_query), "$options": "i"}},
+                {"documento_original.empresa": {"$regex": re.escape(search_query), "$options": "i"}},
+                {"documento_original.nombre": {"$regex": re.escape(search_query), "$options": "i"}},
+                {"deleted_by_user_name": {"$regex": re.escape(search_query), "$options": "i"}},
+                {"tipo_documento": {"$regex": re.escape(search_query), "$options": "i"}},
             ]
 
         documentos = list(

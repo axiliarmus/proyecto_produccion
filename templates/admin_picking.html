@@ -361,6 +361,7 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/html5-qrcode.min.js') }}"></script>
 <script>
+function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 // ESTADO DE LA APLICACIÓN
 const state = {
     scannedCodes: new Set({{ scanned_codes|tojson|safe }}),
@@ -930,7 +931,7 @@ function verDetalleHistorial(histId) {
                 return;
             }
             const h = res.data;
-            document.getElementById('histModalTitle').innerHTML = `<i class='bx bx-archive text-info'></i> ${h.nombre}`;
+            document.getElementById('histModalTitle').innerHTML = `<i class='bx bx-archive text-info'></i> ${escHtml(h.nombre)}`;
             document.getElementById('histModalSubtitle').textContent = `Cerrado el ${h.fecha_cierre_str || ''} por ${h.usuario || 'Usuario'}${h.nota ? ' · Nota: ' + h.nota : ''}`;
             document.getElementById('histStatTotal').textContent = h.total || 0;
             document.getElementById('histStatArmadas').textContent = h.armadas || 0;

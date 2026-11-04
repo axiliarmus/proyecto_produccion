@@ -221,6 +221,7 @@
 
 {% block scripts %}
 <script>
+function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 document.addEventListener('DOMContentLoaded', function() {
     const detalleModal = document.getElementById('detalleModal');
     if (detalleModal) {
@@ -240,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const resp = await fetch(`/api/papelera/${encodeURIComponent(id)}`);
                 const data = await resp.json();
                 if (data.error) {
-                    body.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                    body.innerHTML = `<div class="alert alert-danger">${escHtml(data.error)}</div>`;
                     return;
                 }
                 body.innerHTML = `
