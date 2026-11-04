@@ -313,13 +313,13 @@ class ProjectRegressionTests(unittest.TestCase):
 
         db = MagicMock()
         db.piezas.find.side_effect = lambda q, *a: iter(
-            [{"codigo": "a1", "marco": "TH1"}, {"codigo": "a2", "marco": "th1 "}]
+            [{"codigo": "a1", "marco": "TH1", "tramo": "1"}, {"codigo": "a2", "marco": "th1 ", "tramo": "2"}]
             if "created_at" in q and "$gte" in q["created_at"] else [])
         db.piezas_historicas.find.side_effect = lambda q, *a: iter(
-            [{"codigo": "a1", "marco": "TH1"}, {"codigo": "a4", "marco": "TH1"}]
+            [{"codigo": "a1", "marco": "TH1", "tramo": "1"}, {"codigo": "a4", "marco": "TH1", "tramo": "2"}]
             if "created_at" in q and "$gte" in q["created_at"] else [])
-        db.produccion.aggregate.return_value = [{"_id": "a1", "marco": "TH1"}, {"_id": "a3", "marco": "3 CARRILES"}]
-        db.produccion_historica.aggregate.return_value = [{"_id": "a1", "marco": "TH1"}]
+        db.produccion.aggregate.return_value = [{"_id": "a1", "marco": "TH1", "tramo": "1"}, {"_id": "a3", "marco": "3 CARRILES", "tramo": "1"}]
+        db.produccion_historica.aggregate.return_value = [{"_id": "a1", "marco": "TH1", "tramo": "1"}]
 
         filas, totales, sin_fecha = build_marcos_anual(db, 2026, dt(2026, 1, 1), dt(2026, 12, 31))
 
@@ -329,6 +329,12 @@ class ProjectRegressionTests(unittest.TestCase):
         self.assertEqual(por_marco["3 CARRILES"]["producido"], 1)
         self.assertEqual(totales["ingresado"], 3)
         self.assertEqual(totales["producido"], 2)
+        tramos = {t["tramo"]: t for t in por_marco["TH1"]["tramos"]}
+        self.assertTrue(tramos["1"]["completo"])          # a1 ingresada y rematada
+        self.assertFalse(tramos["2"]["completo"])         # a2 y a4 sin rematar
+        self.assertEqual(tramos["2"]["pendiente"], 2)
+        self.assertEqual(por_marco["TH1"]["tramos_faltantes"], ["2"])
+        self.assertFalse(por_marco["TH1"]["completo"])
 
     def test_informe_marcos_anual_route_rejects_bad_year(self):
         self.assertEqual(self.client.get("/admin/informes/marcos/anual?anio=abc").status_code, 400)

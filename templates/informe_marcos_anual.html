@@ -27,6 +27,7 @@
   <strong>Ingresado</strong>: piezas creadas en {{ anio }}.
   <strong>Producido</strong>: piezas rematadas en {{ anio }}.
   Pendiente = Ingresado − Producido (puede ser negativo si se remataron piezas ingresadas en años anteriores).
+  En cada marco, un tramo en verde está completo; <strong>Faltan</strong> indica cuántas piezas de ese tramo aún no se rematan (+N = piezas rematadas de más).
 </p>
 
 {% if sin_fecha %}
@@ -71,6 +72,32 @@
         {% if f.avance is not none %}
         <div class="small text-secondary mt-2">Avance: {{ f.avance }}%</div>
         {% endif %}
+
+        <div class="mt-3">
+          {% if f.completo %}
+            <span class="badge bg-success">Marco completo</span>
+          {% elif f.tramos_faltantes %}
+            <span class="badge bg-warning text-dark">Faltan tramos: {{ f.tramos_faltantes|join(', ') }}</span>
+          {% endif %}
+        </div>
+
+        <table class="table table-dark table-sm mt-3 mb-0">
+          <thead>
+            <tr class="text-secondary small text-center">
+              <th>Tramo</th><th>Ingr.</th><th>Prod.</th><th>Faltan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in f.tramos %}
+            <tr class="text-center {% if t.completo %}table-success text-dark fw-bold{% endif %}">
+              <td>{{ t.tramo }}</td>
+              <td>{{ t.ingresado }}</td>
+              <td>{{ t.producido }}</td>
+              <td>{% if t.pendiente > 0 %}{{ t.pendiente }}{% elif t.pendiente < 0 %}+{{ -t.pendiente }}{% else %}✔{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

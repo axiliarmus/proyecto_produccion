@@ -1,3 +1,4 @@
+import re
 from bson import ObjectId
 
 from core.helpers.codigo import build_codigo_lookup_keys, build_codigo_query_values
@@ -508,61 +509,84 @@ def build_marcos_anual(db, anio, start_utc, end_utc):
     for collection in (db.piezas, db.piezas_historicas):
         cursor = collection.find(
             {"created_at": rango},
-            {"codigo": 1, "marco": 1, "_id": 0},
+            {"codigo": 1, "marco": 1, "tramo": 1, "_id": 0},
         )
         for pieza in cursor:
             canon = _codigo_canonico(pieza.get("codigo"))
             if canon is None or canon in ingresadas:
                 continue
-            ingresadas[canon] = pieza.get("marco")
+            ingresadas[canon] = (pieza.get("marco"), pieza.get("tramo"))
 
     rematadas = {}
     pipeline = [
         {"$match": {"modo": "rematador", "fecha": rango}},
-        {"$group": {"_id": "$codigo_pieza", "marco": {"$first": "$marco"}}},
+        {"$group": {"_id": "$codigo_pieza", "marco": {"$first": "$marco"}, "tramo": {"$first": "$tramo"}}},
     ]
     for collection in (db.produccion, db.produccion_historica):
         for row in collection.aggregate(pipeline):
             canon = _codigo_canonico(row.get("_id"))
             if canon is None:
                 continue
-            if canon not in rematadas or (not rematadas[canon] and row.get("marco")):
-                rematadas[canon] = row.get("marco")
+            actual = rematadas.get(canon)
+            if actual is None or ((not actual[0] or not actual[1]) and row.get("marco") and row.get("tramo")):
+                rematadas[canon] = (row.get("marco"), row.get("tramo"))
 
-    # Marco faltante en produccion: tomarlo de la pieza (activa o historica).
-    sin_marco = [codigo for codigo, marco in rematadas.items() if not marco]
-    if sin_marco:
-        piezas_map = build_piezas_map(db, sin_marco)
-        for codigo in sin_marco:
+    # Marco o tramo faltante en produccion: tomarlos de la pieza (activa o historica).
+    incompletas = [codigo for codigo, (marco, tramo) in rematadas.items() if not marco or not tramo]
+    if incompletas:
+        piezas_map = build_piezas_map(db, incompletas)
+        for codigo in incompletas:
             pieza = piezas_map.get(codigo)
-            if pieza and pieza.get("marco"):
-                rematadas[codigo] = pieza["marco"]
+            if pieza:
+                marco, tramo = rematadas[codigo]
+                rematadas[codigo] = (marco or pieza.get("marco"), tramo or pieza.get("tramo"))
 
     grupos = {}
 
-    def bucket(marco):
-        key = _marco_key(marco)
-        grupo = grupos.setdefault(key, {"nombres": {}, "ingresado": 0, "producido": 0})
-        nombre = " ".join(str(marco or "").split()) or "Sin Marco"
-        grupo["nombres"][nombre] = grupo["nombres"].get(nombre, 0) + 1
-        return grupo
+    def _nombre(valor, vacio):
+        return " ".join(str(valor or "").split()) or vacio
 
-    for marco in ingresadas.values():
-        bucket(marco)["ingresado"] += 1
-    for marco in rematadas.values():
-        bucket(marco)["producido"] += 1
+    def bucket(marco, tramo):
+        key = _marco_key(marco)
+        grupo = grupos.setdefault(key, {"nombres": {}, "tramos": {}})
+        grupo["nombres"][_nombre(marco, "Sin Marco")] = grupo["nombres"].get(_nombre(marco, "Sin Marco"), 0) + 1
+        tramo_nombre = _nombre(tramo, "Sin Tramo")
+        return grupo["tramos"].setdefault(tramo_nombre.upper(), {"nombre": tramo_nombre, "ingresado": 0, "producido": 0})
+
+    for marco, tramo in ingresadas.values():
+        bucket(marco, tramo)["ingresado"] += 1
+    for marco, tramo in rematadas.values():
+        bucket(marco, tramo)["producido"] += 1
+
+    def _orden_tramo(nombre):
+        partes = re.split(r"(\d+)", nombre)
+        return [(0, int(p), "") if p.isdigit() else (1, 0, p.upper()) for p in partes if p != ""]
 
     filas = []
     for key, grupo in grupos.items():
         nombre = max(grupo["nombres"].items(), key=lambda item: (item[1], item[0]))[0]
-        ingresado = grupo["ingresado"]
-        producido = grupo["producido"]
+        tramos = []
+        for t in sorted(grupo["tramos"].values(), key=lambda t: _orden_tramo(t["nombre"])):
+            pendiente = t["ingresado"] - t["producido"]
+            tramos.append({
+                "tramo": t["nombre"],
+                "ingresado": t["ingresado"],
+                "producido": t["producido"],
+                "pendiente": pendiente,
+                "completo": t["ingresado"] > 0 and pendiente <= 0,
+            })
+        ingresado = sum(t["ingresado"] for t in tramos)
+        producido = sum(t["producido"] for t in tramos)
+        faltantes = [t["tramo"] for t in tramos if t["pendiente"] > 0]
         filas.append({
             "marco": nombre,
             "ingresado": ingresado,
             "producido": producido,
             "pendiente": ingresado - producido,
             "avance": round(producido * 100.0 / ingresado, 1) if ingresado else None,
+            "tramos": tramos,
+            "tramos_faltantes": faltantes,
+            "completo": ingresado > 0 and not faltantes,
         })
     filas.sort(key=lambda fila: fila["marco"].upper())
 

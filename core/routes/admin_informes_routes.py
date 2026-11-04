@@ -75,22 +75,24 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
             abort(404)
         anio = _resolve_anio_marcos()
         filas, totales, _ = _datos_marcos_anual(anio)
-        data = [
-            {
-                "Marco": fila["marco"],
-                "Ingresado": fila["ingresado"],
-                "Producido (rematadas)": fila["producido"],
-                "Pendiente": fila["pendiente"],
-                "Avance %": fila["avance"] if fila["avance"] is not None else "",
-            }
-            for fila in filas
-        ]
+        data = []
+        for fila in filas:
+            for tramo in fila["tramos"]:
+                data.append({
+                    "Marco": fila["marco"],
+                    "Tramo": tramo["tramo"],
+                    "Ingresado": tramo["ingresado"],
+                    "Producido (rematadas)": tramo["producido"],
+                    "Pendiente": tramo["pendiente"],
+                    "Estado": "Completo" if tramo["completo"] else "Falta",
+                })
         data.append({
             "Marco": "TOTAL",
+            "Tramo": "",
             "Ingresado": totales["ingresado"],
             "Producido (rematadas)": totales["producido"],
             "Pendiente": totales["pendiente"],
-            "Avance %": totales["avance"] if totales["avance"] is not None else "",
+            "Estado": "",
         })
         return send_excel_file(data, f"Marcos {anio}", f"informe_marcos_{anio}.xlsx")
 
