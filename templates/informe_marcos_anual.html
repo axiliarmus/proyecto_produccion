@@ -45,21 +45,7 @@
   .mc-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .35s ease; }
   .mc-bar.done > span { background: var(--success); }
 
-  .mc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 1rem; transition: opacity .2s; }
-  .mc-card { background: var(--card-bg); border: 1px solid rgba(255,255,255,.06); border-radius: 16px; padding: 1rem 1.1rem;
-    display: flex; flex-direction: column; gap: .8rem; animation: mcIn .22s ease both; transition: border-color .15s, transform .15s; }
-  .mc-card:hover { border-color: rgba(99,102,241,.55); transform: translateY(-2px); }
-  .mc-card.is-done { border-color: rgba(16,185,129,.35); }
-  .mc-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; cursor: pointer; }
-  .mc-card-title { margin: 0; font-size: 1.05rem; font-weight: 600; word-break: break-word; }
-  .mc-card-title mark, .mc-table td mark { background: rgba(245,158,11,.3); color: inherit; border-radius: 3px; padding: 0 2px; }
-  .mc-stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; }
-  .mc-stats .l { color: var(--text-secondary); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
-  .mc-stats .v { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .mc-chevron { transition: transform .2s; color: var(--text-secondary); }
-  .mc-card.collapsed .mc-chevron { transform: rotate(-90deg); }
-  .mc-card.collapsed .mc-tramos { display: none; }
-
+  mark { background: rgba(245,158,11,.3); color: inherit; border-radius: 3px; padding: 0 2px; }
   .mc-tramos { display: flex; flex-wrap: wrap; gap: .4rem; }
   .mc-chip { display: inline-flex; align-items: center; gap: .4rem; padding: 3px 9px; border-radius: 999px; font-size: .8rem;
     border: 1px solid transparent; font-variant-numeric: tabular-nums; }
@@ -67,11 +53,6 @@
   .mc-chip.ok { background: rgba(16,185,129,.14); border-color: rgba(16,185,129,.4); color: #6ee7b7; }
   .mc-chip.falta { background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.45); color: #fcd34d; }
   .mc-chip.extra { background: rgba(56,189,248,.14); border-color: rgba(56,189,248,.4); color: #7dd3fc; }
-  .mc-badge { font-size: .74rem; padding: 3px 9px; border-radius: 999px; white-space: nowrap; font-weight: 600; }
-  .mc-badge.ok { background: rgba(16,185,129,.18); color: #6ee7b7; }
-  .mc-badge.falta { background: rgba(245,158,11,.18); color: #fcd34d; }
-  .mc-badge.neutral { background: rgba(255,255,255,.08); color: var(--text-secondary); }
-
   .mc-table-wrap { background: var(--card-bg); border: 1px solid rgba(255,255,255,.06); border-radius: 14px; overflow: auto; }
   .mc-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
   .mc-table th { position: sticky; top: 0; background: #17202e; color: var(--text-secondary); font-weight: 600; font-size: .76rem;
@@ -92,7 +73,9 @@
   .mc-note.error { background: rgba(239,68,68,.14); color: #fca5a5; }
   .is-loading { opacity: .45; pointer-events: none; }
   @keyframes mcIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  @media (prefers-reduced-motion: reduce) { .mc-card, .mc-bar > span { animation: none; transition: none; } }
+  .marco-col { animation: mcIn .22s ease both; }
+  .marco-col .table td, .marco-col .table th { vertical-align: middle; }
+  @media (prefers-reduced-motion: reduce) { .marco-col, .mc-bar > span { animation: none; transition: none; } }
   @media (max-width: 640px) { .mc-toolbar { position: static; } .mc-search { max-width: none; } }
 </style>
 
@@ -137,7 +120,6 @@
     <button type="button" data-vista="tabla" aria-label="Tabla"><i class='bx bx-table'></i></button>
   </div>
 
-  <button type="button" class="mc-icon-btn" id="mcToggleTramos" aria-label="Expandir o contraer tramos"><i class='bx bx-collapse-vertical'></i></button>
   <button type="button" class="mc-icon-btn" id="mcReset" aria-label="Limpiar filtros" style="display:none"><i class='bx bx-filter-alt'></i></button>
   {% if puede_exportar %}
   <a href="{{ url_for('informe_marcos_anual_export', anio=anio) }}" id="mcExport" class="btn btn-success btn-sm d-inline-flex align-items-center gap-2" style="height:38px">
@@ -181,7 +163,7 @@
   };
   const icon = name => el('i', 'bx ' + name);
 
-  const DEFAULTS = { q: '', estado: 'todos', orden: 'nombre', dir: 'asc', vista: 'tarjetas', exacto: false, abiertos: true };
+  const DEFAULTS = { q: '', estado: 'todos', orden: 'nombre', dir: 'asc', vista: 'tarjetas', exacto: false };
   const state = Object.assign({}, DEFAULTS, { anio: Number({{ anio }}), data: JSON.parse($('mcPayload').textContent) });
 
   // ---------- URL <-> estado ----------
@@ -259,13 +241,6 @@
     c.append(el('b', null, t.tramo), document.createTextNode(` ${fmt(t.producido)}/${fmt(t.ingresado)}`));
     return c;
   }
-  function badge(f) {
-    if (f.completo) return el('span', 'mc-badge ok', 'Completo');
-    if (f.tramos_faltantes.length) {
-      return el('span', 'mc-badge falta', f.tramos_faltantes.length === 1 ? 'Falta 1 tramo' : `Faltan ${f.tramos_faltantes.length} tramos`);
-    }
-    return el('span', 'mc-badge neutral', 'Sin ingresos');
-  }
   function barra(f) {
     const b = el('div', 'mc-bar' + (f.completo ? ' done' : ''));
     const s = document.createElement('span');
@@ -274,34 +249,39 @@
     return b;
   }
 
+  const resta = (ing, prod) => `${fmt(ing)} - ${fmt(prod)} = ${fmt(ing - prod)}`;
+
   function tarjeta(f, i) {
-    const card = el('article', 'mc-card' + (f.completo ? ' is-done' : '') + (state.abiertos ? '' : ' collapsed'));
-    card.style.animationDelay = Math.min(i, 12) * 18 + 'ms';
-    const head = el('div', 'mc-card-head');
-    const title = el('h3', 'mc-card-title');
+    const col = el('div', 'col marco-col');
+    col.style.animationDelay = Math.min(i, 12) * 18 + 'ms';
+    const card = el('div', 'card bg-dark border-light shadow h-100');
+    const body = el('div', 'card-body d-flex flex-column');
+
+    const head = el('div', 'mb-3 text-center');
+    const title = el('h5', 'card-title text-light mb-0');
     resaltar(title, f.marco);
-    const right = el('div', 'd-flex align-items-center gap-2');
-    right.append(badge(f), icon('bx-chevron-down mc-chevron'));
-    head.append(title, right);
-    head.addEventListener('click', () => card.classList.toggle('collapsed'));
+    head.append(title);
 
-    const stats = el('div', 'mc-stats');
-    [['Ingresado', f.ingresado, ''], ['Producido', f.producido, 'text-success'], ['Pendiente', f.pendiente, f.pendiente > 0 ? 'text-warning' : '']]
-      .forEach(([l, v, cls]) => {
-        const d = el('div');
-        d.append(el('div', 'l', l), el('div', 'v ' + cls, fmt(v)));
-        stats.append(d);
-      });
+    const table = el('table', 'table table-dark table-sm mb-0');
+    const thead = el('thead'), htr = el('tr', 'text-secondary small text-center');
+    htr.append(el('th', null, 'Tramo'), el('th', null, 'Ingresado - Producido = Faltan'));
+    thead.append(htr);
+    const tbody = el('tbody');
+    f.tramos.forEach(t => {
+      const tr = el('tr', t.ingresado > 0 && t.pendiente <= 0 ? 'table-success text-dark fw-bold' : '');
+      tr.append(el('td', 'text-center align-middle', t.tramo), el('td', 'text-center align-middle', resta(t.ingresado, t.producido)));
+      tbody.append(tr);
+    });
+    const tfoot = el('tfoot');
+    const ftr = el('tr', 'text-center fw-bold ' + (f.completo ? 'table-success text-dark' : 'border-top'));
+    ftr.append(el('td', null, 'Total'), el('td', null, resta(f.ingresado, f.producido)));
+    tfoot.append(ftr);
+    table.append(thead, tbody, tfoot);
 
-    const prog = el('div');
-    const meta = el('div', 'd-flex justify-content-between small text-secondary mb-1');
-    meta.append(el('span', null, 'Avance'), el('span', null, fmtPct(f.avance)));
-    prog.append(meta, barra(f));
-
-    const tramos = el('div', 'mc-tramos');
-    f.tramos.forEach(t => tramos.append(chip(t)));
-    card.append(head, stats, prog, tramos);
-    return card;
+    body.append(head, table);
+    card.append(body);
+    col.append(card);
+    return col;
   }
 
   function tabla(lista, totales) {
@@ -390,8 +370,6 @@
       b.querySelector('.mc-count').textContent = fmt(conteos[b.dataset.estado]);
     });
     document.querySelectorAll('#mcVista button').forEach(b => b.classList.toggle('active', b.dataset.vista === state.vista));
-    $('mcToggleTramos').classList.toggle('d-none', state.vista !== 'tarjetas');
-    $('mcToggleTramos').firstElementChild.className = 'bx ' + (state.abiertos ? 'bx-collapse-vertical' : 'bx-expand-vertical');
     $('mcReset').style.display = filtrosActivos() ? '' : 'none';
 
     pintarKpis(totales);
@@ -403,7 +381,7 @@
     } else if (state.vista === 'tabla') {
       cont.append(tabla(lista, totales));
     } else {
-      const grid = el('div', 'mc-grid');
+      const grid = el('div', 'row row-cols-1 row-cols-md-3 g-4');
       lista.forEach((f, i) => grid.append(tarjeta(f, i)));
       cont.append(grid);
     }
@@ -439,7 +417,6 @@
   $('mcVista').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { state.vista = b.dataset.vista; actualizar(); } });
   $('mcOrden').addEventListener('change', e => { state.orden = e.target.value; state.dir = state.orden === 'nombre' ? 'asc' : 'desc'; actualizar(); });
   $('mcDir').addEventListener('click', () => { state.dir = state.dir === 'asc' ? 'desc' : 'asc'; actualizar(); });
-  $('mcToggleTramos').addEventListener('click', () => { state.abiertos = !state.abiertos; actualizar(); });
   $('mcReset').addEventListener('click', reset);
   document.addEventListener('keydown', e => {
     const enCampo = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
