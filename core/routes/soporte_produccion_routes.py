@@ -63,7 +63,7 @@ def register_soporte_produccion_routes(app, db, login_required):
             ubicacion = request.form.get("ubicacion")
 
         coleccion, corte_oid, ubicacion = _resolve_origen(ubicacion)
-        archived = coleccion is db.produccion_historica
+        archived = ubicacion != "activa"
         if corte_oid is not None:
             filtro["corte_id"] = corte_oid
 

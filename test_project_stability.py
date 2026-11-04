@@ -347,6 +347,7 @@ class ProjectRegressionTests(unittest.TestCase):
         response = self.client.get(f"/soporte/produccion?ubicacion={corte_id}")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Enero", response.data)
+        self.assertIn(b'origen: "historica"', response.data)
         self.db.produccion_historica.find.assert_called_with({"corte_id": corte_id})
         self.db.produccion.find.assert_not_called()
 
