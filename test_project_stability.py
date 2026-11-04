@@ -339,6 +339,18 @@ class ProjectRegressionTests(unittest.TestCase):
     def test_informe_marcos_anual_route_rejects_bad_year(self):
         self.assertEqual(self.client.get("/admin/informes/marcos/anual?anio=abc").status_code, 400)
         self.assertEqual(self.client.get("/admin/informes/marcos/anual/export?anio=1500").status_code, 400)
+        self.assertEqual(self.client.get("/admin/informes/marcos/anual/data?anio=abc").status_code, 400)
+
+    def test_informe_marcos_anual_data_devuelve_json(self):
+        self.db.piezas.find.return_value = iter([])
+        self.db.piezas_historicas.find.return_value = iter([])
+        self.db.produccion.aggregate.return_value = []
+        self.db.produccion_historica.aggregate.return_value = []
+        response = self.client.get("/admin/informes/marcos/anual/data?anio=2026")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["anio"], 2026)
+        self.assertEqual(set(data), {"anio", "filas", "totales", "sin_fecha"})
 
     def test_produccion_archivada_lista_borra_y_vuelve_a_activa(self):
         corte_id = ObjectId()

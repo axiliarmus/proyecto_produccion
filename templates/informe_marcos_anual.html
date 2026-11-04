@@ -1,205 +1,489 @@
 {% extends 'admin_layout.html' %}
 
-{% block title %}Marcos del Año {{ anio }}{% endblock %}
-{% block header_title %}Marcos del Año {{ anio }}{% endblock %}
-{% block header_subtitle %}Ingresado y producido en el año, agrupado por marco{% endblock %}
+{% block title %}Marcos {{ anio }}{% endblock %}
+{% block header_title %}Marcos <span id="mcTitleYear">{{ anio }}</span>{% endblock %}
+{% block header_subtitle %}{% endblock %}
 
 {% block content %}
+<style>
+  .mc-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; padding: .75rem; margin-bottom: 1rem;
+    background: var(--card-bg); border: 1px solid rgba(255,255,255,.06); border-radius: 14px; position: sticky; top: 0; z-index: 20; }
+  .mc-field { display: flex; align-items: center; gap: .5rem; }
+  .mc-input, .mc-select { background: #111827; color: var(--text-primary); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px; height: 38px; padding: 0 .75rem; font-size: .9rem; outline: none; transition: border-color .15s, box-shadow .15s; }
+  .mc-input:focus, .mc-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,241,.25); }
+  .mc-search { position: relative; flex: 1 1 280px; min-width: 220px; max-width: 460px; }
+  .mc-search i.bx-search { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); pointer-events: none; }
+  .mc-search .mc-input { width: 100%; padding-left: 38px; padding-right: 36px; }
+  .mc-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent;
+    color: var(--text-secondary); width: 26px; height: 26px; border-radius: 8px; display: none; }
+  .mc-clear:hover { color: var(--text-primary); background: rgba(255,255,255,.08); }
+  .mc-search.has-value .mc-clear { display: block; }
+  .mc-seg { display: inline-flex; background: #111827; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; padding: 3px; gap: 2px; }
+  .mc-seg button { border: 0; background: transparent; color: var(--text-secondary); height: 30px; padding: 0 .8rem;
+    border-radius: 8px; font-size: .85rem; display: inline-flex; align-items: center; gap: .4rem; transition: background .15s, color .15s; }
+  .mc-seg button:hover { color: var(--text-primary); }
+  .mc-seg button.active { background: var(--accent); color: #fff; }
+  .mc-seg button .mc-count { font-size: .72rem; padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,.12); }
+  .mc-seg button.active .mc-count { background: rgba(255,255,255,.25); }
+  .mc-icon-btn { border: 1px solid rgba(255,255,255,.1); background: #111827; color: var(--text-secondary); width: 38px; height: 38px;
+    border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.15rem; transition: all .15s; }
+  .mc-icon-btn:hover { color: var(--text-primary); border-color: rgba(255,255,255,.25); }
+  .mc-spacer { flex: 1 1 auto; }
+  .mc-switch { display: inline-flex; align-items: center; gap: .5rem; color: var(--text-secondary); font-size: .85rem; cursor: pointer; user-select: none; }
+  .mc-switch input { appearance: none; width: 34px; height: 20px; border-radius: 999px; background: #374151; position: relative; cursor: pointer; transition: background .15s; margin: 0; }
+  .mc-switch input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .mc-switch input:checked { background: var(--accent); }
+  .mc-switch input:checked::after { transform: translateX(14px); }
 
-<form method="get" class="d-flex flex-wrap align-items-end gap-3 mb-4">
-  <div>
-    <label for="anio" class="form-label text-secondary small mb-1">Año</label>
-    <select name="anio" id="anio" class="form-select form-select-sm" onchange="this.form.submit()">
-      {% for a in anios %}
-      <option value="{{ a }}" {% if a == anio %}selected{% endif %}>{{ a }}</option>
-      {% endfor %}
+  .mc-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .75rem; margin-bottom: 1rem; }
+  .mc-kpi { background: var(--card-bg); border: 1px solid rgba(255,255,255,.06); border-radius: 14px; padding: .9rem 1.1rem; }
+  .mc-kpi .mc-kpi-label { color: var(--text-secondary); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
+  .mc-kpi .mc-kpi-value { font-size: 1.7rem; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+
+  .mc-bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .mc-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .35s ease; }
+  .mc-bar.done > span { background: var(--success); }
+
+  .mc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 1rem; transition: opacity .2s; }
+  .mc-card { background: var(--card-bg); border: 1px solid rgba(255,255,255,.06); border-radius: 16px; padding: 1rem 1.1rem;
+    display: flex; flex-direction: column; gap: .8rem; animation: mcIn .22s ease both; transition: border-color .15s, transform .15s; }
+  .mc-card:hover { border-color: rgba(99,102,241,.55); transform: translateY(-2px); }
+  .mc-card.is-done { border-color: rgba(16,185,129,.35); }
+  .mc-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; cursor: pointer; }
+  .mc-card-title { margin: 0; font-size: 1.05rem; font-weight: 600; word-break: break-word; }
+  .mc-card-title mark, .mc-table td mark { background: rgba(245,158,11,.3); color: inherit; border-radius: 3px; padding: 0 2px; }
+  .mc-stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; }
+  .mc-stats .l { color: var(--text-secondary); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
+  .mc-stats .v { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .mc-chevron { transition: transform .2s; color: var(--text-secondary); }
+  .mc-card.collapsed .mc-chevron { transform: rotate(-90deg); }
+  .mc-card.collapsed .mc-tramos { display: none; }
+
+  .mc-tramos { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .mc-chip { display: inline-flex; align-items: center; gap: .4rem; padding: 3px 9px; border-radius: 999px; font-size: .8rem;
+    border: 1px solid transparent; font-variant-numeric: tabular-nums; }
+  .mc-chip b { font-weight: 600; }
+  .mc-chip.ok { background: rgba(16,185,129,.14); border-color: rgba(16,185,129,.4); color: #6ee7b7; }
+  .mc-chip.falta { background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.45); color: #fcd34d; }
+  .mc-chip.extra { background: rgba(56,189,248,.14); border-color: rgba(56,189,248,.4); color: #7dd3fc; }
+  .mc-badge { font-size: .74rem; padding: 3px 9px; border-radius: 999px; white-space: nowrap; font-weight: 600; }
+  .mc-badge.ok { background: rgba(16,185,129,.18); color: #6ee7b7; }
+  .mc-badge.falta { background: rgba(245,158,11,.18); color: #fcd34d; }
+  .mc-badge.neutral { background: rgba(255,255,255,.08); color: var(--text-secondary); }
+
+  .mc-table-wrap { background: var(--card-bg); border: 1px solid rgba(255,255,255,.06); border-radius: 14px; overflow: auto; }
+  .mc-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  .mc-table th { position: sticky; top: 0; background: #17202e; color: var(--text-secondary); font-weight: 600; font-size: .76rem;
+    text-transform: uppercase; letter-spacing: .04em; padding: .7rem .9rem; text-align: right; white-space: nowrap; cursor: pointer; user-select: none; }
+  .mc-table th:first-child, .mc-table td:first-child { text-align: left; }
+  .mc-table th.tramos-col, .mc-table td.tramos-col { text-align: left; cursor: default; }
+  .mc-table th:hover:not(.tramos-col) { color: var(--text-primary); }
+  .mc-table td { padding: .6rem .9rem; border-top: 1px solid rgba(255,255,255,.05); text-align: right; font-variant-numeric: tabular-nums; vertical-align: middle; }
+  .mc-table tbody tr:hover { background: rgba(255,255,255,.03); }
+  .mc-table tfoot td { font-weight: 700; background: #17202e; }
+  .mc-table .mc-bar { min-width: 80px; }
+
+  .mc-empty { text-align: center; padding: 3rem 1rem; color: var(--text-secondary); background: var(--card-bg); border-radius: 14px; border: 1px dashed rgba(255,255,255,.12); }
+  .mc-empty i { font-size: 2.4rem; display: block; margin-bottom: .5rem; }
+  .mc-empty button { margin-top: .75rem; }
+  .mc-note { display: flex; align-items: center; gap: .5rem; padding: .55rem .9rem; margin-bottom: 1rem; border-radius: 10px;
+    background: rgba(245,158,11,.12); color: #fcd34d; font-size: .85rem; }
+  .mc-note.error { background: rgba(239,68,68,.14); color: #fca5a5; }
+  .is-loading { opacity: .45; pointer-events: none; }
+  @keyframes mcIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .mc-card, .mc-bar > span { animation: none; transition: none; } }
+  @media (max-width: 640px) { .mc-toolbar { position: static; } .mc-search { max-width: none; } }
+</style>
+
+<div class="mc-toolbar" id="mcToolbar">
+  <div class="mc-field">
+    <select id="mcAnio" class="mc-select" aria-label="Año">
+      {% for a in anios %}<option value="{{ a }}" {% if a == anio %}selected{% endif %}>{{ a }}</option>{% endfor %}
     </select>
   </div>
-  <noscript><button type="submit" class="btn btn-sm btn-outline-light">Ver</button></noscript>
-  {% if puede_exportar and filas %}
-  <a href="{{ url_for('informe_marcos_anual_export', anio=anio) }}" class="btn btn-sm btn-success">
-    <i class='bx bxs-file-export'></i> Exportar Excel
+
+  <div class="mc-search" id="mcSearchBox">
+    <i class='bx bx-search'></i>
+    <input type="text" id="mcBuscar" class="mc-input" placeholder="Buscar marco" autocomplete="off" spellcheck="false" aria-label="Buscar marco">
+    <button type="button" class="mc-clear" id="mcClear" aria-label="Borrar búsqueda"><i class='bx bx-x'></i></button>
+  </div>
+
+  <label class="mc-switch">
+    <input type="checkbox" id="mcExacto"> Exacto
+  </label>
+
+  <div class="mc-seg" id="mcEstado" role="group" aria-label="Estado">
+    <button type="button" data-estado="todos" class="active">Todos <span class="mc-count">0</span></button>
+    <button type="button" data-estado="faltantes">Con faltantes <span class="mc-count">0</span></button>
+    <button type="button" data-estado="completos">Completos <span class="mc-count">0</span></button>
+  </div>
+
+  <div class="mc-spacer"></div>
+
+  <div class="mc-field">
+    <select id="mcOrden" class="mc-select" aria-label="Ordenar por">
+      <option value="nombre">Nombre</option>
+      <option value="avance">Avance</option>
+      <option value="pendiente">Pendiente</option>
+      <option value="ingresado">Ingresado</option>
+      <option value="producido">Producido</option>
+    </select>
+    <button type="button" class="mc-icon-btn" id="mcDir" aria-label="Invertir orden"><i class='bx bx-sort-a-z'></i></button>
+  </div>
+
+  <div class="mc-seg" id="mcVista" role="group" aria-label="Vista">
+    <button type="button" data-vista="tarjetas" class="active" aria-label="Tarjetas"><i class='bx bxs-grid-alt'></i></button>
+    <button type="button" data-vista="tabla" aria-label="Tabla"><i class='bx bx-table'></i></button>
+  </div>
+
+  <button type="button" class="mc-icon-btn" id="mcToggleTramos" aria-label="Expandir o contraer tramos"><i class='bx bx-collapse-vertical'></i></button>
+  <button type="button" class="mc-icon-btn" id="mcReset" aria-label="Limpiar filtros" style="display:none"><i class='bx bx-filter-alt'></i></button>
+  {% if puede_exportar %}
+  <a href="{{ url_for('informe_marcos_anual_export', anio=anio) }}" id="mcExport" class="btn btn-success btn-sm d-inline-flex align-items-center gap-2" style="height:38px">
+    <i class='bx bxs-file-export'></i> Excel
   </a>
   {% endif %}
-</form>
-
-<p class="text-secondary small">
-  <strong>Ingresado</strong>: piezas creadas en {{ anio }}.
-  <strong>Producido</strong>: piezas rematadas en {{ anio }}.
-  Pendiente = Ingresado − Producido (puede ser negativo si se remataron piezas ingresadas en años anteriores).
-  En cada marco, un tramo en verde está completo; <strong>Faltan</strong> indica cuántas piezas de ese tramo aún no se rematan (+N = piezas rematadas de más).
-</p>
-
-{% if sin_fecha %}
-<div class="alert alert-warning small">
-  Hay {{ sin_fecha }} pieza(s) sin fecha de creación; no se pueden contar como ingresadas en ningún año.
 </div>
-{% endif %}
 
-{% if filas %}
-<div class="row g-3 mb-4">
-  <div class="col-md-4">
-    <div class="card bg-dark border-light text-center"><div class="card-body">
-      <div class="text-secondary small">Total ingresado</div>
-      <div class="fs-3 text-light">{{ totales.ingresado }}</div>
-    </div></div>
-  </div>
-  <div class="col-md-4">
-    <div class="card bg-dark border-light text-center"><div class="card-body">
-      <div class="text-secondary small">Total producido</div>
-      <div class="fs-3 text-success">{{ totales.producido }}</div>
-    </div></div>
-  </div>
-  <div class="col-md-4">
-    <div class="card bg-dark border-light text-center"><div class="card-body">
-      <div class="text-secondary small">Avance</div>
-      <div class="fs-3 text-warning">{% if totales.avance is not none %}{{ totales.avance }}%{% else %}—{% endif %}</div>
-    </div></div>
+<div id="mcAviso"></div>
+
+<div class="mc-kpis" id="mcKpis">
+  <div class="mc-kpi"><div class="mc-kpi-label">Marcos</div><div class="mc-kpi-value" data-kpi="marcos">0</div></div>
+  <div class="mc-kpi"><div class="mc-kpi-label">Ingresado</div><div class="mc-kpi-value" data-kpi="ingresado">0</div></div>
+  <div class="mc-kpi"><div class="mc-kpi-label">Producido</div><div class="mc-kpi-value text-success" data-kpi="producido">0</div></div>
+  <div class="mc-kpi"><div class="mc-kpi-label">Pendiente</div><div class="mc-kpi-value text-warning" data-kpi="pendiente">0</div></div>
+  <div class="mc-kpi">
+    <div class="mc-kpi-label">Avance</div>
+    <div class="mc-kpi-value" data-kpi="avance">—</div>
+    <div class="mc-bar mt-2" id="mcKpiBar"><span style="width:0%"></span></div>
   </div>
 </div>
 
-<div class="d-flex flex-wrap align-items-center gap-3 mb-3">
-  <div class="flex-grow-1" style="max-width: 420px;">
-    <label for="buscarMarco" class="form-label text-secondary small mb-1">Buscar marco</label>
-    <div class="input-group input-group-sm">
-      <span class="input-group-text"><i class='bx bx-search'></i></span>
-      <input type="search" id="buscarMarco" class="form-control" placeholder="Ej: TH1, 3 carriles…" autocomplete="off">
-    </div>
-  </div>
-  <div class="form-check mt-4">
-    <input class="form-check-input" type="checkbox" id="marcoExacto">
-    <label class="form-check-label text-secondary small" for="marcoExacto">Nombre exacto (TH1 no muestra TH10)</label>
-  </div>
-  <div class="form-check mt-4">
-    <input class="form-check-input" type="checkbox" id="soloFaltantes">
-    <label class="form-check-label text-secondary small" for="soloFaltantes">Solo con tramos faltantes</label>
-  </div>
-  <div class="text-secondary small mt-4" id="marcoContador" aria-live="polite"></div>
-</div>
+<div id="mcResultados"></div>
 
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-4" id="marcoCards">
-  {% for f in filas %}
-  <div class="col marco-item" data-marco="{{ f.marco }}" data-faltantes="{{ 1 if f.tramos_faltantes else 0 }}">
-    <div class="card bg-dark border-light shadow h-100">
-      <div class="card-body text-center">
-        <h5 class="card-title text-light mb-3">{{ f.marco }}</h5>
-        <div class="d-flex justify-content-around">
-          <div><div class="text-secondary small">Ingresado</div><div class="fs-4 text-light">{{ f.ingresado }}</div></div>
-          <div><div class="text-secondary small">Producido</div><div class="fs-4 text-success">{{ f.producido }}</div></div>
-          <div><div class="text-secondary small">Pendiente</div><div class="fs-4 {% if f.pendiente > 0 %}text-warning{% else %}text-light{% endif %}">{{ f.pendiente }}</div></div>
-        </div>
-        {% if f.avance is not none %}
-        <div class="small text-secondary mt-2">Avance: {{ f.avance }}%</div>
-        {% endif %}
-
-        <div class="mt-3">
-          {% if f.completo %}
-            <span class="badge bg-success">Marco completo</span>
-          {% elif f.tramos_faltantes %}
-            <span class="badge bg-warning text-dark">Faltan tramos: {{ f.tramos_faltantes|join(', ') }}</span>
-          {% endif %}
-        </div>
-
-        <table class="table table-dark table-sm mt-3 mb-0">
-          <thead>
-            <tr class="text-secondary small text-center">
-              <th>Tramo</th><th>Ingr.</th><th>Prod.</th><th>Faltan</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for t in f.tramos %}
-            <tr class="text-center {% if t.completo %}table-success text-dark fw-bold{% endif %}">
-              <td>{{ t.tramo }}</td>
-              <td>{{ t.ingresado }}</td>
-              <td>{{ t.producido }}</td>
-              <td>{% if t.pendiente > 0 %}{{ t.pendiente }}{% elif t.pendiente < 0 %}+{{ -t.pendiente }}{% else %}✔{% endif %}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-  {% endfor %}
-</div>
-<div id="marcoSinResultados" class="alert alert-secondary text-center d-none">Ningún marco coincide con la búsqueda.</div>
-
-<div class="table-responsive">
-  <table class="table table-dark table-sm align-middle">
-    <thead>
-      <tr class="text-secondary small">
-        <th>Marco</th>
-        <th class="text-end">Ingresado</th>
-        <th class="text-end">Producido</th>
-        <th class="text-end">Pendiente</th>
-        <th class="text-end">Avance</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for f in filas %}
-      <tr class="marco-item" data-marco="{{ f.marco }}" data-faltantes="{{ 1 if f.tramos_faltantes else 0 }}">
-        <td>{{ f.marco }}</td>
-        <td class="text-end">{{ f.ingresado }}</td>
-        <td class="text-end">{{ f.producido }}</td>
-        <td class="text-end">{{ f.pendiente }}</td>
-        <td class="text-end">{% if f.avance is not none %}{{ f.avance }}%{% else %}—{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-    <tfoot>
-      <tr class="fw-bold">
-        <td>TOTAL</td>
-        <td class="text-end">{{ totales.ingresado }}</td>
-        <td class="text-end">{{ totales.producido }}</td>
-        <td class="text-end">{{ totales.pendiente }}</td>
-        <td class="text-end">{% if totales.avance is not none %}{{ totales.avance }}%{% else %}—{% endif %}</td>
-      </tr>
-    </tfoot>
-  </table>
-</div>
-{% else %}
-<div class="alert alert-secondary text-center">No hay marcos ingresados ni producidos en {{ anio }}.</div>
-{% endif %}
-
-{% endblock %}
-
-{% block scripts %}
+<script id="mcPayload" type="application/json">{{ payload|tojson }}</script>
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  const input = document.getElementById('buscarMarco');
-  if (!input) return;
-  const exacto = document.getElementById('marcoExacto');
-  const faltantes = document.getElementById('soloFaltantes');
-  const contador = document.getElementById('marcoContador');
-  const vacio = document.getElementById('marcoSinResultados');
-  const cards = Array.from(document.querySelectorAll('#marcoCards .marco-item'));
-  const filas = Array.from(document.querySelectorAll('tr.marco-item'));
-  const norm = s => (s || '').normalize('NFD').replace(/\p{M}/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
+(() => {
+  const $ = id => document.getElementById(id);
+  const fmt = n => Number(n).toLocaleString('es-CL');
+  const fmtPct = n => n == null ? '—' : Number(n).toLocaleString('es-CL', { maximumFractionDigits: 1 }) + '%';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/\p{M}/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const BASE_DATA_URL = {{ url_for('informe_marcos_anual_data')|tojson }};
+  const BASE_EXPORT_URL = {{ url_for('informe_marcos_anual_export')|tojson }};
 
-  function coincide(el) {
-    const q = norm(input.value);
-    const nombre = norm(el.dataset.marco);
-    if (q && (exacto.checked ? nombre !== q : !nombre.includes(q))) return false;
-    if (faltantes.checked && el.dataset.faltantes !== '1') return false;
-    return true;
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const icon = name => el('i', 'bx ' + name);
+
+  const DEFAULTS = { q: '', estado: 'todos', orden: 'nombre', dir: 'asc', vista: 'tarjetas', exacto: false, abiertos: true };
+  const state = Object.assign({}, DEFAULTS, { anio: Number({{ anio }}), data: JSON.parse($('mcPayload').textContent) });
+
+  // ---------- URL <-> estado ----------
+  function leerUrl() {
+    const p = new URLSearchParams(location.search);
+    if (p.get('q')) state.q = p.get('q');
+    if (['todos', 'faltantes', 'completos'].includes(p.get('estado'))) state.estado = p.get('estado');
+    if (['nombre', 'avance', 'pendiente', 'ingresado', 'producido'].includes(p.get('orden'))) state.orden = p.get('orden');
+    if (['asc', 'desc'].includes(p.get('dir'))) state.dir = p.get('dir');
+    if (['tarjetas', 'tabla'].includes(p.get('vista'))) state.vista = p.get('vista');
+    if (p.get('exacto') === '1') state.exacto = true;
+  }
+  function escribirUrl() {
+    const p = new URLSearchParams();
+    p.set('anio', state.anio);
+    if (state.q) p.set('q', state.q);
+    if (state.estado !== DEFAULTS.estado) p.set('estado', state.estado);
+    if (state.orden !== DEFAULTS.orden) p.set('orden', state.orden);
+    if (state.dir !== DEFAULTS.dir) p.set('dir', state.dir);
+    if (state.vista !== DEFAULTS.vista) p.set('vista', state.vista);
+    if (state.exacto) p.set('exacto', '1');
+    history.replaceState(null, '', location.pathname + '?' + p.toString());
   }
 
-  function aplicar() {
-    let visibles = 0;
-    cards.forEach(el => {
-      const ok = coincide(el);
-      el.classList.toggle('d-none', !ok);
-      if (ok) visibles++;
+  // ---------- filtrado y orden ----------
+  const coincideTexto = f => {
+    const q = norm(state.q);
+    if (!q) return true;
+    const nombre = norm(f.marco);
+    return state.exacto ? nombre === q : nombre.includes(q);
+  };
+  const coincideEstado = f => state.estado === 'todos' ||
+    (state.estado === 'completos' ? f.completo : !f.completo && f.tramos_faltantes.length > 0);
+
+  function calcular() {
+    const base = state.data.filas.filter(coincideTexto);
+    const conteos = {
+      todos: base.length,
+      faltantes: base.filter(f => !f.completo && f.tramos_faltantes.length > 0).length,
+      completos: base.filter(f => f.completo).length,
+    };
+    const lista = base.filter(coincideEstado);
+    const mult = state.dir === 'asc' ? 1 : -1;
+    const key = f => state.orden === 'nombre' ? norm(f.marco) : (state.orden === 'avance' ? (f.avance == null ? -1 : f.avance) : f[state.orden]);
+    lista.sort((a, b) => {
+      const x = key(a), y = key(b);
+      const c = typeof x === 'string' ? x.localeCompare(y, 'es', { numeric: true }) : x - y;
+      return (c || norm(a.marco).localeCompare(norm(b.marco), 'es', { numeric: true })) * mult;
     });
-    filas.forEach(el => el.classList.toggle('d-none', !coincide(el)));
-    contador.textContent = `Mostrando ${visibles} de ${cards.length} marcos`;
-    vacio.classList.toggle('d-none', visibles > 0);
+    const t = lista.reduce((acc, f) => { acc.ingresado += f.ingresado; acc.producido += f.producido; return acc; }, { ingresado: 0, producido: 0 });
+    t.pendiente = t.ingresado - t.producido;
+    t.avance = t.ingresado ? Math.round(t.producido * 1000 / t.ingresado) / 10 : null;
+    t.marcos = lista.length;
+    return { lista, conteos, totales: t };
   }
 
-  input.addEventListener('input', aplicar);
-  exacto.addEventListener('change', aplicar);
-  faltantes.addEventListener('change', aplicar);
-  aplicar();
-});
+  // ---------- render ----------
+  function resaltar(nodo, texto) {
+    const q = state.q.trim();
+    if (!q || state.exacto) { nodo.textContent = texto; return; }
+    const t = norm(texto), n = norm(q);
+    // normalizar puede cambiar longitudes; solo resaltar cuando coinciden 1:1
+    if (t.length !== texto.length) { nodo.textContent = texto; return; }
+    const i = t.indexOf(n);
+    if (i < 0) { nodo.textContent = texto; return; }
+    nodo.append(document.createTextNode(texto.slice(0, i)));
+    nodo.append(el('mark', null, texto.slice(i, i + n.length)), document.createTextNode(texto.slice(i + n.length)));
+  }
+
+  function chip(t) {
+    const tipo = t.pendiente > 0 ? 'falta' : (t.pendiente < 0 ? 'extra' : 'ok');
+    const c = el('span', 'mc-chip ' + tipo);
+    c.title = tipo === 'falta' ? `Faltan ${fmt(t.pendiente)}` : (tipo === 'extra' ? `${fmt(-t.pendiente)} de más` : 'Completo');
+    c.append(icon(tipo === 'falta' ? 'bx-error-circle' : 'bx-check-circle'));
+    c.append(el('b', null, t.tramo), document.createTextNode(` ${fmt(t.producido)}/${fmt(t.ingresado)}`));
+    return c;
+  }
+  function badge(f) {
+    if (f.completo) return el('span', 'mc-badge ok', 'Completo');
+    if (f.tramos_faltantes.length) {
+      return el('span', 'mc-badge falta', f.tramos_faltantes.length === 1 ? 'Falta 1 tramo' : `Faltan ${f.tramos_faltantes.length} tramos`);
+    }
+    return el('span', 'mc-badge neutral', 'Sin ingresos');
+  }
+  function barra(f) {
+    const b = el('div', 'mc-bar' + (f.completo ? ' done' : ''));
+    const s = document.createElement('span');
+    s.style.width = Math.max(0, Math.min(100, f.avance || 0)) + '%';
+    b.append(s);
+    return b;
+  }
+
+  function tarjeta(f, i) {
+    const card = el('article', 'mc-card' + (f.completo ? ' is-done' : '') + (state.abiertos ? '' : ' collapsed'));
+    card.style.animationDelay = Math.min(i, 12) * 18 + 'ms';
+    const head = el('div', 'mc-card-head');
+    const title = el('h3', 'mc-card-title');
+    resaltar(title, f.marco);
+    const right = el('div', 'd-flex align-items-center gap-2');
+    right.append(badge(f), icon('bx-chevron-down mc-chevron'));
+    head.append(title, right);
+    head.addEventListener('click', () => card.classList.toggle('collapsed'));
+
+    const stats = el('div', 'mc-stats');
+    [['Ingresado', f.ingresado, ''], ['Producido', f.producido, 'text-success'], ['Pendiente', f.pendiente, f.pendiente > 0 ? 'text-warning' : '']]
+      .forEach(([l, v, cls]) => {
+        const d = el('div');
+        d.append(el('div', 'l', l), el('div', 'v ' + cls, fmt(v)));
+        stats.append(d);
+      });
+
+    const prog = el('div');
+    const meta = el('div', 'd-flex justify-content-between small text-secondary mb-1');
+    meta.append(el('span', null, 'Avance'), el('span', null, fmtPct(f.avance)));
+    prog.append(meta, barra(f));
+
+    const tramos = el('div', 'mc-tramos');
+    f.tramos.forEach(t => tramos.append(chip(t)));
+    card.append(head, stats, prog, tramos);
+    return card;
+  }
+
+  function tabla(lista, totales) {
+    const wrap = el('div', 'mc-table-wrap');
+    const table = el('table', 'mc-table');
+    const thead = el('thead'), tr = el('tr');
+    [['nombre', 'Marco'], ['ingresado', 'Ingresado'], ['producido', 'Producido'], ['pendiente', 'Pendiente'], ['avance', 'Avance']].forEach(([k, label]) => {
+      const th = el('th', null, label);
+      if (state.orden === k) th.append(document.createTextNode(state.dir === 'asc' ? ' ▲' : ' ▼'));
+      th.addEventListener('click', () => {
+        if (state.orden === k) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+        else { state.orden = k; state.dir = k === 'nombre' ? 'asc' : 'desc'; }
+        actualizar();
+      });
+      tr.append(th);
+    });
+    tr.append(el('th', 'tramos-col', 'Tramos'));
+    thead.append(tr);
+    const tbody = el('tbody');
+    lista.forEach(f => {
+      const row = el('tr');
+      const c0 = el('td'); resaltar(c0, f.marco);
+      const cAv = el('td'); cAv.append(el('div', 'small mb-1', fmtPct(f.avance)), barra(f));
+      const cT = el('td', 'tramos-col'); const box = el('div', 'mc-tramos'); f.tramos.forEach(t => box.append(chip(t))); cT.append(box);
+      row.append(c0, el('td', null, fmt(f.ingresado)), el('td', null, fmt(f.producido)), el('td', f.pendiente > 0 ? 'text-warning' : null, fmt(f.pendiente)), cAv, cT);
+      tbody.append(row);
+    });
+    const tfoot = el('tfoot'), fr = el('tr');
+    [`Total (${fmt(totales.marcos)})`, fmt(totales.ingresado), fmt(totales.producido), fmt(totales.pendiente), fmtPct(totales.avance), ''].forEach(v => fr.append(el('td', null, v)));
+    tfoot.append(fr);
+    table.append(thead, tbody, tfoot);
+    wrap.append(table);
+    return wrap;
+  }
+
+  function vacio(hayDatos) {
+    const box = el('div', 'mc-empty');
+    box.append(icon(hayDatos ? 'bx-search-alt' : 'bx-package'));
+    box.append(el('div', null, hayDatos ? 'Sin resultados' : `Sin marcos en ${state.anio}`));
+    if (hayDatos) {
+      const b = el('button', 'btn btn-outline-light btn-sm', 'Limpiar filtros');
+      b.addEventListener('click', reset);
+      box.append(b);
+    }
+    return box;
+  }
+
+  const kpiPrev = {};
+  function animarKpi(nombre, destino, formato) {
+    const nodo = document.querySelector(`[data-kpi="${nombre}"]`);
+    const desde = kpiPrev[nombre] == null ? destino : kpiPrev[nombre];
+    kpiPrev[nombre] = destino;
+    if (reduceMotion || desde === destino) { nodo.textContent = formato(destino); return; }
+    const t0 = performance.now(), dur = 260;
+    const paso = ahora => {
+      const k = Math.min(1, (ahora - t0) / dur);
+      nodo.textContent = formato(Math.round(desde + (destino - desde) * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) requestAnimationFrame(paso);
+    };
+    requestAnimationFrame(paso);
+  }
+
+  function pintarKpis(t) {
+    animarKpi('marcos', t.marcos, fmt);
+    animarKpi('ingresado', t.ingresado, fmt);
+    animarKpi('producido', t.producido, fmt);
+    animarKpi('pendiente', t.pendiente, fmt);
+    document.querySelector('[data-kpi="avance"]').textContent = fmtPct(t.avance);
+    const bar = $('mcKpiBar');
+    bar.classList.toggle('done', t.avance != null && t.avance >= 100);
+    bar.firstElementChild.style.width = Math.max(0, Math.min(100, t.avance || 0)) + '%';
+  }
+
+  const filtrosActivos = () => state.q !== '' || state.estado !== 'todos' || state.exacto;
+
+  function actualizar() {
+    const { lista, conteos, totales } = calcular();
+
+    if ($('mcBuscar').value !== state.q) $('mcBuscar').value = state.q;
+    $('mcSearchBox').classList.toggle('has-value', state.q !== '');
+    $('mcExacto').checked = state.exacto;
+    $('mcOrden').value = state.orden;
+    $('mcDir').firstElementChild.className = 'bx ' + (state.dir === 'asc' ? 'bx-sort-a-z' : 'bx-sort-z-a');
+    document.querySelectorAll('#mcEstado button').forEach(b => {
+      b.classList.toggle('active', b.dataset.estado === state.estado);
+      b.querySelector('.mc-count').textContent = fmt(conteos[b.dataset.estado]);
+    });
+    document.querySelectorAll('#mcVista button').forEach(b => b.classList.toggle('active', b.dataset.vista === state.vista));
+    $('mcToggleTramos').classList.toggle('d-none', state.vista !== 'tarjetas');
+    $('mcToggleTramos').firstElementChild.className = 'bx ' + (state.abiertos ? 'bx-collapse-vertical' : 'bx-expand-vertical');
+    $('mcReset').style.display = filtrosActivos() ? '' : 'none';
+
+    pintarKpis(totales);
+
+    const cont = $('mcResultados');
+    cont.replaceChildren();
+    if (!lista.length) {
+      cont.append(vacio(state.data.filas.length > 0));
+    } else if (state.vista === 'tabla') {
+      cont.append(tabla(lista, totales));
+    } else {
+      const grid = el('div', 'mc-grid');
+      lista.forEach((f, i) => grid.append(tarjeta(f, i)));
+      cont.append(grid);
+    }
+    escribirUrl();
+  }
+
+  function pintarAviso() {
+    const a = $('mcAviso');
+    a.replaceChildren();
+    if (state.data.sin_fecha) {
+      const n = el('div', 'mc-note');
+      n.append(icon('bx-error'), document.createTextNode(`${fmt(state.data.sin_fecha)} piezas sin fecha de creación`));
+      a.append(n);
+    }
+  }
+
+  function reset() {
+    state.q = ''; state.estado = 'todos'; state.exacto = false;
+    actualizar();
+    $('mcBuscar').focus();
+  }
+
+  // ---------- eventos ----------
+  let debounce;
+  $('mcBuscar').addEventListener('input', e => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => { state.q = e.target.value; actualizar(); }, 120);
+    $('mcSearchBox').classList.toggle('has-value', e.target.value !== '');
+  });
+  $('mcClear').addEventListener('click', () => { clearTimeout(debounce); state.q = ''; actualizar(); $('mcBuscar').focus(); });
+  $('mcExacto').addEventListener('change', e => { state.exacto = e.target.checked; actualizar(); });
+  $('mcEstado').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { state.estado = b.dataset.estado; actualizar(); } });
+  $('mcVista').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { state.vista = b.dataset.vista; actualizar(); } });
+  $('mcOrden').addEventListener('change', e => { state.orden = e.target.value; state.dir = state.orden === 'nombre' ? 'asc' : 'desc'; actualizar(); });
+  $('mcDir').addEventListener('click', () => { state.dir = state.dir === 'asc' ? 'desc' : 'asc'; actualizar(); });
+  $('mcToggleTramos').addEventListener('click', () => { state.abiertos = !state.abiertos; actualizar(); });
+  $('mcReset').addEventListener('click', reset);
+  document.addEventListener('keydown', e => {
+    const enCampo = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+    if (e.key === '/' && !enCampo && !e.ctrlKey && !e.metaKey) { e.preventDefault(); $('mcBuscar').focus(); $('mcBuscar').select(); }
+    if (e.key === 'Escape' && document.activeElement === $('mcBuscar')) {
+      if (state.q || $('mcBuscar').value) { clearTimeout(debounce); state.q = ''; actualizar(); } else { $('mcBuscar').blur(); }
+    }
+  });
+
+  let peticion = 0;
+  $('mcAnio').addEventListener('change', async e => {
+    const anio = Number(e.target.value);
+    const id = ++peticion;
+    $('mcResultados').classList.add('is-loading');
+    $('mcKpis').classList.add('is-loading');
+    try {
+      const r = await fetch(`${BASE_DATA_URL}?anio=${anio}`, { headers: { Accept: 'application/json' } });
+      if (!(r.headers.get('content-type') || '').includes('application/json')) throw new Error('Sesión expirada. Recarga la página.');
+      if (!r.ok) throw new Error('No se pudo cargar el año seleccionado.');
+      const data = await r.json();
+      if (id !== peticion) return;
+      state.data = data;
+      state.anio = anio;
+      $('mcTitleYear').textContent = anio;
+      document.title = document.title.replace(/\d{4}/, anio);
+      const ex = $('mcExport');
+      if (ex) ex.href = `${BASE_EXPORT_URL}?anio=${anio}`;
+      pintarAviso();
+      actualizar();
+    } catch (err) {
+      if (id !== peticion) return;
+      e.target.value = state.anio;
+      const n = el('div', 'mc-note error');
+      n.append(icon('bx-error-circle'), document.createTextNode(err.message));
+      $('mcAviso').replaceChildren(n);
+      setTimeout(pintarAviso, 4000);
+    } finally {
+      if (id === peticion) { $('mcResultados').classList.remove('is-loading'); $('mcKpis').classList.remove('is-loading'); }
+    }
+  });
+
+  leerUrl();
+  pintarAviso();
+  actualizar();
+})();
 </script>
 {% endblock %}

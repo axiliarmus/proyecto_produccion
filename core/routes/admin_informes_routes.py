@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, timedelta, timezone
 
-from flask import abort, render_template, request, session
+from flask import abort, jsonify, render_template, request, session
 
 from core.helpers.date_utils import CL, build_date_range_utc, now_cl
 from core.helpers.reporting import build_marcos_anual, get_marcos_anual_years, merge_status_maps
@@ -52,21 +52,27 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
         start_utc, end_utc = build_date_range_utc(f"{anio}-01-01", f"{anio}-12-31")
         return build_marcos_anual(db, anio, start_utc, end_utc)
 
+    def _payload_marcos_anual(anio):
+        filas, totales, sin_fecha = _datos_marcos_anual(anio)
+        return {"anio": anio, "filas": filas, "totales": totales, "sin_fecha": sin_fecha}
+
     @app.route("/admin/informes/marcos/anual", methods=["GET"])
     @login_required(["administrador", "supervisor", "soporte", "cliente"])
     def informe_marcos_anual():
         anio = _resolve_anio_marcos()
-        filas, totales, sin_fecha = _datos_marcos_anual(anio)
         anios = sorted(set(get_marcos_anual_years(db)) | {anio}, reverse=True)
         return render_template(
             "informe_marcos_anual.html",
             anio=anio,
             anios=anios,
-            filas=filas,
-            totales=totales,
-            sin_fecha=sin_fecha,
+            payload=_payload_marcos_anual(anio),
             puede_exportar=send_excel_file is not None,
         )
+
+    @app.route("/admin/informes/marcos/anual/data", methods=["GET"])
+    @login_required(["administrador", "supervisor", "soporte", "cliente"])
+    def informe_marcos_anual_data():
+        return jsonify(_payload_marcos_anual(_resolve_anio_marcos()))
 
     @app.route("/admin/informes/marcos/anual/export", methods=["GET"])
     @login_required(["administrador", "supervisor", "soporte", "cliente"])
