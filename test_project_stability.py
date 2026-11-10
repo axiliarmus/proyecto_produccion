@@ -16,7 +16,11 @@ from core.helpers.auth import authenticate_user
 from core.helpers.date_utils import InvalidDateRange, build_date_range_utc
 from core.helpers.reporting import build_marcos_anual, build_tarjetas_grupos, listar_piezas_marcos_anual
 from core.helpers.soft_delete import soft_delete_many, soft_delete_selected_production
-from core.routes.admin_planificacion_routes import _get_marco_production_stats, _unidad_armado
+from core.routes.admin_planificacion_routes import (
+    _build_asignaciones_armado,
+    _get_marco_production_stats,
+    _unidad_armado,
+)
 from core.routes.registry import register_all_routes
 
 
@@ -466,26 +470,107 @@ class ProjectRegressionTests(unittest.TestCase):
 
     def test_planificacion_armado_cuenta_una_vez_por_pieza(self):
         solo, otro = ObjectId(), ObjectId()
+        d = lambda n: datetime(2026, 5, n, tzinfo=timezone.utc)
         docs = [
-            {"user_id": str(solo), "tramo": "1", "codigo_pieza": "p1"},
-            {"user_id": str(solo), "tramo": "1", "codigo_pieza": "p1", "armado_solo_extra": True},   # 2do registro del armado solo
-            {"user_id": str(solo), "tramo": "1", "codigo_pieza": "p2"},
-            {"user_id": str(otro), "tramo": "1", "codigo_pieza": "p2"},                                # 2da persona arma la misma pieza
+            {"user_id": str(solo), "tramo": "1", "codigo_pieza": "p1", "fecha": d(1)},
+            {"user_id": str(solo), "tramo": "1", "codigo_pieza": "p1", "fecha": d(1), "armado_solo_extra": True},
+            {"user_id": str(solo), "tramo": "1", "codigo_pieza": "p2", "fecha": d(2)},
+            {"user_id": str(otro), "tramo": "1", "codigo_pieza": "p2", "fecha": d(3)},   # segundo armador de p2
+            {"user_id": str(otro), "tramo": "1", "codigo_pieza": "p3", "fecha": d(4)},
+            {"user_id": str(solo), "tramo": "1", "codigo_pieza": "p3", "fecha": d(5)},   # segundo armador de p3
         ]
         db = MagicMock()
-        db.produccion.find.side_effect = lambda *a, **k: iter([dict(d) for d in docs])
+        db.produccion.find.side_effect = lambda *a, **k: iter([dict(x) for x in docs])
 
         por_op, _, total = _get_marco_production_stats(db, "Cli", "TH1", modo="armador", armado_por_pieza=True)
-        self.assertEqual(total, {"1": 2})                       # p1 y p2: 2 piezas
-        self.assertEqual(por_op[solo], 2)
-        self.assertEqual(por_op[otro], 1)
+        self.assertEqual(total, {"1": 3})                       # p1, p2 y p3: 3 piezas
+        self.assertEqual(por_op[solo], 2)                       # p1 y p2: las armo primero
+        self.assertEqual(por_op[otro], 1)                       # p3: la armo primero
+        self.assertEqual(sum(por_op.values()), 3)               # la suma de cupos nunca supera las piezas
 
         _, _, total_registros = _get_marco_production_stats(db, "Cli", "TH1", modo="armador")
-        self.assertEqual(total_registros, {"1": 4})             # criterio anterior: 4 registros
+        self.assertEqual(total_registros, {"1": 6})             # criterio anterior: 6 registros
 
         self.assertEqual(_unidad_armado(None), 1)
         self.assertEqual(_unidad_armado({"modos": {"armador": {"unidad_armado": 1}}}), 1)
         self.assertEqual(_unidad_armado({"modos": {"armador": {"tramos": {}}}}), 2)   # plan anterior: sigue en 2
+
+    def test_operador_piezas_armadas_primero(self):
+        from core.routes.operator_routes import _piezas_armadas_primero
+        ana, beto = ObjectId(), ObjectId()
+        d = lambda n: datetime(2026, 5, n)
+        # El pipeline ya agrupa por pieza y trae el primer armador (el sort lo hace Mongo)
+        db = MagicMock()
+        db.produccion.aggregate.return_value = [
+            {"_id": "p1", "user": str(ana), "fecha": d(1)},
+            {"_id": "p2", "user": str(beto), "fecha": d(2)},
+        ]
+        db.produccion_historica.aggregate.return_value = [
+            {"_id": "p2", "user": str(ana), "fecha": d(1)},   # en el corte se armo antes: se la lleva Ana
+        ]
+        corte = [{"corte_id": ObjectId()}]
+        self.assertEqual(_piezas_armadas_primero(db, [{"modo": "armador"}], ana, corte), {"p1", "p2"})
+        self.assertEqual(_piezas_armadas_primero(db, [{"modo": "armador"}], beto, corte), set())
+        pipeline = db.produccion.aggregate.call_args.args[0]
+        self.assertIn({"armado_solo_extra": {"$ne": True}}, pipeline[0]["$match"]["$and"])
+        self.assertEqual(pipeline[1], {"$sort": {"fecha": 1}})
+
+    def test_planificacion_armado_duplica_y_respeta_operadores_solos(self):
+        a, b, c = ObjectId(), ObjectId(), ObjectId()
+        ops = [{"_id": a, "nombre": "Ana"}, {"_id": b, "nombre": "Beto"}, {"_id": c, "nombre": "Cami"}]
+
+        # 10 piezas = 20 unidades; Ana arma sola: su objetivo es par y el total no cambia
+        r = {x["user_id"]: x for x in _build_asignaciones_armado(20, ops, {}, {a})}
+        self.assertEqual(sum(x["objetivo"] for x in r.values()), 20)
+        self.assertEqual(r[a]["objetivo"] % 2, 0)
+        self.assertTrue(r[a]["solo"])
+        self.assertFalse(r[b]["solo"])
+
+        # todos solos: todos pares y el total se mantiene
+        r = _build_asignaciones_armado(20, ops, {}, {a, b, c})
+        self.assertEqual(sum(x["objetivo"] for x in r), 20)
+        self.assertTrue(all(x["objetivo"] % 2 == 0 for x in r))
+
+        # sin solos: igual que el reparto parejo de siempre
+        r = _build_asignaciones_armado(20, ops, {}, set())
+        self.assertEqual(sorted(x["objetivo"] for x in r), [6, 7, 7])
+        self.assertFalse(any(x["solo"] for x in r))
+
+        # un solo que ya llevaba 7 registros no baja de lo producido (sube a 8) y se compensa con los demas
+        r = {x["user_id"]: x for x in _build_asignaciones_armado(20, ops, {a: 7}, {a})}
+        self.assertEqual(r[a]["objetivo"], 8)
+        self.assertGreaterEqual(r[a]["objetivo"], r[a]["producido"])
+        self.assertEqual(sum(x["objetivo"] for x in r.values()), 20)
+
+    def test_planificacion_crear_armado_duplica_meta_y_guarda_solos(self):
+        a, b, c = ObjectId(), ObjectId(), ObjectId()
+        self.login("administrador")
+        self.db.__getitem__.side_effect = lambda nombre: getattr(self.db, nombre)
+        self.db.config.find_one.return_value = {"value": "a"}
+        self.db.usuarios.find.return_value = [
+            {"_id": a, "nombre": "Ana"}, {"_id": b, "nombre": "Beto"}, {"_id": c, "nombre": "Cami"}]
+        self.db.planificaciones.find_one.return_value = None
+        self.db.planificaciones.insert_one.return_value = MagicMock(inserted_id=ObjectId())
+        self.db.produccion.find.return_value = iter([])
+        self.db.produccion_historica.find.return_value = iter([])
+        grupos = [{"cliente": "Cli", "marcos": [{"marco": "TH1", "tramos": [
+            {"tramo": "1", "total": 10, "armadas": 0, "rematadas": 0}]}]}]
+        with patch("core.routes.admin_planificacion_routes._get_planificacion_grupos_completos",
+                   return_value=([], {}, grupos)):
+            response = self.post("/admin/planificacion/crear", data={
+                "modo": "armador", "empresa": "Cli", "marco": "TH1",
+                "operadores[]": [str(a), str(b), str(c)], "solo[]": [str(a)]})
+        self.assertEqual(response.status_code, 302)
+        cambios = self.db.planificaciones.update_one.call_args.args[1]["$set"]
+        tramo = cambios["modos.armador.tramos"]["1"]
+        self.assertEqual(tramo["total_piezas"], 10)
+        self.assertEqual(tramo["total"], 20)                      # 10 piezas = 20 armados
+        self.assertEqual(cambios["modos.armador.unidad_armado"], 2)
+        asign = {x["user_id"]: x for x in tramo["asignaciones"]}
+        self.assertEqual(sum(x["objetivo"] for x in asign.values()), 20)
+        self.assertTrue(asign[a]["solo"])
+        self.assertEqual(asign[a]["objetivo"] % 2, 0)
+        self.assertFalse(asign[b]["solo"])
 
 
 if __name__ == "__main__":

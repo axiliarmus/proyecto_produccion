@@ -201,6 +201,11 @@
                       {{ op.nombre or op.usuario }}
                     </label>
                   </div>
+                  <div class="form-check form-switch ms-auto me-3" title="Arma las piezas completas, sin compartirlas con otros armadores">
+                    <input class="form-check-input" type="checkbox" name="solo[]" value="{{ op._id }}" id="soloA{{ op._id }}"
+                           {% if op._id in operador_solo_armador %}checked{% endif %}>
+                    <label class="form-check-label small" for="soloA{{ op._id }}">Solo</label>
+                  </div>
                   {% if prod_arm > 0 %}
                     <span class="badge bg-primary" title="Piezas ya armadas por este operador en este marco">
                       {{ prod_arm }} ya armada{% if prod_arm > 1 %}s{% endif %}
@@ -398,7 +403,7 @@
                       {% set prod = (a.producido or 0)|int %}
                       {% set rest = obj - prod %}
                       <tr>
-                        <td class="fw-bold text-white">{{ a.user_name }}</td>
+                        <td class="fw-bold text-white">{{ a.user_name }}{% if a.solo %} <span class="badge bg-info text-dark ms-1">Solo</span>{% endif %}</td>
                         <td class="text-end">{{ prod }}</td>
                         <td class="text-end">{{ obj }}</td>
                         <td class="text-end fw-bold">{% if rest > 0 %}{{ rest }}{% else %}0{% endif %}</td>

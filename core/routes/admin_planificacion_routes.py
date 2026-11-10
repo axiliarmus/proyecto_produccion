@@ -254,37 +254,31 @@ def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None, inclu
     per_op_marco = {}
     per_tramo_op = {}
     total_per_tramo = {}
-    vistos_total = set()
-    vistos_op = set()
+    vistos = set()
 
     def acumular(doc):
         if por_pieza and doc.get("armado_solo_extra"):
             return
         tramo_norm = str(doc.get("tramo") or "").strip()
-        codigo = str(doc.get("codigo_pieza") or "").strip()
+        if por_pieza:
+            # Cada pieza cuenta una vez y se carga a quien la armo primero.
+            clave = (tramo_norm.lower(), str(doc.get("codigo_pieza") or "").strip())
+            if clave in vistos:
+                return
+            vistos.add(clave)
 
-        if not por_pieza or (tramo_norm.lower(), codigo) not in vistos_total:
-            total_per_tramo[tramo_norm] = total_per_tramo.get(tramo_norm, 0) + 1
-            if por_pieza:
-                vistos_total.add((tramo_norm.lower(), codigo))
+        total_per_tramo[tramo_norm] = total_per_tramo.get(tramo_norm, 0) + 1
 
         raw_user = doc.get("user_id")
         if not raw_user:
             return
         user_key = ObjectId(raw_user) if ObjectId.is_valid(str(raw_user)) else raw_user
-        if por_pieza:
-            clave_op = (str(user_key), tramo_norm.lower(), codigo)
-            if clave_op in vistos_op:
-                return
-            vistos_op.add(clave_op)
-
         per_op_marco[user_key] = per_op_marco.get(user_key, 0) + 1
         per_tramo_op.setdefault(tramo_norm, {})
         per_tramo_op[tramo_norm][user_key] = per_tramo_op[tramo_norm].get(user_key, 0) + 1
 
-    campos = {"user_id": 1, "tramo": 1, "codigo_pieza": 1, "armado_solo_extra": 1}
-    for doc in db.produccion.find(match_base, campos):
-        acumular(doc)
+    campos = {"user_id": 1, "tramo": 1, "codigo_pieza": 1, "armado_solo_extra": 1, "fecha": 1}
+    docs = list(db.produccion.find(match_base, campos))
 
     # Solo sumar registros históricos si se solicita explícitamente (ej: marcos de corte anterior pendientes)
     if include_historica:
@@ -299,9 +293,12 @@ def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None, inclu
                 except Exception:
                     pass
             match_hist["$or"] = corte_cond
+        docs.extend(db.produccion_historica.find(match_hist, campos))
 
-        for doc in db.produccion_historica.find(match_hist, campos):
-            acumular(doc)
+    if por_pieza:
+        docs.sort(key=lambda d: (d.get("fecha") is None, d.get("fecha") or datetime.min))
+    for doc in docs:
+        acumular(doc)
 
     return per_op_marco, per_tramo_op, total_per_tramo
 
@@ -471,6 +468,48 @@ def _build_asignaciones_equitativas(total_target, operadores, producido_por_oper
                 "producido": prod,
             }
         )
+    return asignaciones
+
+
+def _build_asignaciones_armado(total_target, operadores, producido_por_operador, solo_ids=None):
+    """Reparto de armado en unidades (2 por pieza) con operadores que arman solos.
+
+    Quien arma solo registra cada pieza completa (2 unidades) y no la comparte con otros armadores,
+    por eso su objetivo siempre es par. Lo que se redondea se compensa con los demas operadores.
+    """
+    asignaciones = _build_asignaciones_equitativas(total_target, operadores, producido_por_operador)
+    solo = {str(x) for x in (solo_ids or [])}
+    for a in asignaciones:
+        a["solo"] = str(a["user_id"]) in solo
+    solos = [a for a in asignaciones if a["solo"]]
+    if not solos:
+        return asignaciones
+
+    pool = 0
+    for a in solos:
+        if a["objetivo"] % 2:
+            if a["objetivo"] - 1 >= a["producido"]:
+                a["objetivo"] -= 1
+                pool += 1
+            else:
+                a["objetivo"] += 1
+                pool -= 1
+
+    otros = [a for a in asignaciones if not a["solo"]]
+    while pool > 0 and otros:
+        min(otros, key=lambda a: a["objetivo"])["objetivo"] += 1
+        pool -= 1
+    while pool >= 2:
+        min(solos, key=lambda a: a["objetivo"])["objetivo"] += 2
+        pool -= 2
+    if pool == 1:
+        min(solos, key=lambda a: a["objetivo"])["objetivo"] += 1
+    while pool < 0:
+        candidatos = [a for a in otros if a["objetivo"] > a["producido"]]
+        if not candidatos:
+            break
+        max(candidatos, key=lambda a: a["objetivo"])["objetivo"] -= 1
+        pool += 1
     return asignaciones
 
 
@@ -779,6 +818,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         pendientes_armador = {}
         pendientes_rematador = {}
         operador_ids_armador = set()
+        operador_solo_armador = set()
         operador_ids_rematador = set()
         prod_arm_op_marco = {}
         prod_rem_op_marco = {}
@@ -800,6 +840,8 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                                 if a.get("user_id"):
                                     if modo_key == "armador":
                                         operador_ids_armador.add(a["user_id"])
+                                        if a.get("solo"):
+                                            operador_solo_armador.add(a["user_id"])
                                     else:
                                         operador_ids_rematador.add(a["user_id"])
 
@@ -894,6 +936,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             pendientes_armador=pendientes_armador,
             pendientes_rematador=pendientes_rematador,
             operador_ids_armador=operador_ids_armador,
+            operador_solo_armador=operador_solo_armador,
             operador_ids_rematador=operador_ids_rematador,
             filtro_marco=filtro_marco,
             filtro_operador=filtro_operador,
@@ -1015,8 +1058,11 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         _, prod_tramo_op, _ = _get_marco_production_stats(
             db, grupo["empresa"], grupo["marco"], modo=modo_key,
             include_historica=is_corte_anterior_crear, corte_id=base.get("corte_id"),
-            armado_por_pieza=(modo_key == "armador"),
         )
+
+        solo_ids = set()
+        if modo_key == "armador":
+            solo_ids = {ObjectId(x) for x in request.form.getlist("solo[]") if ObjectId.is_valid(str(x))}
 
         tramos_doc = {}
         total_global = 0
@@ -1058,8 +1104,8 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             # Producción de los operadores seleccionados
             producido_selected = {uid: all_produced.get(uid, 0) for uid in selected_ids}
 
-            # Una pieza cuenta como 1 en armado y en remate
-            factor_modo = 1
+            # En armado se requieren 2 armados por cada pieza (se duplica la meta); en remate, 1
+            factor_modo = 2 if modo_key == "armador" else 1
             total_tramo_meta = total_tramo * factor_modo
 
             # El remanente a repartir entre los seleccionados es la meta total menos lo que ya hicieron otros
@@ -1071,11 +1117,19 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             if total_tramo_plan <= 0 and total_tramo_meta <= 0:
                 continue
 
-            asignaciones = _build_asignaciones_equitativas(
-                total_tramo_plan,
-                operadores_payload,
-                producido_selected,
-            )
+            if modo_key == "armador":
+                asignaciones = _build_asignaciones_armado(
+                    total_tramo_plan,
+                    operadores_payload,
+                    producido_selected,
+                    solo_ids,
+                )
+            else:
+                asignaciones = _build_asignaciones_equitativas(
+                    total_tramo_plan,
+                    operadores_payload,
+                    producido_selected,
+                )
 
             total_global += total_tramo_plan
             tramos_doc[tramo_key] = {
@@ -1092,7 +1146,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                 "$set": {
                     f"modos.{modo_key}.total": total_global,
                     f"modos.{modo_key}.tramos": tramos_doc,
-                    f"modos.{modo_key}.unidad_armado": 1,
+                    f"modos.{modo_key}.unidad_armado": 2 if modo_key == "armador" else 1,
                     "updated_at": now,
                 }
             },
@@ -1136,6 +1190,12 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             return redirect(url_for("admin_planificacion_home"))
 
         modo_doc = ((plan.get("modos") or {}).get(modo_key) or {"total": 0, "tramos": {}})
+        if modo_key == "armador" and new_objetivo % 2:
+            for tk, td in (modo_doc.get("tramos") or {}).items():
+                if str(tk).lower() != tramo.lower():
+                    continue
+                if any(str(a.get("user_id")) == str(user_id) and a.get("solo") for a in (td.get("asignaciones") or [])):
+                    new_objetivo += 1   # quien arma solo registra piezas completas (2 unidades)
         tramos = modo_doc.get("tramos") or {}
         tramo_doc = tramos.get(tramo)
         if not tramo_doc:

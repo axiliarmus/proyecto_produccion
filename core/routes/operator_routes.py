@@ -25,6 +25,34 @@ def _build_submission_guard_id(user_id, modo, box, codigo_pieza, cuerda_interna_
     return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
 
 
+def _piezas_armadas_primero(db, conds, user_oid, corte_cond=None):
+    """Codigos de piezas cuyo primer armado (por fecha) fue de este operador.
+
+    En la planificacion por pieza, la pieza se carga a quien la armo primero; el segundo armador
+    y el registro extra del armado solo no suman otra unidad.
+    """
+    pipeline = [
+        {"$match": {"$and": conds + [{"armado_solo_extra": {"$ne": True}}]}},
+        {"$sort": {"fecha": 1}},
+        {"$group": {"_id": "$codigo_pieza", "user": {"$first": "$user_id"}, "fecha": {"$first": "$fecha"}}},
+    ]
+    pipeline_hist = [
+        {"$match": {"$and": conds + [{"armado_solo_extra": {"$ne": True}}, {"$or": corte_cond or []}]}}
+    ] + pipeline[1:]
+    fuentes = [(db.produccion, pipeline)]
+    if corte_cond:
+        fuentes.append((db.produccion_historica, pipeline_hist))
+    primeros = {}
+    for coleccion, pipe in fuentes:
+        for fila in coleccion.aggregate(pipe):
+            codigo = str(fila.get("_id"))
+            fecha = fila.get("fecha")
+            actual = primeros.get(codigo)
+            if actual is None or (fecha is not None and (actual[1] is None or fecha < actual[1])):
+                primeros[codigo] = (str(fila.get("user")), fecha)
+    return {codigo for codigo, (usuario, _) in primeros.items() if usuario == str(user_oid)}
+
+
 def _verificar_y_limpiar_planificacion_completada(db, plan_id):
     """
     Verifica si una planificación ha cumplido el 100% de sus objetivos en todos
@@ -524,6 +552,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             filtro_prod_hist = {"codigo_pieza": {"$in": codigos_lookup}}
 
         plan_control = None
+        forzar_solo = False
         empresa_plan = str(pieza_data.get("empresa") or "Sin Cliente").strip()
         marco_plan = str(pieza_data.get("marco") or "Sin Marco").strip()
         tramo_plan = str(pieza_data.get("tramo") or "Sin Tramo").strip()
@@ -600,6 +629,8 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                 if plan:
                     objetivo = int(asignacion.get("objetivo") or 0)
                     producido = int(asignacion.get("producido") or 0)
+                    if modo == "armador" and asignacion.get("solo"):
+                        forzar_solo = True   # asignado como armador solo: cada registro es la pieza completa
 
                     user_conds = [{"user_id": str(user_oid)}, {"user_id": user_oid}]
                     match_conds_real = [
@@ -621,13 +652,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
 
                     unidad_plan = 1 if (modo != "armador" or modo_doc.get("unidad_armado") == 1) else 2
                     contar_por_pieza = modo == "armador" and unidad_plan == 1
-                    if contar_por_pieza:
-                        # Una pieza armada cuenta 1, aunque tenga dos registros (armado solo)
-                        filtro_real = {"$and": match_conds_real + [{"armado_solo_extra": {"$ne": True}}]}
-                        piezas_armadas = {str(c) for c in db.produccion.distinct("codigo_pieza", filtro_real)}
-                        real_producido = len(piezas_armadas)
-                    else:
-                        real_producido = db.produccion.count_documents(filtro_real)
+                    corte_cond = None
                     if es_historico and corte_id_historico:
                         corte_cond = [{"corte_id": corte_id_historico}]
                         if isinstance(corte_id_historico, ObjectId):
@@ -637,13 +662,16 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                                 corte_cond.append({"corte_id": ObjectId(str(corte_id_historico))})
                             except Exception:
                                 pass
-                        filtro_real_hist = {"$and": match_conds_real + [{"$or": corte_cond}]}
-                        if contar_por_pieza:
-                            filtro_real_hist["$and"].append({"armado_solo_extra": {"$ne": True}})
-                            piezas_armadas |= {str(c) for c in db.produccion_historica.distinct("codigo_pieza", filtro_real_hist)}
-                            real_producido = len(piezas_armadas)
-                        else:
-                            real_producido += db.produccion_historica.count_documents(filtro_real_hist)
+                    if contar_por_pieza:
+                        # Una pieza cuenta 1 y se carga a quien la armo primero
+                        conds_sin_usuario = [c for c in match_conds_real if c.get("$or") is not user_conds]
+                        real_producido = len(_piezas_armadas_primero(db, conds_sin_usuario, user_oid, corte_cond))
+                    else:
+                        real_producido = db.produccion.count_documents(filtro_real)
+                        if corte_cond:
+                            real_producido += db.produccion_historica.count_documents(
+                                {"$and": match_conds_real + [{"$or": corte_cond}]}
+                            )
 
                     if real_producido != producido:
                         producido = real_producido
@@ -661,8 +689,20 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                         except Exception:
                             pass
 
-                    unidades_plan = 2 if (unidad_plan == 2 and modo == "armador" and bool(session.get("armado_solo"))) else 1
-                    if producido + unidades_plan > objetivo:
+                    unidades_plan = 2 if (unidad_plan == 2 and modo == "armador" and (bool(session.get("armado_solo")) or forzar_solo)) else 1
+                    # Segundo armador de una pieza ya armada por otro: no consume su cupo
+                    segundo_armado = False
+                    if contar_por_pieza:
+                        otros = {"modo": "armador", "armado_solo_extra": {"$ne": True},
+                                 "user_id": {"$nin": [str(user_oid), user_oid]}}
+                        segundo_armado = (
+                            db.produccion.count_documents({**filtro_prod_activa, **otros})
+                            + db.produccion_historica.count_documents({**filtro_prod_hist, **otros})
+                        ) > 0
+
+                    if segundo_armado:
+                        plan_control = None
+                    elif producido + unidades_plan > objetivo:
                         if es_historico:
                             # Si es pieza que quedó en el corte anterior y el cupo está cubierto, permitir ingreso
                             plan_control = None
@@ -679,6 +719,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                             "objetivo": objetivo,
                             "units": unidades_plan,
                             "ciclo_pieza": ciclo_pieza,
+                            "por_pieza": contar_por_pieza,
                         }
 
         # Conteo unificado de armados y remates (produccion activa + historica)
@@ -694,7 +735,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
         # #endregion
 
         if modo == "armador":
-            armado_solo = bool(session.get("armado_solo"))
+            armado_solo = bool(session.get("armado_solo")) or forzar_solo
             unidades_registro = 2 if armado_solo else 1
 
             def safe_float(value):
@@ -774,7 +815,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
             flecha = None
 
         if modo == "armador":
-            registro_armado_solo = bool(session.get("armado_solo"))
+            registro_armado_solo = bool(session.get("armado_solo")) or forzar_solo
             unidades_registro = 2 if registro_armado_solo else 1
         else:
             registro_armado_solo = False
@@ -874,20 +915,27 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                                 {"codigo_pieza": re.compile(r"^[^a-zA-Z]")},
                             ]
                         })
-                    filtro_rescue = {"$and": match_conds_rescue}
-
-                    conteo_actual_total = db.produccion.count_documents(filtro_rescue)
+                    corte_cond_rescue = None
                     if es_historico and corte_id_historico:
-                        corte_cond = [{"corte_id": corte_id_historico}]
+                        corte_cond_rescue = [{"corte_id": corte_id_historico}]
                         if isinstance(corte_id_historico, ObjectId):
-                            corte_cond.append({"corte_id": str(corte_id_historico)})
+                            corte_cond_rescue.append({"corte_id": str(corte_id_historico)})
                         else:
                             try:
-                                corte_cond.append({"corte_id": ObjectId(str(corte_id_historico))})
+                                corte_cond_rescue.append({"corte_id": ObjectId(str(corte_id_historico))})
                             except Exception:
                                 pass
-                        filtro_rescue_hist = {"$and": match_conds_rescue + [{"$or": corte_cond}]}
-                        conteo_actual_total += db.produccion_historica.count_documents(filtro_rescue_hist)
+                    if plan_control.get("por_pieza"):
+                        conds_resc = [c for c in match_conds_rescue if c.get("$or") is not user_conds_rescue]
+                        conteo_actual_total = len(
+                            _piezas_armadas_primero(db, conds_resc, plan_control["user_oid"], corte_cond_rescue)
+                        )
+                    else:
+                        conteo_actual_total = db.produccion.count_documents({"$and": match_conds_rescue})
+                        if corte_cond_rescue:
+                            conteo_actual_total += db.produccion_historica.count_documents(
+                                {"$and": match_conds_rescue + [{"$or": corte_cond_rescue}]}
+                            )
                     upd_rescue = db.planificaciones.update_one(
                         {"_id": plan_control["plan_id"]},
                         {
