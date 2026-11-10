@@ -21,8 +21,14 @@ def _get_ciclo_actual(db):
 def register_admin_informes_routes(app, db, login_required, get_production_status_map, build_tarjetas_grupos, send_excel_file=None):
     """Registra rutas aisladas del menú e informes resumidos."""
 
+    @app.route("/invitado")
+    @login_required(["invitado"])
+    def invitado_home():
+        """Panel exclusivo del invitado: solo los dos informes que tiene permitidos."""
+        return render_template("invitado_panel.html")
+
     @app.route("/admin/informes")
-    @login_required(["administrador", "soporte", "cliente", "supervisor", "invitado"])
+    @login_required(["administrador", "soporte", "cliente", "supervisor"])
     def admin_informes():
         return render_template("admin_informes.html", is_cliente=(session.get("role") == "cliente"), role=session.get("role"))
 

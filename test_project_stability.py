@@ -625,7 +625,7 @@ class ProjectRegressionTests(unittest.TestCase):
     def test_invitado_solo_accede_a_dos_informes(self):
         import re as _re
         permitidos = {
-            ("GET", "/admin/informes"),                      # centro de informes (solo muestra los dos)
+            ("GET", "/invitado"),                            # su panel, con los dos informes
             ("GET", "/admin/informes/piezas/tarjetas"),      # tarjetas por cliente
             ("GET", "/admin/informes/resumen-produccion"),   # resumen por kilos
             ("GET", "/cambiar-password"),
@@ -649,18 +649,27 @@ class ProjectRegressionTests(unittest.TestCase):
                     accesibles.add((metodo, rule.rule))
         self.assertEqual(accesibles, permitidos)
 
-    def test_invitado_ve_solo_dos_tarjetas_en_el_centro_de_informes(self):
+    def test_invitado_tiene_su_propio_panel_con_dos_informes(self):
         self.login("invitado")
-        html = self.client.get("/admin/informes").get_data(as_text=True)
+        html = self.client.get("/invitado").get_data(as_text=True)
         self.assertIn("/admin/informes/resumen-produccion", html)
         self.assertIn("/admin/informes/piezas/tarjetas", html)
         self.assertEqual(html.count("Ver Informe"), 2)
-        for ruta in ("/admin/informes/marcos/anual", "/admin/produccion", "/admin/usuarios", "/admin/planificacion"):
+        # el menu lateral solo trae su panel: nada de las demas secciones
+        for ruta in ("/admin/informes\"", "/admin/usuarios", "/admin/produccion", "/admin/planificacion",
+                     "/operador", "/soporte"):
             self.assertNotIn(ruta, html)
+        # el centro de informes de los demas roles no es para el invitado
+        respuesta = self.client.get("/admin/informes")
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(respuesta.headers["Location"].endswith("/invitado"))
+        # los demas roles no entran al panel del invitado
+        self.login("operador")
+        self.assertEqual(self.client.get("/invitado").status_code, 302)
 
-    def test_invitado_inicia_en_el_centro_de_informes_y_se_puede_crear(self):
+    def test_invitado_inicia_en_su_panel_y_se_puede_crear(self):
         from core.helpers.auth import get_role_home_endpoint
-        self.assertEqual(get_role_home_endpoint("invitado"), "admin_informes")
+        self.assertEqual(get_role_home_endpoint("invitado"), "invitado_home")
 
         self.db.usuarios.find_one.return_value = None
         self.login("administrador")

@@ -1,0 +1,39 @@
+{% extends 'admin_layout.html' %}
+
+{% block title %}Panel de Invitado{% endblock %}
+{% block header_title %}Mis Informes{% endblock %}
+{% block header_subtitle %}{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-md-4 col-xl-3">
+    <div class="admin-card h-100 text-center">
+      <div class="d-flex justify-content-center mb-3">
+        <div class="stat-icon bg-gradient-1 text-white position-relative">
+          <i class='bx bxs-bar-chart-alt-2'></i>
+        </div>
+      </div>
+      <h5 class="text-white">Resumen Kilos</h5>
+      <p class="text-secondary small mb-4">
+        Kilos diarios, mensuales y evolución de los últimos 6 meses.
+      </p>
+      <a href="{{ url_for('informe_resumen_produccion') }}" class="btn btn-outline-light w-100 stretched-link">Ver Informe</a>
+    </div>
+  </div>
+
+  <div class="col-md-4 col-xl-3">
+    <div class="admin-card h-100 text-center">
+      <div class="d-flex justify-content-center mb-3">
+        <div class="stat-icon bg-warning text-white position-relative">
+          <i class='bx bxs-collection'></i>
+        </div>
+      </div>
+      <h5 class="text-white">Piezas por Cliente</h5>
+      <p class="text-secondary small mb-4">
+        Tarjetas agrupadas por cliente, marco y tramo.
+      </p>
+      <a href="{{ url_for('informe_piezas_tarjetas') }}" class="btn btn-outline-light w-100 stretched-link">Ver Informe</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

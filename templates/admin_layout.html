@@ -53,11 +53,19 @@
             </li>
             {% endif %}
 
+            {% if session.get('role') == 'invitado' %}
+            <li>
+                <a href="{{ url_for('invitado_home') }}" class="nav-link {% if request.endpoint in ['invitado_home', 'informe_piezas_tarjetas', 'informe_resumen_produccion'] %}active{% endif %}">
+                    <i class='bx bxs-report'></i> Mis Informes
+                </a>
+            </li>
+            {% else %}
             <li>
                 <a href="{{ url_for('admin_informes') }}" class="nav-link {% if 'informe' in request.endpoint %}active{% endif %}">
                     <i class='bx bxs-report'></i> Informes
                 </a>
             </li>
+            {% endif %}
 
             {% if session.get('role') in ['administrador', 'soporte', 'supervisor'] %}
             <li>

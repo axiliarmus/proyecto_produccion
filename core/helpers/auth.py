@@ -21,8 +21,10 @@ def get_role_home_endpoint(role):
         return "supervisor_home"
     if role == "soporte":
         return "soporte_dashboard"
-    if role in ("cliente", "invitado"):
+    if role == "cliente":
         return "admin_informes"
+    if role == "invitado":
+        return "invitado_home"
     return "operador_home"
 
 
