@@ -622,6 +622,53 @@ class ProjectRegressionTests(unittest.TestCase):
         vacio = zipfile.ZipFile(io.BytesIO(build_excel_bytes([], "Vacio", columns=["Código", "Marco"])))
         self.assertIn("Sin registros", vacio.read("xl/sharedStrings.xml").decode())
 
+    def test_invitado_solo_accede_a_dos_informes(self):
+        import re as _re
+        permitidos = {
+            ("GET", "/admin/informes"),                      # centro de informes (solo muestra los dos)
+            ("GET", "/admin/informes/piezas/tarjetas"),      # tarjetas por cliente
+            ("GET", "/admin/informes/resumen-produccion"),   # resumen por kilos
+            ("GET", "/cambiar-password"),
+            ("GET", "/login"),
+            ("POST", "/login"),
+        }
+        omitidas = {"static", "index", "logout"}
+        oid = str(ObjectId())
+        accesibles = set()
+        for rule in sorted(self.app.url_map.iter_rules(), key=lambda r: r.rule):
+            if rule.endpoint in omitidas:
+                continue
+            ruta = _re.sub(r"<(?:[^:>]+:)?[^>]+>", oid, rule.rule)
+            for metodo in sorted(rule.methods - {"HEAD", "OPTIONS"}):
+                self.login("invitado")
+                if metodo == "GET":
+                    response = self.client.get(ruta)
+                else:
+                    response = self.client.open(ruta, method=metodo, json={}, headers={"X-CSRFToken": "token"})
+                if response.status_code != 302:
+                    accesibles.add((metodo, rule.rule))
+        self.assertEqual(accesibles, permitidos)
+
+    def test_invitado_ve_solo_dos_tarjetas_en_el_centro_de_informes(self):
+        self.login("invitado")
+        html = self.client.get("/admin/informes").get_data(as_text=True)
+        self.assertIn("/admin/informes/resumen-produccion", html)
+        self.assertIn("/admin/informes/piezas/tarjetas", html)
+        self.assertEqual(html.count("Ver Informe"), 2)
+        for ruta in ("/admin/informes/marcos/anual", "/admin/produccion", "/admin/usuarios", "/admin/planificacion"):
+            self.assertNotIn(ruta, html)
+
+    def test_invitado_inicia_en_el_centro_de_informes_y_se_puede_crear(self):
+        from core.helpers.auth import get_role_home_endpoint
+        self.assertEqual(get_role_home_endpoint("invitado"), "admin_informes")
+
+        self.db.usuarios.find_one.return_value = None
+        self.login("administrador")
+        response = self.post("/admin/usuarios/nuevo", data={
+            "usuario": "visita", "nombre": "Visita", "tipo": "invitado", "password": "abcdef"})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.db.usuarios.insert_one.call_args.args[0]["tipo"], "invitado")
+
 
 if __name__ == "__main__":
     unittest.main()

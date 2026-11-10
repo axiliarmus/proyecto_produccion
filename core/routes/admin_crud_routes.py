@@ -58,7 +58,7 @@ def _normalize_massive_field(raw_field):
 
 
 
-ROLES_VALIDOS = {"operador", "supervisor", "soporte", "administrador", "cliente"}
+ROLES_VALIDOS = {"operador", "supervisor", "soporte", "administrador", "cliente", "invitado"}
 PRECIO_CAMPOS = ("precio_metro_armado", "precio_metro_remate", "precio_avo_armado", "precio_avo_remate")
 
 

@@ -22,12 +22,12 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
     """Registra rutas aisladas del menú e informes resumidos."""
 
     @app.route("/admin/informes")
-    @login_required(["administrador", "soporte", "cliente", "supervisor"])
+    @login_required(["administrador", "soporte", "cliente", "supervisor", "invitado"])
     def admin_informes():
         return render_template("admin_informes.html", is_cliente=(session.get("role") == "cliente"), role=session.get("role"))
 
     @app.route("/admin/informes/piezas/tarjetas", methods=["GET"])
-    @login_required(["administrador", "supervisor", "soporte", "cliente"])
+    @login_required(["administrador", "supervisor", "soporte", "cliente", "invitado"])
     def informe_piezas_tarjetas():
         ciclo = _get_ciclo_actual(db)
         filtro_ciclo_piezas = {"codigo": {"$regex": f"^{re.escape(ciclo)}"}}
@@ -151,7 +151,7 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
         })
 
     @app.route("/admin/informes/resumen-produccion", methods=["GET"])
-    @login_required(["administrador", "cliente", "soporte"])
+    @login_required(["administrador", "cliente", "soporte", "invitado"])
     def informe_resumen_produccion():
         today_real = now_cl().date()
         start_today = datetime.combine(today_real, datetime.min.time()).replace(tzinfo=CL).astimezone(timezone.utc)

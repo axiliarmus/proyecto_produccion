@@ -35,6 +35,10 @@
               <span class="badge bg-warning text-dark">Supervisor</span>
             {% elif u.tipo == 'soporte' %}
               <span class="badge bg-info text-dark">Soporte</span>
+            {% elif u.tipo == 'cliente' %}
+              <span class="badge bg-primary">Cliente</span>
+            {% elif u.tipo == 'invitado' %}
+              <span class="badge bg-light text-dark">Invitado</span>
             {% else %}
               <span class="badge bg-secondary">Operador</span>
             {% endif %}
