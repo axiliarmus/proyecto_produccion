@@ -108,6 +108,15 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
         })
         return send_excel_file(data, f"Marcos {anio}", f"informe_marcos_{anio}.xlsx")
 
+    def _piezas_marcos_anual(anio):
+        estado = (request.args.get("estado") or "").strip()
+        if estado not in ESTADOS_PIEZAS_MARCOS:
+            abort(400)
+        marco = " ".join((request.args.get("marco") or "").split()) or None
+        start_utc, end_utc = build_date_range_utc(f"{anio}-01-01", f"{anio}-12-31")
+        columnas, filas = listar_piezas_marcos_anual(db, start_utc, end_utc, estado, marco)
+        return estado, marco, columnas, filas
+
     @app.route("/admin/informes/marcos/anual/piezas", methods=["GET"])
     @login_required(["administrador", "supervisor", "soporte", "cliente"])
     def informe_marcos_anual_piezas_export():
@@ -115,16 +124,25 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
         if send_excel_file is None:
             abort(404)
         anio = _resolve_anio_marcos()
-        estado = (request.args.get("estado") or "").strip()
-        if estado not in ESTADOS_PIEZAS_MARCOS:
-            abort(400)
-        marco = " ".join((request.args.get("marco") or "").split()) or None
-        start_utc, end_utc = build_date_range_utc(f"{anio}-01-01", f"{anio}-12-31")
-        columnas, filas = listar_piezas_marcos_anual(db, start_utc, end_utc, estado, marco)
-
+        estado, marco, columnas, filas = _piezas_marcos_anual(anio)
         hoja = re.sub(r"[\[\]:*?/\\]", "", ESTADOS_PIEZAS_MARCOS[estado])[:31]
         sufijo = re.sub(r"[^\w\-]+", "_", marco).strip("_")[:40] if marco else "todos_los_marcos"
         return send_excel_file(filas, hoja, f"piezas_{estado}_{sufijo}_{anio}.xlsx", columns=columnas)
+
+    @app.route("/admin/informes/marcos/anual/piezas/data", methods=["GET"])
+    @login_required(["administrador", "supervisor", "soporte", "cliente"])
+    def informe_marcos_anual_piezas_data():
+        """Mismas piezas del Excel, para verlas en pantalla con su corte."""
+        anio = _resolve_anio_marcos()
+        estado, marco, columnas, filas = _piezas_marcos_anual(anio)
+        return jsonify({
+            "anio": anio,
+            "estado": estado,
+            "titulo": ESTADOS_PIEZAS_MARCOS[estado],
+            "marco": marco,
+            "columnas": columnas,
+            "filas": filas,
+        })
 
     @app.route("/admin/informes/resumen-produccion", methods=["GET"])
     @login_required(["administrador", "cliente", "soporte"])

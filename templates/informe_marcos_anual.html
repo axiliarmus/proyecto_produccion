@@ -82,6 +82,16 @@
   .mc-dl.rematadas { background: rgba(16,185,129,.14); border-color: rgba(16,185,129,.4); color: #6ee7b7; }
   .mc-dl.sin_fabricar { background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); color: #fca5a5; }
   .mc-dl.vacio { opacity: .55; }
+  .mc-kpi.clicable { cursor: pointer; transition: border-color .15s, transform .15s; }
+  .mc-kpi.clicable:hover { border-color: rgba(99,102,241,.6); transform: translateY(-2px); }
+  button.mc-dl { cursor: pointer; background-clip: padding-box; }
+  .mc-modal-cortes { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .75rem; }
+  .mc-corte-chip { border: 1px solid rgba(99,102,241,.5); background: rgba(99,102,241,.12); color: #c7d2fe; border-radius: 999px;
+    font-size: .8rem; padding: 3px 11px; cursor: pointer; font-variant-numeric: tabular-nums; }
+  .mc-corte-chip.activo { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .mc-list-table { font-size: .86rem; }
+  .mc-list-table th { position: sticky; top: 0; background: #17202e; z-index: 1; white-space: nowrap; }
+  .mc-list-table td { white-space: nowrap; }
   .marco-col { animation: mcIn .22s ease both; }
   .marco-col .table td, .marco-col .table th { vertical-align: middle; }
   @media (prefers-reduced-motion: reduce) { .marco-col, .mc-bar > span { animation: none; transition: none; } }
@@ -150,10 +160,10 @@
 <div class="mc-kpis" id="mcKpis">
   <div class="mc-kpi"><div class="mc-kpi-label">Marcos</div><div class="mc-kpi-value" data-kpi="marcos">0</div></div>
   <div class="mc-kpi"><div class="mc-kpi-label">Ingresado</div><div class="mc-kpi-value" data-kpi="ingresado">0</div></div>
-  <div class="mc-kpi"><div class="mc-kpi-label">Producido</div><div class="mc-kpi-value text-success" data-kpi="producido">0</div></div>
+  <div class="mc-kpi clicable" data-listar="rematadas"><div class="mc-kpi-label">Producido</div><div class="mc-kpi-value text-success" data-kpi="producido">0</div></div>
   <div class="mc-kpi"><div class="mc-kpi-label">Pendiente</div><div class="mc-kpi-value text-warning" data-kpi="pendiente">0</div></div>
-  <div class="mc-kpi"><div class="mc-kpi-label">Solo armadas</div><div class="mc-kpi-value" style="color:#fcd34d" data-kpi="solo_armadas">0</div></div>
-  <div class="mc-kpi"><div class="mc-kpi-label">Sin fabricar</div><div class="mc-kpi-value" style="color:#fca5a5" data-kpi="sin_fabricar">0</div></div>
+  <div class="mc-kpi clicable" data-listar="armadas"><div class="mc-kpi-label">Solo armadas</div><div class="mc-kpi-value" style="color:#fcd34d" data-kpi="solo_armadas">0</div></div>
+  <div class="mc-kpi clicable" data-listar="sin_fabricar"><div class="mc-kpi-label">Sin fabricar</div><div class="mc-kpi-value" style="color:#fca5a5" data-kpi="sin_fabricar">0</div></div>
   <div class="mc-kpi">
     <div class="mc-kpi-label">Avance</div>
     <div class="mc-kpi-value" data-kpi="avance">—</div>
@@ -162,6 +172,30 @@
 </div>
 
 <div id="mcResultados"></div>
+
+<div class="modal fade" id="mcModal" tabindex="-1" aria-labelledby="mcModalTitulo" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content bg-dark text-light border-secondary shadow">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title" id="mcModalTitulo"></h5>
+        <span class="badge bg-secondary ms-3" id="mcModalConteo"></span>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mc-search mb-3" style="max-width: 420px;">
+          <i class='bx bx-search'></i>
+          <input type="text" id="mcModalBuscar" class="mc-input" placeholder="Buscar código, tramo u operador" autocomplete="off" aria-label="Buscar en la lista">
+        </div>
+        <div class="mc-modal-cortes" id="mcModalCortes"></div>
+        <div id="mcModalTabla"></div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <a class="btn btn-success btn-sm d-inline-flex align-items-center gap-2" id="mcModalExcel" href="#"><i class='bx bxs-file-export'></i> Descargar Excel</a>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script id="mcPayload" type="application/json">{{ payload|tojson }}</script>
 <script>
@@ -174,6 +208,7 @@
   const BASE_DATA_URL = {{ url_for('informe_marcos_anual_data')|tojson }};
   const BASE_EXPORT_URL = {{ url_for('informe_marcos_anual_export')|tojson }};
   const BASE_PIEZAS_URL = {{ url_for('informe_marcos_anual_piezas_export')|tojson }};
+  const BASE_PIEZAS_DATA_URL = {{ url_for('informe_marcos_anual_piezas_data')|tojson }};
   const DESCARGAS = [
     ['armadas', 'Solo armadas', 'solo_armadas', 'Descargar Excel: armadas sin rematar'],
     ['rematadas', 'Rematadas', 'producido', 'Descargar Excel: rematadas'],
@@ -278,10 +313,11 @@
   function descargas(f) {
     const box = el('div', 'mc-dls');
     DESCARGAS.forEach(([estado, etiqueta, campo, titulo]) => {
-      const a = el('a', `mc-dl ${estado}` + (f[campo] ? '' : ' vacio'));
-      a.href = urlPiezas(estado, f.marco);
-      a.title = titulo;
-      a.append(icon('bx-download'), document.createTextNode(etiqueta + ' '), el('b', null, fmt(f[campo])));
+      const a = el('button', `mc-dl ${estado}` + (f[campo] ? '' : ' vacio'));
+      a.type = 'button';
+      a.title = titulo.replace('Descargar Excel', 'Ver piezas');
+      a.addEventListener('click', () => abrirListado(estado, f.marco));
+      a.append(icon('bx-list-ul'), document.createTextNode(etiqueta + ' '), el('b', null, fmt(f[campo])));
       box.append(a);
     });
     return box;
@@ -503,6 +539,95 @@
       if (id === peticion) { $('mcResultados').classList.remove('is-loading'); $('mcKpis').classList.remove('is-loading'); }
     }
   });
+
+  // ---------- lista de piezas (codigo, corte, operador) ----------
+  const ETIQUETAS_ESTADO = { armadas: 'Armadas sin rematar', rematadas: 'Rematadas', sin_fabricar: 'Nunca fabricadas' };
+  const MAX_FILAS = 1500;
+  const listado = { filas: [], columnas: [], q: '', corte: null, colCorte: null };
+  let peticionListado = 0;
+
+  function pintarListado() {
+    const q = norm(listado.q);
+    const filtradas = listado.filas.filter(f => {
+      if (listado.corte && !String(f[listado.colCorte] || '').split(', ').includes(listado.corte)) return false;
+      return !q || listado.columnas.some(c => norm(f[c]).includes(q));
+    });
+    $('mcModalConteo').textContent = filtradas.length === listado.filas.length
+      ? `${fmt(listado.filas.length)} piezas` : `${fmt(filtradas.length)} de ${fmt(listado.filas.length)} piezas`;
+
+    // chips por corte (sobre la busqueda de texto, sin el filtro de corte)
+    const cont = $('mcModalCortes');
+    cont.replaceChildren();
+    if (listado.colCorte) {
+      const cuentas = new Map();
+      listado.filas.filter(f => !q || listado.columnas.some(c => norm(f[c]).includes(q))).forEach(f => {
+        String(f[listado.colCorte] || 'Sin corte').split(', ').forEach(c => cuentas.set(c, (cuentas.get(c) || 0) + 1));
+      });
+      [...cuentas.entries()].sort((a, b) => b[1] - a[1]).forEach(([corte, n]) => {
+        const chip = el('button', 'mc-corte-chip' + (listado.corte === corte ? ' activo' : ''), `${corte} · ${fmt(n)}`);
+        chip.type = 'button';
+        chip.addEventListener('click', () => { listado.corte = listado.corte === corte ? null : corte; pintarListado(); });
+        cont.append(chip);
+      });
+    }
+
+    const caja = $('mcModalTabla');
+    caja.replaceChildren();
+    if (!filtradas.length) {
+      caja.append(el('div', 'text-center text-secondary py-4', 'Sin piezas'));
+      return;
+    }
+    const wrap = el('div', 'table-responsive');
+    const table = el('table', 'table table-dark table-sm table-hover align-middle mb-0 mc-list-table');
+    const thead = el('thead'), htr = el('tr');
+    listado.columnas.forEach(c => htr.append(el('th', null, c)));
+    thead.append(htr);
+    const tbody = el('tbody');
+    filtradas.slice(0, MAX_FILAS).forEach(f => {
+      const tr = el('tr');
+      listado.columnas.forEach(c => tr.append(el('td', c === 'Código' ? 'fw-bold text-info' : null, f[c] == null ? '' : String(f[c]))));
+      tbody.append(tr);
+    });
+    table.append(thead, tbody);
+    wrap.append(table);
+    caja.append(wrap);
+    if (filtradas.length > MAX_FILAS) {
+      caja.append(el('div', 'text-secondary small mt-2', `Se muestran ${fmt(MAX_FILAS)} de ${fmt(filtradas.length)}. El Excel trae la lista completa.`));
+    }
+  }
+
+  async function abrirListado(estado, marco) {
+    const id = ++peticionListado;
+    listado.q = ''; listado.corte = null; listado.filas = []; listado.columnas = []; listado.colCorte = null;
+    $('mcModalBuscar').value = '';
+    $('mcModalTitulo').textContent = `${ETIQUETAS_ESTADO[estado]} · ${marco || 'Todos los marcos'} · ${state.anio}`;
+    $('mcModalConteo').textContent = '';
+    $('mcModalCortes').replaceChildren();
+    $('mcModalExcel').href = urlPiezas(estado, marco);
+    $('mcModalTabla').replaceChildren(el('div', 'text-center text-secondary py-4', 'Cargando…'));
+    bootstrap.Modal.getOrCreateInstance($('mcModal')).show();
+    try {
+      const url = `${BASE_PIEZAS_DATA_URL}?anio=${state.anio}&estado=${estado}` + (marco ? `&marco=${encodeURIComponent(marco)}` : '');
+      const r = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (!(r.headers.get('content-type') || '').includes('application/json')) throw new Error('Sesión expirada. Recarga la página.');
+      if (!r.ok) throw new Error('No se pudo cargar la lista.');
+      const data = await r.json();
+      if (id !== peticionListado) return;
+      listado.filas = data.filas;
+      listado.columnas = data.columnas;
+      listado.colCorte = data.columnas.includes('Corte del armado') ? 'Corte del armado' : null;
+      pintarListado();
+    } catch (err) {
+      if (id !== peticionListado) return;
+      $('mcModalTabla').replaceChildren(el('div', 'mc-note error', err.message));
+    }
+  }
+
+  $('mcModalBuscar').addEventListener('input', e => { listado.q = e.target.value; pintarListado(); });
+  document.querySelectorAll('.mc-kpi[data-listar]').forEach(k => k.addEventListener('click', () => {
+    const marcos = calcular().lista;
+    abrirListado(k.dataset.listar, marcos.length === 1 ? marcos[0].marco : null);
+  }));
 
   leerUrl();
   pintarAviso();

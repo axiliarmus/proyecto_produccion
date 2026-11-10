@@ -572,6 +572,35 @@ class ProjectRegressionTests(unittest.TestCase):
         self.assertEqual(asign[a]["objetivo"] % 2, 0)
         self.assertFalse(asign[b]["solo"])
 
+    def test_listar_piezas_armadas_indica_el_corte_donde_se_armaron(self):
+        utc = timezone.utc
+        corte_id = ObjectId()
+        db = self._db_marcos_estados()
+        db.cortes.find.return_value = [{"_id": corte_id, "nombre": "Octubre 2026"}]
+        # a2 sigue en produccion activa; a4 se armo y quedo archivada en el corte de octubre
+        db.produccion.aggregate.side_effect = lambda pipe: (
+            [{"_id": "a2", "usuarios": ["Ana"], "fecha": datetime(2026, 3, 5, tzinfo=utc), "registros": 1, "cortes": []}]
+            if pipe[0]["$match"].get("modo") == "armador" else [])
+        db.produccion_historica.aggregate.side_effect = lambda pipe: (
+            [{"_id": "a4", "usuarios": ["Beto"], "fecha": datetime(2026, 9, 20, tzinfo=utc), "registros": 2, "cortes": [corte_id]}]
+            if pipe[0]["$match"].get("modo") == "armador" else [])
+
+        columnas, filas = listar_piezas_marcos_anual(
+            db, datetime(2026, 1, 1, tzinfo=utc), datetime(2026, 12, 31, tzinfo=utc), "armadas")
+
+        self.assertIn("Corte del armado", columnas)
+        cortes = {f["Código"]: f["Corte del armado"] for f in filas}
+        self.assertEqual(cortes, {"a2": "Producción activa (sin corte)", "a4": "Octubre 2026"})
+
+    def test_informe_marcos_anual_piezas_data_json(self):
+        response = self.client.get("/admin/informes/marcos/anual/piezas/data?anio=2026&estado=armadas&marco=TH1")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["estado"], "armadas")
+        self.assertEqual(data["marco"], "TH1")
+        self.assertIn("Corte del armado", data["columnas"])
+        self.assertEqual(self.client.get("/admin/informes/marcos/anual/piezas/data?anio=2026&estado=x").status_code, 400)
+
 
 if __name__ == "__main__":
     unittest.main()

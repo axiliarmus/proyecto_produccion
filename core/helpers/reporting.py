@@ -679,8 +679,21 @@ def build_marcos_anual(db, anio, start_utc, end_utc):
     return filas, totales, sin_fecha
 
 
-def _detalle_produccion(db, codigos, modo):
-    """{codigo_canonico: {"usuarios": [...], "fecha": datetime, "registros": n}} del modo indicado."""
+def _nombres_cortes(db):
+    """{id_corte_como_texto: nombre} de todos los cortes."""
+    return {str(c.get("_id")): (c.get("nombre") or "Corte sin nombre") for c in db.cortes.find({}, {"nombre": 1})}
+
+
+ETIQUETA_CORTE_ACTIVO = "Producción activa (sin corte)"
+
+
+def _detalle_produccion(db, codigos, modo, cortes=None):
+    """{codigo_canonico: {"usuarios", "fecha", "registros", "cortes"}} del modo indicado.
+
+    `cortes` son los nombres de los cortes donde estan los registros; la produccion que aun no
+    se archiva figura como "Producción activa (sin corte)".
+    """
+    cortes = cortes if cortes is not None else _nombres_cortes(db)
     detalle = {}
     for chunk_start in range(0, len(codigos), 5000):
         valores = build_codigo_query_values(codigos[chunk_start:chunk_start + 5000])
@@ -693,16 +706,25 @@ def _detalle_produccion(db, codigos, modo):
                 "usuarios": {"$addToSet": "$usuario"},
                 "fecha": {"$max": "$fecha"},
                 "registros": {"$sum": 1},
+                "cortes": {"$addToSet": "$corte_id"},
             }},
         ]
-        for collection in (db.produccion, db.produccion_historica):
+        for collection, es_activa in ((db.produccion, True), (db.produccion_historica, False)):
             for row in collection.aggregate(pipeline):
                 canon = _codigo_canonico(row.get("_id"))
                 if canon is None:
                     continue
-                actual = detalle.setdefault(canon, {"usuarios": set(), "fecha": None, "registros": 0})
+                actual = detalle.setdefault(
+                    canon, {"usuarios": set(), "fecha": None, "registros": 0, "cortes": set()})
                 actual["usuarios"].update(u for u in (row.get("usuarios") or []) if u)
                 actual["registros"] += int(row.get("registros") or 0)
+                if es_activa:
+                    actual["cortes"].add(ETIQUETA_CORTE_ACTIVO)
+                else:
+                    ids = [c for c in (row.get("cortes") or []) if c is not None]
+                    actual["cortes"].update(cortes.get(str(c), "Corte sin nombre") for c in ids)
+                    if not ids:
+                        actual["cortes"].add("Corte sin nombre")
                 fecha = _a_utc(row.get("fecha"))
                 if fecha and (actual["fecha"] is None or fecha > actual["fecha"]):
                     actual["fecha"] = fecha
@@ -717,7 +739,7 @@ ESTADOS_PIEZAS_MARCOS = {
 
 
 def listar_piezas_marcos_anual(db, start_utc, end_utc, estado, marco=None):
-    """Piezas ingresadas en el rango segun su estado: (columnas, filas) listas para Excel."""
+    """Piezas ingresadas en el rango segun su estado: (columnas, filas) listas para Excel o pantalla."""
     if estado not in ESTADOS_PIEZAS_MARCOS:
         raise ValueError("Estado de piezas no valido")
 
@@ -737,13 +759,14 @@ def listar_piezas_marcos_anual(db, start_utc, end_utc, estado, marco=None):
         return to_cl(fecha).strftime("%d-%m-%Y %H:%M") if fecha else ""
 
     base = ["Código", "Cliente", "Marco", "Tramo", "Fecha de ingreso"]
+    cortes = _nombres_cortes(db) if estado != "sin_fabricar" else {}
     if estado == "armadas":
-        columnas = base + ["Armado por", "Último armado", "Registros de armado"]
-        arm = _detalle_produccion(db, codigos, "armador")
+        columnas = base + ["Corte del armado", "Armado por", "Último armado", "Registros de armado"]
+        arm = _detalle_produccion(db, codigos, "armador", cortes)
     elif estado == "rematadas":
-        columnas = base + ["Armado por", "Rematado por", "Fecha de remate"]
-        arm = _detalle_produccion(db, codigos, "armador")
-        rem = _detalle_produccion(db, codigos, "rematador")
+        columnas = base + ["Corte del armado", "Corte del remate", "Armado por", "Rematado por", "Fecha de remate"]
+        arm = _detalle_produccion(db, codigos, "armador", cortes)
+        rem = _detalle_produccion(db, codigos, "rematador", cortes)
     else:
         columnas = base
 
@@ -751,6 +774,9 @@ def listar_piezas_marcos_anual(db, start_utc, end_utc, estado, marco=None):
         d = seleccion[canon]
         return (_marco_key(d["marco"]), str(d["tramo"] or "").upper(),
                 [(0, int(t), "") if t.isdigit() else (1, 0, t.upper()) for t in re.split(r"(\d+)", str(d["codigo"] or "")) if t != ""])
+
+    def lista(valores):
+        return ", ".join(sorted(valores or []))
 
     filas = []
     for canon in sorted(codigos, key=clave):
@@ -764,13 +790,16 @@ def listar_piezas_marcos_anual(db, start_utc, end_utc, estado, marco=None):
         }
         if estado == "armadas":
             info = arm.get(canon) or {}
-            fila["Armado por"] = ", ".join(sorted(info.get("usuarios") or []))
+            fila["Corte del armado"] = lista(info.get("cortes"))
+            fila["Armado por"] = lista(info.get("usuarios"))
             fila["Último armado"] = fmt(info.get("fecha"))
             fila["Registros de armado"] = info.get("registros", 0)
         elif estado == "rematadas":
             info_a, info_r = arm.get(canon) or {}, rem.get(canon) or {}
-            fila["Armado por"] = ", ".join(sorted(info_a.get("usuarios") or []))
-            fila["Rematado por"] = ", ".join(sorted(info_r.get("usuarios") or []))
+            fila["Corte del armado"] = lista(info_a.get("cortes"))
+            fila["Corte del remate"] = lista(info_r.get("cortes"))
+            fila["Armado por"] = lista(info_a.get("usuarios"))
+            fila["Rematado por"] = lista(info_r.get("usuarios"))
             fila["Fecha de remate"] = fmt(info_r.get("fecha"))
         filas.append(fila)
     return columnas, filas
