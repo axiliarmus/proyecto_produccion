@@ -124,7 +124,7 @@ def register_admin_produccion_routes(
                 }
             )
 
-        return send_excel_file(data, "Produccion", "registro_produccion.xlsx")
+        return send_excel_file(data, "Produccion", "registro_produccion.xlsx", title="Registro de producción")
 
     @app.route("/admin/archivados/menu")
     @login_required(["administrador", "soporte", "supervisor"])
@@ -418,4 +418,4 @@ def register_admin_produccion_routes(
                 }
             )
 
-        return send_excel_file(data, "ProduccionArchivada", "registro_produccion_archivada.xlsx")
+        return send_excel_file(data, "ProduccionArchivada", "registro_produccion_archivada.xlsx", title="Registro de producción archivada")

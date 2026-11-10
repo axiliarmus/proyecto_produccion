@@ -95,6 +95,8 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
                     "Tramo": tramo["tramo"],
                     "Ingresado": tramo["ingresado"],
                     "Producido (rematadas)": tramo["producido"],
+                    "Solo armadas": tramo["solo_armadas"],
+                    "Sin fabricar": tramo["sin_fabricar"],
                     "Pendiente": tramo["pendiente"],
                     "Estado": "Completo" if tramo["completo"] else "Falta",
                 })
@@ -103,10 +105,12 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
             "Tramo": "",
             "Ingresado": totales["ingresado"],
             "Producido (rematadas)": totales["producido"],
+            "Solo armadas": totales["solo_armadas"],
+            "Sin fabricar": totales["sin_fabricar"],
             "Pendiente": totales["pendiente"],
             "Estado": "",
         })
-        return send_excel_file(data, f"Marcos {anio}", f"informe_marcos_{anio}.xlsx")
+        return send_excel_file(data, f"Marcos {anio}", f"informe_marcos_{anio}.xlsx", title="Marcos del año: ingresado y producido", subtitle=f"Año {anio}")
 
     def _piezas_marcos_anual(anio):
         estado = (request.args.get("estado") or "").strip()
@@ -127,7 +131,9 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
         estado, marco, columnas, filas = _piezas_marcos_anual(anio)
         hoja = re.sub(r"[\[\]:*?/\\]", "", ESTADOS_PIEZAS_MARCOS[estado])[:31]
         sufijo = re.sub(r"[^\w\-]+", "_", marco).strip("_")[:40] if marco else "todos_los_marcos"
-        return send_excel_file(filas, hoja, f"piezas_{estado}_{sufijo}_{anio}.xlsx", columns=columnas)
+        return send_excel_file(
+            filas, hoja, f"piezas_{estado}_{sufijo}_{anio}.xlsx", columns=columnas,
+            title=f"{ESTADOS_PIEZAS_MARCOS[estado]} · {marco or 'Todos los marcos'}", subtitle=f"Año {anio}")
 
     @app.route("/admin/informes/marcos/anual/piezas/data", methods=["GET"])
     @login_required(["administrador", "supervisor", "soporte", "cliente"])

@@ -88,7 +88,7 @@ def register_admin_informes_operacion_routes(
             flash("No hay datos para exportar", "warning")
             return redirect(url_for("informe_horarios"))
 
-        return send_excel_file(data, "Horarios", "informe_horarios.xlsx")
+        return send_excel_file(data, "Horarios", "informe_horarios.xlsx", title="Horarios de operadores")
 
     @app.route("/admin/informes/operadores", methods=["GET", "POST"])
     @login_required(["administrador", "soporte"])
@@ -231,4 +231,4 @@ def register_admin_informes_operacion_routes(
             }
         )
 
-        return send_excel_file(data, "Operadores", "informe_valor_operador.xlsx")
+        return send_excel_file(data, "Operadores", "informe_valor_operador.xlsx", title="Valor por operador (detalle)")

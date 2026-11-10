@@ -188,7 +188,9 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
                 }
             )
 
-        return send_excel_file(data, "PiezasArchivadas", f"piezas_corte_{corte_nombre.replace(' ', '_')}.xlsx")
+        return send_excel_file(
+            data, "PiezasArchivadas", f"piezas_corte_{corte_nombre.replace(' ', '_')}.xlsx",
+            title="Piezas archivadas", subtitle=f"Corte {corte_nombre}")
 
     @app.route("/admin/picking")
     @login_required(["administrador", "soporte", "supervisor"])
@@ -627,7 +629,7 @@ def register_admin_tools_routes(app, db, login_required, normalize_page, paginat
             )
 
         nombre_archivo = f"picking_{hist.get('nombre', 'sesion')}".replace(" ", "_").replace("/", "-")
-        return send_excel_file(data_excel, "DetallePicking", f"{nombre_archivo}.xlsx")
+        return send_excel_file(data_excel, "DetallePicking", f"{nombre_archivo}.xlsx", title="Detalle de picking", subtitle=str(hist.get("nombre") or ""))
 
     @app.route("/admin/picking/historial/<hist_id>/eliminar", methods=["POST"])
     @login_required(["administrador"])

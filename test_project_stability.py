@@ -601,6 +601,27 @@ class ProjectRegressionTests(unittest.TestCase):
         self.assertIn("Corte del armado", data["columnas"])
         self.assertEqual(self.client.get("/admin/informes/marcos/anual/piezas/data?anio=2026&estado=x").status_code, 400)
 
+    def test_excel_tiene_formato_profesional(self):
+        import io
+        import zipfile
+        from core.helpers.excel import build_excel_bytes
+
+        data = [
+            {"Fecha": "05-10-2026", "Código": 1001, "Total": 1500.5},
+            {"Fecha": "TOTAL", "Código": "", "Total": 1500.5},
+        ]
+        libro = zipfile.ZipFile(io.BytesIO(build_excel_bytes(data, "Operadores", title="Valor por operador")))
+        hoja = libro.read("xl/worksheets/sheet1.xml").decode()
+        textos = libro.read("xl/sharedStrings.xml").decode()
+        self.assertIn("<autoFilter", hoja)               # filtros en el encabezado
+        self.assertIn('state="frozen"', hoja)            # encabezado congelado
+        self.assertIn("<mergeCell ", hoja)               # titulo combinado
+        self.assertIn("Valor por operador", textos)
+        self.assertIn("TOTAL", textos)
+        self.assertNotIn("05-10-2026", textos)           # la fecha se guarda como fecha real, no como texto
+        vacio = zipfile.ZipFile(io.BytesIO(build_excel_bytes([], "Vacio", columns=["Código", "Marco"])))
+        self.assertIn("Sin registros", vacio.read("xl/sharedStrings.xml").decode())
+
 
 if __name__ == "__main__":
     unittest.main()

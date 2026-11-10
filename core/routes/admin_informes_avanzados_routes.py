@@ -480,7 +480,7 @@ def register_admin_informes_avanzados_routes(
             flash("No hay datos para exportar con esos filtros", "warning")
             return redirect(url_for("informe_piezas_operador"))
 
-        return send_excel_file(data, "ValorOperador", "valor_por_operador.xlsx")
+        return send_excel_file(data, "ValorOperador", "valor_por_operador.xlsx", title="Valor por operador")
 
     @app.route("/admin/archivados/valor-operador/export", methods=["POST"])
     @login_required(["administrador", "soporte"])
@@ -654,7 +654,7 @@ def register_admin_informes_avanzados_routes(
                 }
             )
 
-        return send_excel_file(data, "ValorOperadorArchivado", "valor_por_operador_archivado.xlsx")
+        return send_excel_file(data, "ValorOperadorArchivado", "valor_por_operador_archivado.xlsx", title="Valor por operador (producción archivada)")
 
     @app.route("/admin/informes/piezas/estado", methods=["GET", "POST"])
     @login_required(["administrador", "supervisor", "soporte", "cliente"])
@@ -760,4 +760,4 @@ def register_admin_informes_avanzados_routes(
             flash("No hay datos para exportar con esos filtros.", "warning")
             return redirect(url_for("informe_estado_piezas"))
 
-        return send_excel_file(data, "EstadoPiezas", "informe_estado_piezas.xlsx")
+        return send_excel_file(data, "EstadoPiezas", "informe_estado_piezas.xlsx", title="Estado de piezas")
