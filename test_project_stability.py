@@ -14,8 +14,9 @@ from pymongo.errors import BulkWriteError, OperationFailure
 
 from core.helpers.auth import authenticate_user
 from core.helpers.date_utils import InvalidDateRange, build_date_range_utc
-from core.helpers.reporting import build_marcos_anual, build_tarjetas_grupos
+from core.helpers.reporting import build_marcos_anual, build_tarjetas_grupos, listar_piezas_marcos_anual
 from core.helpers.soft_delete import soft_delete_many, soft_delete_selected_production
+from core.routes.admin_planificacion_routes import _get_marco_production_stats, _unidad_armado
 from core.routes.registry import register_all_routes
 
 
@@ -401,6 +402,90 @@ class ProjectRegressionTests(unittest.TestCase):
     def test_soft_delete_produccion_rechaza_coleccion_no_permitida(self):
         with self.assertRaises(ValueError):
             soft_delete_selected_production(MagicMock(), [ObjectId()], collection="usuarios")
+
+    def _db_marcos_estados(self):
+        utc = timezone.utc
+        db = MagicMock()
+        db.piezas.find.return_value = iter([
+            {"codigo": "a1", "marco": "TH1", "tramo": "1", "empresa": "Cli", "created_at": datetime(2026, 2, 1, tzinfo=utc)},
+            {"codigo": "a2", "marco": "TH1", "tramo": "2", "empresa": "Cli", "created_at": datetime(2026, 2, 1, tzinfo=utc)},
+            {"codigo": "a3", "marco": "th1", "tramo": "2", "empresa": "Cli", "created_at": datetime(2026, 2, 1, tzinfo=utc)},
+            {"codigo": "a4", "marco": "TH10", "tramo": "1", "empresa": "Cli", "created_at": datetime(2026, 2, 1, tzinfo=utc)},
+        ])
+        db.piezas_historicas.find.return_value = iter([])
+        db.produccion.distinct.side_effect = lambda field, flt: (
+            ["a1", "a2", "a4"] if flt.get("modo") == "armador" else ["a1"] if flt.get("modo") == "rematador" else [])
+        db.produccion_historica.distinct.side_effect = lambda field, flt: []
+        db.produccion.aggregate.side_effect = lambda pipe: (
+            [{"_id": "a2", "usuarios": ["Ana"], "fecha": datetime(2026, 3, 5, tzinfo=utc), "registros": 2}]
+            if pipe[0]["$match"].get("modo") == "armador" else [])
+        db.produccion_historica.aggregate.side_effect = lambda pipe: []
+        return db
+
+    def test_informe_marcos_anual_separa_rematadas_armadas_y_sin_fabricar(self):
+        db = self._db_marcos_estados()
+        utc = timezone.utc
+        filas, totales, _ = build_marcos_anual(db, 2026, datetime(2026, 1, 1, tzinfo=utc), datetime(2026, 12, 31, tzinfo=utc))
+        por_marco = {f["marco"]: f for f in filas}
+        self.assertEqual(totales["ingresado"], 4)
+        self.assertEqual(totales["producido"], 1)
+        self.assertEqual(totales["solo_armadas"], 2)
+        self.assertEqual(totales["sin_fabricar"], 1)
+        self.assertEqual(totales["ingresado"], totales["producido"] + totales["solo_armadas"] + totales["sin_fabricar"])
+        self.assertEqual((por_marco["TH1"]["solo_armadas"], por_marco["TH1"]["sin_fabricar"]), (1, 1))
+
+    def test_listar_piezas_marcos_anual_por_estado_y_marco(self):
+        utc = timezone.utc
+        rango = (datetime(2026, 1, 1, tzinfo=utc), datetime(2026, 12, 31, tzinfo=utc))
+
+        def listar(estado, marco=None):
+            db = self._db_marcos_estados()
+            return listar_piezas_marcos_anual(db, *rango, estado, marco)
+
+        columnas, filas = listar("armadas", "TH1")
+        self.assertEqual([f["Código"] for f in filas], ["a2"])        # solo TH1; a4 es de TH10
+        self.assertEqual(filas[0]["Armado por"], "Ana")
+        self.assertEqual(filas[0]["Registros de armado"], 2)
+        self.assertIn("Último armado", columnas)
+
+        _, filas = listar("armadas")
+        self.assertEqual(sorted(f["Código"] for f in filas), ["a2", "a4"])
+        _, filas = listar("rematadas")
+        self.assertEqual([f["Código"] for f in filas], ["a1"])
+        _, filas = listar("sin_fabricar", "TH1")
+        self.assertEqual([f["Código"] for f in filas], ["a3"])        # a3 llega como "th1": mismo marco
+        with self.assertRaises(ValueError):
+            listar("otro")
+
+    def test_informe_marcos_anual_piezas_export_excel(self):
+        response = self.client.get("/admin/informes/marcos/anual/piezas?anio=2026&estado=armadas&marco=TH1")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("spreadsheetml", response.mimetype)
+        self.assertIn("piezas_armadas_TH1_2026.xlsx", response.headers["Content-Disposition"])
+        self.assertEqual(self.client.get("/admin/informes/marcos/anual/piezas?anio=2026&estado=x").status_code, 400)
+
+    def test_planificacion_armado_cuenta_una_vez_por_pieza(self):
+        solo, otro = ObjectId(), ObjectId()
+        docs = [
+            {"user_id": str(solo), "tramo": "1", "codigo_pieza": "p1"},
+            {"user_id": str(solo), "tramo": "1", "codigo_pieza": "p1", "armado_solo_extra": True},   # 2do registro del armado solo
+            {"user_id": str(solo), "tramo": "1", "codigo_pieza": "p2"},
+            {"user_id": str(otro), "tramo": "1", "codigo_pieza": "p2"},                                # 2da persona arma la misma pieza
+        ]
+        db = MagicMock()
+        db.produccion.find.side_effect = lambda *a, **k: iter([dict(d) for d in docs])
+
+        por_op, _, total = _get_marco_production_stats(db, "Cli", "TH1", modo="armador", armado_por_pieza=True)
+        self.assertEqual(total, {"1": 2})                       # p1 y p2: 2 piezas
+        self.assertEqual(por_op[solo], 2)
+        self.assertEqual(por_op[otro], 1)
+
+        _, _, total_registros = _get_marco_production_stats(db, "Cli", "TH1", modo="armador")
+        self.assertEqual(total_registros, {"1": 4})             # criterio anterior: 4 registros
+
+        self.assertEqual(_unidad_armado(None), 1)
+        self.assertEqual(_unidad_armado({"modos": {"armador": {"unidad_armado": 1}}}), 1)
+        self.assertEqual(_unidad_armado({"modos": {"armador": {"tramos": {}}}}), 2)   # plan anterior: sigue en 2
 
 
 if __name__ == "__main__":

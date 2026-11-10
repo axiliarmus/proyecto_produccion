@@ -73,6 +73,15 @@
   .mc-note.error { background: rgba(239,68,68,.14); color: #fca5a5; }
   .is-loading { opacity: .45; pointer-events: none; }
   @keyframes mcIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .mc-dls { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem; margin-bottom: .9rem; }
+  .mc-dl { display: inline-flex; align-items: center; gap: .35rem; padding: 3px 10px; border-radius: 999px; font-size: .78rem;
+    text-decoration: none; border: 1px solid transparent; font-variant-numeric: tabular-nums; transition: filter .15s, transform .15s; }
+  .mc-dl:hover { filter: brightness(1.25); transform: translateY(-1px); }
+  .mc-dl b { font-weight: 700; }
+  .mc-dl.armadas { background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.45); color: #fcd34d; }
+  .mc-dl.rematadas { background: rgba(16,185,129,.14); border-color: rgba(16,185,129,.4); color: #6ee7b7; }
+  .mc-dl.sin_fabricar { background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); color: #fca5a5; }
+  .mc-dl.vacio { opacity: .55; }
   .marco-col { animation: mcIn .22s ease both; }
   .marco-col .table td, .marco-col .table th { vertical-align: middle; }
   @media (prefers-reduced-motion: reduce) { .marco-col, .mc-bar > span { animation: none; transition: none; } }
@@ -122,9 +131,17 @@
 
   <button type="button" class="mc-icon-btn" id="mcReset" aria-label="Limpiar filtros" style="display:none"><i class='bx bx-filter-alt'></i></button>
   {% if puede_exportar %}
-  <a href="{{ url_for('informe_marcos_anual_export', anio=anio) }}" id="mcExport" class="btn btn-success btn-sm d-inline-flex align-items-center gap-2" style="height:38px">
-    <i class='bx bxs-file-export'></i> Excel
-  </a>
+  <div class="dropdown">
+    <button type="button" class="btn btn-success btn-sm dropdown-toggle d-inline-flex align-items-center gap-2" style="height:38px"
+            data-bs-toggle="dropdown" aria-expanded="false"><i class='bx bxs-file-export'></i> Excel</button>
+    <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+      <li><a class="dropdown-item" id="mcExport" href="{{ url_for('informe_marcos_anual_export', anio=anio) }}">Resumen por marco y tramo</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item mc-dl-global" data-estado="armadas" href="#">Armadas sin rematar</a></li>
+      <li><a class="dropdown-item mc-dl-global" data-estado="rematadas" href="#">Rematadas</a></li>
+      <li><a class="dropdown-item mc-dl-global" data-estado="sin_fabricar" href="#">Nunca fabricadas</a></li>
+    </ul>
+  </div>
   {% endif %}
 </div>
 
@@ -135,6 +152,8 @@
   <div class="mc-kpi"><div class="mc-kpi-label">Ingresado</div><div class="mc-kpi-value" data-kpi="ingresado">0</div></div>
   <div class="mc-kpi"><div class="mc-kpi-label">Producido</div><div class="mc-kpi-value text-success" data-kpi="producido">0</div></div>
   <div class="mc-kpi"><div class="mc-kpi-label">Pendiente</div><div class="mc-kpi-value text-warning" data-kpi="pendiente">0</div></div>
+  <div class="mc-kpi"><div class="mc-kpi-label">Solo armadas</div><div class="mc-kpi-value" style="color:#fcd34d" data-kpi="solo_armadas">0</div></div>
+  <div class="mc-kpi"><div class="mc-kpi-label">Sin fabricar</div><div class="mc-kpi-value" style="color:#fca5a5" data-kpi="sin_fabricar">0</div></div>
   <div class="mc-kpi">
     <div class="mc-kpi-label">Avance</div>
     <div class="mc-kpi-value" data-kpi="avance">—</div>
@@ -154,6 +173,13 @@
   const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/\p{M}/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
   const BASE_DATA_URL = {{ url_for('informe_marcos_anual_data')|tojson }};
   const BASE_EXPORT_URL = {{ url_for('informe_marcos_anual_export')|tojson }};
+  const BASE_PIEZAS_URL = {{ url_for('informe_marcos_anual_piezas_export')|tojson }};
+  const DESCARGAS = [
+    ['armadas', 'Solo armadas', 'solo_armadas', 'Descargar Excel: armadas sin rematar'],
+    ['rematadas', 'Rematadas', 'producido', 'Descargar Excel: rematadas'],
+    ['sin_fabricar', 'Sin fabricar', 'sin_fabricar', 'Descargar Excel: nunca fabricadas'],
+  ];
+  const urlPiezas = (estado, marco) => `${BASE_PIEZAS_URL}?anio=${state.anio}&estado=${estado}` + (marco ? `&marco=${encodeURIComponent(marco)}` : '');
 
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -213,7 +239,7 @@
       const c = typeof x === 'string' ? x.localeCompare(y, 'es', { numeric: true }) : x - y;
       return (c || norm(a.marco).localeCompare(norm(b.marco), 'es', { numeric: true })) * mult;
     });
-    const t = lista.reduce((acc, f) => { acc.ingresado += f.ingresado; acc.producido += f.producido; return acc; }, { ingresado: 0, producido: 0 });
+    const t = lista.reduce((acc, f) => { acc.ingresado += f.ingresado; acc.producido += f.producido; acc.solo_armadas += f.solo_armadas; acc.sin_fabricar += f.sin_fabricar; return acc; }, { ingresado: 0, producido: 0, solo_armadas: 0, sin_fabricar: 0 });
     t.pendiente = t.ingresado - t.producido;
     t.avance = t.ingresado ? Math.round(t.producido * 1000 / t.ingresado) / 10 : null;
     t.marcos = lista.length;
@@ -249,6 +275,18 @@
     return b;
   }
 
+  function descargas(f) {
+    const box = el('div', 'mc-dls');
+    DESCARGAS.forEach(([estado, etiqueta, campo, titulo]) => {
+      const a = el('a', `mc-dl ${estado}` + (f[campo] ? '' : ' vacio'));
+      a.href = urlPiezas(estado, f.marco);
+      a.title = titulo;
+      a.append(icon('bx-download'), document.createTextNode(etiqueta + ' '), el('b', null, fmt(f[campo])));
+      box.append(a);
+    });
+    return box;
+  }
+
   const resta = (ing, prod) => `${fmt(ing)} - ${fmt(prod)} = ${fmt(ing - prod)}`;
 
   function tarjeta(f, i) {
@@ -278,7 +316,7 @@
     tfoot.append(ftr);
     table.append(thead, tbody, tfoot);
 
-    body.append(head, table);
+    body.append(head, descargas(f), table);
     card.append(body);
     col.append(card);
     return col;
@@ -288,7 +326,7 @@
     const wrap = el('div', 'mc-table-wrap');
     const table = el('table', 'mc-table');
     const thead = el('thead'), tr = el('tr');
-    [['nombre', 'Marco'], ['ingresado', 'Ingresado'], ['producido', 'Producido'], ['pendiente', 'Pendiente'], ['avance', 'Avance']].forEach(([k, label]) => {
+    [['nombre', 'Marco'], ['ingresado', 'Ingresado'], ['producido', 'Producido'], ['pendiente', 'Pendiente'], ['solo_armadas', 'Solo armadas'], ['sin_fabricar', 'Sin fabricar'], ['avance', 'Avance']].forEach(([k, label]) => {
       const th = el('th', null, label);
       if (state.orden === k) th.append(document.createTextNode(state.dir === 'asc' ? ' ▲' : ' ▼'));
       th.addEventListener('click', () => {
@@ -298,7 +336,7 @@
       });
       tr.append(th);
     });
-    tr.append(el('th', 'tramos-col', 'Tramos'));
+    tr.append(el('th', 'tramos-col', 'Tramos'), el('th', 'tramos-col', 'Excel'));
     thead.append(tr);
     const tbody = el('tbody');
     lista.forEach(f => {
@@ -306,11 +344,12 @@
       const c0 = el('td'); resaltar(c0, f.marco);
       const cAv = el('td'); cAv.append(el('div', 'small mb-1', fmtPct(f.avance)), barra(f));
       const cT = el('td', 'tramos-col'); const box = el('div', 'mc-tramos'); f.tramos.forEach(t => box.append(chip(t))); cT.append(box);
-      row.append(c0, el('td', null, fmt(f.ingresado)), el('td', null, fmt(f.producido)), el('td', f.pendiente > 0 ? 'text-warning' : null, fmt(f.pendiente)), cAv, cT);
+      const cD = el('td', 'tramos-col'); cD.append(descargas(f)); cD.firstElementChild.classList.remove('justify-content-center'); cD.firstElementChild.style.marginBottom = '0';
+      row.append(c0, el('td', null, fmt(f.ingresado)), el('td', null, fmt(f.producido)), el('td', f.pendiente > 0 ? 'text-warning' : null, fmt(f.pendiente)), el('td', null, fmt(f.solo_armadas)), el('td', null, fmt(f.sin_fabricar)), cAv, cT, cD);
       tbody.append(row);
     });
     const tfoot = el('tfoot'), fr = el('tr');
-    [`Total (${fmt(totales.marcos)})`, fmt(totales.ingresado), fmt(totales.producido), fmt(totales.pendiente), fmtPct(totales.avance), ''].forEach(v => fr.append(el('td', null, v)));
+    [`Total (${fmt(totales.marcos)})`, fmt(totales.ingresado), fmt(totales.producido), fmt(totales.pendiente), fmt(totales.solo_armadas), fmt(totales.sin_fabricar), fmtPct(totales.avance), '', ''].forEach(v => fr.append(el('td', null, v)));
     tfoot.append(fr);
     table.append(thead, tbody, tfoot);
     wrap.append(table);
@@ -349,6 +388,8 @@
     animarKpi('ingresado', t.ingresado, fmt);
     animarKpi('producido', t.producido, fmt);
     animarKpi('pendiente', t.pendiente, fmt);
+    animarKpi('solo_armadas', t.solo_armadas, fmt);
+    animarKpi('sin_fabricar', t.sin_fabricar, fmt);
     document.querySelector('[data-kpi="avance"]').textContent = fmtPct(t.avance);
     const bar = $('mcKpiBar');
     bar.classList.toggle('done', t.avance != null && t.avance >= 100);
@@ -357,7 +398,14 @@
 
   const filtrosActivos = () => state.q !== '' || state.estado !== 'todos' || state.exacto;
 
+  function actualizarEnlacesExcel() {
+    document.querySelectorAll('.mc-dl-global').forEach(a => { a.href = urlPiezas(a.dataset.estado); });
+    const ex = $('mcExport');
+    if (ex) ex.href = `${BASE_EXPORT_URL}?anio=${state.anio}`;
+  }
+
   function actualizar() {
+    actualizarEnlacesExcel();
     const { lista, conteos, totales } = calcular();
 
     if ($('mcBuscar').value !== state.q) $('mcBuscar').value = state.q;
@@ -442,8 +490,6 @@
       state.anio = anio;
       $('mcTitleYear').textContent = anio;
       document.title = document.title.replace(/\d{4}/, anio);
-      const ex = $('mcExport');
-      if (ex) ex.href = `${BASE_EXPORT_URL}?anio=${anio}`;
       pintarAviso();
       actualizar();
     } catch (err) {

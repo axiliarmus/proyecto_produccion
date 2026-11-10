@@ -4,9 +4,9 @@ import pandas as pd
 from flask import send_file
 
 
-def send_excel_file(data, sheet_name, download_name):
+def send_excel_file(data, sheet_name, download_name, columns=None):
     """Genera y retorna un archivo Excel a partir de una lista de diccionarios."""
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(data, columns=columns) if columns else pd.DataFrame(data)
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name=sheet_name)

@@ -529,60 +529,84 @@ def _primera_produccion(db, codigos):
     return primeras
 
 
-def build_marcos_anual(db, anio, start_utc, end_utc):
-    """Ingresado y producido por marco y tramo para las piezas ingresadas en el anio.
+def _cohorte_piezas(db, start_utc, end_utc):
+    """Piezas ingresadas en el rango: {codigo_canonico: datos} y cantidad sin fecha ubicable.
 
-    - Ingresado: piezas cuyo ingreso cae en el anio (created_at; si falta, la fecha de
-      creacion del documento o, en su defecto, el primer registro de produccion).
-    - Producido: de esas mismas piezas, las que tienen registro de remate (en cualquier fecha).
-      Asi el producido nunca supera al ingresado.
-
-    Los cortes mensuales copian las piezas activas a piezas_historicas, por lo que una misma
-    pieza puede estar repetida: se deduplica por codigo normalizado. El marco y el tramo se
-    toman siempre de la pieza.
+    Ingreso = created_at; si falta, la fecha de creacion del documento (piezas activas) o el
+    primer registro de produccion. Los cortes copian las piezas activas a piezas_historicas,
+    por eso se deduplica por codigo normalizado.
     """
     rango = {"$gte": start_utc, "$lte": end_utc}
     filtro = {"$or": [{"created_at": rango}, {"created_at": {"$exists": False}}]}
+    campos = {"codigo": 1, "marco": 1, "tramo": 1, "empresa": 1, "created_at": 1}
 
-    piezas = {}          # canon -> (marco, tramo)
-    sin_created_at = {}  # canon -> (marco, tramo, fecha_por_id | None)
+    piezas = {}
+    sin_created_at = {}
     vistos = set()
     for collection, es_activa in ((db.piezas, True), (db.piezas_historicas, False)):
-        for pieza in collection.find(filtro, {"codigo": 1, "marco": 1, "tramo": 1, "created_at": 1}):
+        for pieza in collection.find(filtro, campos):
             canon = _codigo_canonico(pieza.get("codigo"))
             if canon is None or canon in vistos:
                 continue
+            datos = {
+                "codigo": pieza.get("codigo"),
+                "marco": pieza.get("marco"),
+                "tramo": pieza.get("tramo"),
+                "empresa": pieza.get("empresa"),
+                "ingreso": _a_utc(pieza.get("created_at")),
+            }
             if pieza.get("created_at") is not None:
                 vistos.add(canon)
-                piezas[canon] = (pieza.get("marco"), pieza.get("tramo"))
+                piezas[canon] = datos
                 continue
             fecha_id = None
             if es_activa and pieza.get("_id") is not None and hasattr(pieza["_id"], "generation_time"):
                 fecha_id = _a_utc(pieza["_id"].generation_time)
+            datos["ingreso"] = fecha_id
             previo = sin_created_at.get(canon)
-            if previo is None or (previo[2] is None and fecha_id is not None):
-                sin_created_at[canon] = (pieza.get("marco"), pieza.get("tramo"), fecha_id)
+            if previo is None or (previo["ingreso"] is None and fecha_id is not None):
+                sin_created_at[canon] = datos
 
-    # Piezas sin created_at: ubicarlas por la fecha de su documento o su primera produccion.
     sin_fecha = 0
     if sin_created_at:
-        pendientes = [c for c, (_, _, f) in sin_created_at.items() if f is None]
+        pendientes = [c for c, d in sin_created_at.items() if d["ingreso"] is None]
         primeras = _primera_produccion(db, pendientes) if pendientes else {}
-        for canon, (marco, tramo, fecha_id) in sin_created_at.items():
+        for canon, datos in sin_created_at.items():
             if canon in piezas:
                 continue
-            fecha = fecha_id or primeras.get(canon)
+            fecha = datos["ingreso"] or primeras.get(canon)
             if fecha is None:
                 sin_fecha += 1
             elif start_utc <= fecha <= end_utc:
-                piezas[canon] = (marco, tramo)
+                datos["ingreso"] = fecha
+                piezas[canon] = datos
+    return piezas, sin_fecha
 
-    # Producido: piezas de esta cohorte con remate registrado.
-    rematadas = set()
-    codigos = list(piezas)
+
+def _estado_cohorte(db, codigos):
+    """(solo_armadas, rematadas): piezas con armado y sin remate, y piezas con remate (cualquier fecha)."""
+    solo_armadas, rematadas = set(), set()
     for chunk_start in range(0, len(codigos), 5000):
-        _, set_remate = get_piece_status_sets(db, codigos[chunk_start:chunk_start + 5000])
-        rematadas.update(c for c in codigos[chunk_start:chunk_start + 5000] if c in set_remate)
+        chunk = codigos[chunk_start:chunk_start + 5000]
+        set_armado, set_remate = get_piece_status_sets(db, chunk)
+        for canon in chunk:
+            if canon in set_remate:
+                rematadas.add(canon)
+            elif canon in set_armado:
+                solo_armadas.add(canon)
+    return solo_armadas, rematadas
+
+
+def build_marcos_anual(db, anio, start_utc, end_utc):
+    """Ingresado y producido por marco y tramo para las piezas ingresadas en el anio.
+
+    - Ingresado: piezas ingresadas en el anio.
+    - Producido: de esas piezas, las que tienen remate (en cualquier fecha); nunca supera al ingresado.
+    - Solo armadas: con armado y sin remate. Sin fabricar: sin armado ni remate.
+    El marco y el tramo se toman siempre de la pieza.
+    """
+    piezas, sin_fecha = _cohorte_piezas(db, start_utc, end_utc)
+    solo_armadas, rematadas = _estado_cohorte(db, list(piezas))
 
     grupos = {}
 
@@ -595,13 +619,16 @@ def build_marcos_anual(db, anio, start_utc, end_utc):
         nombre_marco = _nombre(marco, "Sin Marco")
         grupo["nombres"][nombre_marco] = grupo["nombres"].get(nombre_marco, 0) + 1
         tramo_nombre = _nombre(tramo, "Sin Tramo")
-        return grupo["tramos"].setdefault(tramo_nombre.upper(), {"nombre": tramo_nombre, "ingresado": 0, "producido": 0})
+        return grupo["tramos"].setdefault(
+            tramo_nombre.upper(), {"nombre": tramo_nombre, "ingresado": 0, "producido": 0, "solo_armadas": 0})
 
-    for canon, (marco, tramo) in piezas.items():
-        b = bucket(marco, tramo)
+    for canon, datos in piezas.items():
+        b = bucket(datos["marco"], datos["tramo"])
         b["ingresado"] += 1
         if canon in rematadas:
             b["producido"] += 1
+        elif canon in solo_armadas:
+            b["solo_armadas"] += 1
 
     def _orden_tramo(nombre):
         partes = re.split(r"(\d+)", nombre)
@@ -618,6 +645,8 @@ def build_marcos_anual(db, anio, start_utc, end_utc):
                 "ingresado": t["ingresado"],
                 "producido": t["producido"],
                 "pendiente": pendiente,
+                "solo_armadas": t["solo_armadas"],
+                "sin_fabricar": pendiente - t["solo_armadas"],
                 "completo": t["ingresado"] > 0 and pendiente <= 0,
             })
         ingresado = sum(t["ingresado"] for t in tramos)
@@ -628,6 +657,8 @@ def build_marcos_anual(db, anio, start_utc, end_utc):
             "ingresado": ingresado,
             "producido": producido,
             "pendiente": ingresado - producido,
+            "solo_armadas": sum(t["solo_armadas"] for t in tramos),
+            "sin_fabricar": sum(t["sin_fabricar"] for t in tramos),
             "avance": round(producido * 100.0 / ingresado, 1) if ingresado else None,
             "tramos": tramos,
             "tramos_faltantes": faltantes,
@@ -641,6 +672,105 @@ def build_marcos_anual(db, anio, start_utc, end_utc):
         "ingresado": total_ingresado,
         "producido": total_producido,
         "pendiente": total_ingresado - total_producido,
+        "solo_armadas": sum(f["solo_armadas"] for f in filas),
+        "sin_fabricar": sum(f["sin_fabricar"] for f in filas),
         "avance": round(total_producido * 100.0 / total_ingresado, 1) if total_ingresado else None,
     }
     return filas, totales, sin_fecha
+
+
+def _detalle_produccion(db, codigos, modo):
+    """{codigo_canonico: {"usuarios": [...], "fecha": datetime, "registros": n}} del modo indicado."""
+    detalle = {}
+    for chunk_start in range(0, len(codigos), 5000):
+        valores = build_codigo_query_values(codigos[chunk_start:chunk_start + 5000])
+        if not valores:
+            continue
+        pipeline = [
+            {"$match": {"codigo_pieza": {"$in": valores}, "modo": modo}},
+            {"$group": {
+                "_id": "$codigo_pieza",
+                "usuarios": {"$addToSet": "$usuario"},
+                "fecha": {"$max": "$fecha"},
+                "registros": {"$sum": 1},
+            }},
+        ]
+        for collection in (db.produccion, db.produccion_historica):
+            for row in collection.aggregate(pipeline):
+                canon = _codigo_canonico(row.get("_id"))
+                if canon is None:
+                    continue
+                actual = detalle.setdefault(canon, {"usuarios": set(), "fecha": None, "registros": 0})
+                actual["usuarios"].update(u for u in (row.get("usuarios") or []) if u)
+                actual["registros"] += int(row.get("registros") or 0)
+                fecha = _a_utc(row.get("fecha"))
+                if fecha and (actual["fecha"] is None or fecha > actual["fecha"]):
+                    actual["fecha"] = fecha
+    return detalle
+
+
+ESTADOS_PIEZAS_MARCOS = {
+    "armadas": "Armadas sin rematar",
+    "rematadas": "Rematadas",
+    "sin_fabricar": "Nunca fabricadas",
+}
+
+
+def listar_piezas_marcos_anual(db, start_utc, end_utc, estado, marco=None):
+    """Piezas ingresadas en el rango segun su estado: (columnas, filas) listas para Excel."""
+    if estado not in ESTADOS_PIEZAS_MARCOS:
+        raise ValueError("Estado de piezas no valido")
+
+    piezas, _ = _cohorte_piezas(db, start_utc, end_utc)
+    objetivo = _marco_key(marco) if marco else None
+    seleccion = {c: d for c, d in piezas.items() if objetivo is None or _marco_key(d["marco"]) == objetivo}
+
+    solo_armadas, rematadas = _estado_cohorte(db, list(seleccion))
+    if estado == "armadas":
+        codigos = [c for c in seleccion if c in solo_armadas]
+    elif estado == "rematadas":
+        codigos = [c for c in seleccion if c in rematadas]
+    else:
+        codigos = [c for c in seleccion if c not in solo_armadas and c not in rematadas]
+
+    def fmt(fecha):
+        return to_cl(fecha).strftime("%d-%m-%Y %H:%M") if fecha else ""
+
+    base = ["Código", "Cliente", "Marco", "Tramo", "Fecha de ingreso"]
+    if estado == "armadas":
+        columnas = base + ["Armado por", "Último armado", "Registros de armado"]
+        arm = _detalle_produccion(db, codigos, "armador")
+    elif estado == "rematadas":
+        columnas = base + ["Armado por", "Rematado por", "Fecha de remate"]
+        arm = _detalle_produccion(db, codigos, "armador")
+        rem = _detalle_produccion(db, codigos, "rematador")
+    else:
+        columnas = base
+
+    def clave(canon):
+        d = seleccion[canon]
+        return (_marco_key(d["marco"]), str(d["tramo"] or "").upper(),
+                [(0, int(t), "") if t.isdigit() else (1, 0, t.upper()) for t in re.split(r"(\d+)", str(d["codigo"] or "")) if t != ""])
+
+    filas = []
+    for canon in sorted(codigos, key=clave):
+        d = seleccion[canon]
+        fila = {
+            "Código": d["codigo"],
+            "Cliente": d["empresa"] or "",
+            "Marco": d["marco"] or "Sin Marco",
+            "Tramo": d["tramo"] or "Sin Tramo",
+            "Fecha de ingreso": fmt(d["ingreso"]),
+        }
+        if estado == "armadas":
+            info = arm.get(canon) or {}
+            fila["Armado por"] = ", ".join(sorted(info.get("usuarios") or []))
+            fila["Último armado"] = fmt(info.get("fecha"))
+            fila["Registros de armado"] = info.get("registros", 0)
+        elif estado == "rematadas":
+            info_a, info_r = arm.get(canon) or {}, rem.get(canon) or {}
+            fila["Armado por"] = ", ".join(sorted(info_a.get("usuarios") or []))
+            fila["Rematado por"] = ", ".join(sorted(info_r.get("usuarios") or []))
+            fila["Fecha de remate"] = fmt(info_r.get("fecha"))
+        filas.append(fila)
+    return columnas, filas

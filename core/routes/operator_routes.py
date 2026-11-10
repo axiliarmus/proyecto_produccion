@@ -619,7 +619,15 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                         })
                     filtro_real = {"$and": match_conds_real}
 
-                    real_producido = db.produccion.count_documents(filtro_real)
+                    unidad_plan = 1 if (modo != "armador" or modo_doc.get("unidad_armado") == 1) else 2
+                    contar_por_pieza = modo == "armador" and unidad_plan == 1
+                    if contar_por_pieza:
+                        # Una pieza armada cuenta 1, aunque tenga dos registros (armado solo)
+                        filtro_real = {"$and": match_conds_real + [{"armado_solo_extra": {"$ne": True}}]}
+                        piezas_armadas = {str(c) for c in db.produccion.distinct("codigo_pieza", filtro_real)}
+                        real_producido = len(piezas_armadas)
+                    else:
+                        real_producido = db.produccion.count_documents(filtro_real)
                     if es_historico and corte_id_historico:
                         corte_cond = [{"corte_id": corte_id_historico}]
                         if isinstance(corte_id_historico, ObjectId):
@@ -630,7 +638,12 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                             except Exception:
                                 pass
                         filtro_real_hist = {"$and": match_conds_real + [{"$or": corte_cond}]}
-                        real_producido += db.produccion_historica.count_documents(filtro_real_hist)
+                        if contar_por_pieza:
+                            filtro_real_hist["$and"].append({"armado_solo_extra": {"$ne": True}})
+                            piezas_armadas |= {str(c) for c in db.produccion_historica.distinct("codigo_pieza", filtro_real_hist)}
+                            real_producido = len(piezas_armadas)
+                        else:
+                            real_producido += db.produccion_historica.count_documents(filtro_real_hist)
 
                     if real_producido != producido:
                         producido = real_producido
@@ -648,7 +661,7 @@ def register_operator_routes(app, db, login_required, normalize_page, paginate_l
                         except Exception:
                             pass
 
-                    unidades_plan = 2 if (modo == "armador" and bool(session.get("armado_solo"))) else 1
+                    unidades_plan = 2 if (unidad_plan == 2 and modo == "armador" and bool(session.get("armado_solo"))) else 1
                     if producido + unidades_plan > objetivo:
                         if es_historico:
                             # Si es pieza que quedó en el corte anterior y el cupo está cubierto, permitir ingreso

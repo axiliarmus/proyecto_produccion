@@ -221,7 +221,7 @@
                 <div class="p-2 mb-2 bg-dark rounded border border-secondary small">
                   <div class="d-flex justify-content-between">
                     <span class="text-secondary">Total piezas:</span>
-                    <span class="fw-bold text-white">{{ marco_resumen.total if marco_resumen else 0 }} ({{ (marco_resumen.total * 2) if marco_resumen else 0 }} armados)</span>
+                    <span class="fw-bold text-white">{{ marco_resumen.total if marco_resumen else 0 }} {% if marco_resumen and marco_resumen.total_armados != marco_resumen.total %}({{ marco_resumen.total_armados }} armados){% endif %}</span>
                   </div>
                   <div class="d-flex justify-content-between">
                     <span class="text-info">Ya armadas:</span>

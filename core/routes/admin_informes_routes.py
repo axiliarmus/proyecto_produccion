@@ -4,7 +4,13 @@ from datetime import datetime, timedelta, timezone
 from flask import abort, jsonify, render_template, request, session
 
 from core.helpers.date_utils import CL, build_date_range_utc, now_cl
-from core.helpers.reporting import build_marcos_anual, get_marcos_anual_years, merge_status_maps
+from core.helpers.reporting import (
+    ESTADOS_PIEZAS_MARCOS,
+    build_marcos_anual,
+    get_marcos_anual_years,
+    listar_piezas_marcos_anual,
+    merge_status_maps,
+)
 
 
 def _get_ciclo_actual(db):
@@ -101,6 +107,24 @@ def register_admin_informes_routes(app, db, login_required, get_production_statu
             "Estado": "",
         })
         return send_excel_file(data, f"Marcos {anio}", f"informe_marcos_{anio}.xlsx")
+
+    @app.route("/admin/informes/marcos/anual/piezas", methods=["GET"])
+    @login_required(["administrador", "supervisor", "soporte", "cliente"])
+    def informe_marcos_anual_piezas_export():
+        """Excel de piezas del anio por estado: armadas sin rematar, rematadas o nunca fabricadas."""
+        if send_excel_file is None:
+            abort(404)
+        anio = _resolve_anio_marcos()
+        estado = (request.args.get("estado") or "").strip()
+        if estado not in ESTADOS_PIEZAS_MARCOS:
+            abort(400)
+        marco = " ".join((request.args.get("marco") or "").split()) or None
+        start_utc, end_utc = build_date_range_utc(f"{anio}-01-01", f"{anio}-12-31")
+        columnas, filas = listar_piezas_marcos_anual(db, start_utc, end_utc, estado, marco)
+
+        hoja = re.sub(r"[\[\]:*?/\\]", "", ESTADOS_PIEZAS_MARCOS[estado])[:31]
+        sufijo = re.sub(r"[^\w\-]+", "_", marco).strip("_")[:40] if marco else "todos_los_marcos"
+        return send_excel_file(filas, hoja, f"piezas_{estado}_{sufijo}_{anio}.xlsx", columns=columnas)
 
     @app.route("/admin/informes/resumen-produccion", methods=["GET"])
     @login_required(["administrador", "cliente", "soporte"])

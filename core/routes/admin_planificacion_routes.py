@@ -213,7 +213,26 @@ def _merge_status_maps(primary, secondary):
     return merged
 
 
-def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None, include_historica=False, corte_id=None):
+def _unidad_armado(plan_doc):
+    """Unidades de armado por pieza de una planificacion.
+
+    Las planificaciones nuevas cuentan 1 por pieza (`unidad_armado` = 1). Las anteriores, que no
+    guardan el dato, siguen contando 2 registros por pieza hasta que se vuelvan a guardar.
+    Sin planificacion se usa el criterio nuevo (1).
+    """
+    if not plan_doc:
+        return 1
+    valor = ((plan_doc.get("modos") or {}).get("armador") or {}).get("unidad_armado")
+    return 1 if valor == 1 else 2
+
+
+def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None, include_historica=False, corte_id=None,
+                                armado_por_pieza=False):
+    """Conteo de produccion por operador y tramo.
+
+    Con `armado_por_pieza` el armado cuenta piezas distintas: el registro extra del armado solo y la
+    segunda persona que arma la misma pieza no suman otra unidad al total del tramo.
+    """
     empresa = (empresa or "").strip()
     marco = (marco or "").strip()
     match_base = {}
@@ -230,22 +249,42 @@ def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None, inclu
             {"codigo_pieza": re.compile(r"^[^a-zA-Z]")}
         ]
 
+    por_pieza = bool(armado_por_pieza and modo == "armador")
+
     per_op_marco = {}
     per_tramo_op = {}
     total_per_tramo = {}
+    vistos_total = set()
+    vistos_op = set()
 
-    for doc in db.produccion.find(match_base, {"user_id": 1, "tramo": 1}):
+    def acumular(doc):
+        if por_pieza and doc.get("armado_solo_extra"):
+            return
         tramo_norm = str(doc.get("tramo") or "").strip()
-        total_per_tramo[tramo_norm] = total_per_tramo.get(tramo_norm, 0) + 1
+        codigo = str(doc.get("codigo_pieza") or "").strip()
+
+        if not por_pieza or (tramo_norm.lower(), codigo) not in vistos_total:
+            total_per_tramo[tramo_norm] = total_per_tramo.get(tramo_norm, 0) + 1
+            if por_pieza:
+                vistos_total.add((tramo_norm.lower(), codigo))
 
         raw_user = doc.get("user_id")
         if not raw_user:
-            continue
+            return
         user_key = ObjectId(raw_user) if ObjectId.is_valid(str(raw_user)) else raw_user
+        if por_pieza:
+            clave_op = (str(user_key), tramo_norm.lower(), codigo)
+            if clave_op in vistos_op:
+                return
+            vistos_op.add(clave_op)
 
         per_op_marco[user_key] = per_op_marco.get(user_key, 0) + 1
         per_tramo_op.setdefault(tramo_norm, {})
         per_tramo_op[tramo_norm][user_key] = per_tramo_op[tramo_norm].get(user_key, 0) + 1
+
+    campos = {"user_id": 1, "tramo": 1, "codigo_pieza": 1, "armado_solo_extra": 1}
+    for doc in db.produccion.find(match_base, campos):
+        acumular(doc)
 
     # Solo sumar registros históricos si se solicita explícitamente (ej: marcos de corte anterior pendientes)
     if include_historica:
@@ -261,18 +300,8 @@ def _get_marco_production_stats(db, empresa, marco, modo=None, ciclo=None, inclu
                     pass
             match_hist["$or"] = corte_cond
 
-        for doc in db.produccion_historica.find(match_hist, {"user_id": 1, "tramo": 1}):
-            tramo_norm = str(doc.get("tramo") or "").strip()
-            total_per_tramo[tramo_norm] = total_per_tramo.get(tramo_norm, 0) + 1
-
-            raw_user = doc.get("user_id")
-            if not raw_user:
-                continue
-            user_key = ObjectId(raw_user) if ObjectId.is_valid(str(raw_user)) else raw_user
-
-            per_op_marco[user_key] = per_op_marco.get(user_key, 0) + 1
-            per_tramo_op.setdefault(tramo_norm, {})
-            per_tramo_op[tramo_norm][user_key] = per_tramo_op[tramo_norm].get(user_key, 0) + 1
+        for doc in db.produccion_historica.find(match_hist, campos):
+            acumular(doc)
 
     return per_op_marco, per_tramo_op, total_per_tramo
 
@@ -316,7 +345,8 @@ def _sync_plan_producido(db, plan_doc):
         tramos_doc = modo_doc.get("tramos") or {}
         _, per_tramo_op, _ = _get_marco_production_stats(
             db, empresa, marco, modo=modo_key, ciclo=ciclo_plan,
-            include_historica=is_plan_corte_ant, corte_id=corte_id_plan
+            include_historica=is_plan_corte_ant, corte_id=corte_id_plan,
+            armado_por_pieza=(modo_key == "armador" and _unidad_armado(plan_doc) == 1),
         )
 
         for tramo_key, tramo_data in tramos_doc.items():
@@ -592,8 +622,10 @@ def _get_planificacion_grupos_completos(db, get_production_status_map, build_tar
         if not all_tramo_keys:
             continue
 
+        unidad_plan = _unidad_armado(plan_sync)
         _, _, arm_totals = _get_marco_production_stats(
-            db, empresa, marco, modo="armador", include_historica=True, corte_id=plan_sync.get("corte_id")
+            db, empresa, marco, modo="armador", include_historica=True, corte_id=plan_sync.get("corte_id"),
+            armado_por_pieza=(unidad_plan == 1),
         )
         _, _, rem_totals = _get_marco_production_stats(
             db, empresa, marco, modo="rematador", include_historica=True, corte_id=plan_sync.get("corte_id")
@@ -613,7 +645,7 @@ def _get_planificacion_grupos_completos(db, get_production_status_map, build_tar
                 if tot_piezas <= 0:
                     tot_piezas = db.piezas_historicas.count_documents(match_p)
             if tot_piezas <= 0:
-                tot_piezas = max(int(t_arm.get("total") or 0) // 2, int(t_rem.get("total") or 0), 1)
+                tot_piezas = max(int(t_arm.get("total") or 0) // unidad_plan, int(t_rem.get("total") or 0), 1)
 
             arm_reales = _get_tramo_count(arm_totals, tramo_k)
             rem_reales = _get_tramo_count(rem_totals, tramo_k)
@@ -622,9 +654,9 @@ def _get_planificacion_grupos_completos(db, get_production_status_map, build_tar
             tramos_list.append({
                 "tramo": tramo_k,
                 "total": tot_piezas,
-                "armadas": min(arm_reales // 2, tot_piezas),
+                "armadas": min(arm_reales // unidad_plan, tot_piezas),
                 "rematadas": min(rem_reales, tot_piezas),
-                "en_armado": max((arm_reales // 2) - rem_reales, 0),
+                "en_armado": max((arm_reales // unidad_plan) - rem_reales, 0),
                 "pendientes": faltan_rem,
             })
 
@@ -751,6 +783,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
         prod_arm_op_marco = {}
         prod_rem_op_marco = {}
         is_corte_anterior = False
+        unidad_armado = 1
         if selected_active:
             plan = db[COLLECTION_PLANIFICACIONES].find_one({"ciclo": ciclo, **_group_filter(selected)})
             if not plan:
@@ -779,10 +812,12 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                         is_corte_anterior = True
                         break
 
+            unidad_armado = _unidad_armado(plan)
             prod_arm_op_marco, _, prod_arm_total_per_tramo = _get_marco_production_stats(
                 db, selected["empresa"], selected["marco"], modo="armador",
                 ciclo=plan.get("ciclo") if plan else None, include_historica=is_corte_anterior,
-                corte_id=plan.get("corte_id") if plan else None
+                corte_id=plan.get("corte_id") if plan else None,
+                armado_por_pieza=(unidad_armado == 1),
             )
             prod_rem_op_marco, _, prod_rem_total_per_tramo = _get_marco_production_stats(
                 db, selected["empresa"], selected["marco"], modo="rematador",
@@ -801,8 +836,8 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                         total_piezas = int(t.get("total") or 0)
                         armadas_reales = _get_tramo_count(prod_arm_total_per_tramo, tramo_key)
                         rematadas_reales = _get_tramo_count(prod_rem_total_per_tramo, tramo_key)
-                        # En armado se requieren 2 armados por pieza
-                        total_armados_tramo = total_piezas * 2
+                        # Armados requeridos por pieza segun la planificacion (1 en las nuevas)
+                        total_armados_tramo = total_piezas * unidad_armado
                         faltan_arm = max(total_armados_tramo - armadas_reales, 0)
                         faltan_rem = max(total_piezas - rematadas_reales, 0)
                         tramos_info.append(
@@ -979,7 +1014,8 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
 
         _, prod_tramo_op, _ = _get_marco_production_stats(
             db, grupo["empresa"], grupo["marco"], modo=modo_key,
-            include_historica=is_corte_anterior_crear, corte_id=base.get("corte_id")
+            include_historica=is_corte_anterior_crear, corte_id=base.get("corte_id"),
+            armado_por_pieza=(modo_key == "armador"),
         )
 
         tramos_doc = {}
@@ -1022,8 +1058,8 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
             # Producción de los operadores seleccionados
             producido_selected = {uid: all_produced.get(uid, 0) for uid in selected_ids}
 
-            # En armado se requieren 2 armados por cada pieza
-            factor_modo = 2 if modo_key == "armador" else 1
+            # Una pieza cuenta como 1 en armado y en remate
+            factor_modo = 1
             total_tramo_meta = total_tramo * factor_modo
 
             # El remanente a repartir entre los seleccionados es la meta total menos lo que ya hicieron otros
@@ -1056,6 +1092,7 @@ def register_admin_planificacion_routes(app, db, login_required, get_production_
                 "$set": {
                     f"modos.{modo_key}.total": total_global,
                     f"modos.{modo_key}.tramos": tramos_doc,
+                    f"modos.{modo_key}.unidad_armado": 1,
                     "updated_at": now,
                 }
             },
